@@ -34,6 +34,16 @@ const OPEN_MARKETS_SIMILES = [
   'FETCH_OPEN_MARKETS',
   'SHOW_OPEN_MARKETS',
   'LIST_OPEN_MARKETS',
+  'MARKETS_NOT_CLOSED',
+  'UNCLOSED_MARKETS',
+  'ACTIVE_MARKETS',
+  'OPEN_AND_NOT_CLOSED',
+  'NOT_YET_CLOSED',
+  'STILL_OPEN',
+  'CURRENTLY_OPEN',
+  'MARKETS_OPEN',
+  'TRADABLE_MARKETS',
+  'LIVE_MARKETS',
 ];
 
 interface OpenMarketsParams {
@@ -48,8 +58,27 @@ export const getOpenMarkets: Action = {
   description:
     'Get the latest open Polymarket markets sorted by listing time - markets that are still active and available for trading',
 
-  validate: async (_runtime: IAgentRuntime, _message: Memory) => {
-    return true;
+  validate: async (runtime: IAgentRuntime, message: Memory) => {
+    const clobApiUrl = runtime.getSetting('CLOB_API_URL');
+
+    if (!clobApiUrl) {
+      logger.warn('[getOpenMarkets] CLOB_API_URL is required but not provided');
+      return false;
+    }
+
+    // Check if message requests open/active/tradeable markets
+    const messageText = message.content?.text?.toLowerCase() || '';
+    const isOpenMarketsRequest = messageText.includes('open') ||
+                                messageText.includes('active') ||
+                                messageText.includes('tradeable') ||
+                                messageText.includes('tradable') ||
+                                messageText.includes('available') ||
+                                messageText.includes('not closed') ||
+                                messageText.includes('live') ||
+                                messageText.includes('current');
+    
+    logger.info(`[getOpenMarkets] Validating message: "${messageText}", isOpenMarketsRequest: ${isOpenMarketsRequest}`);
+    return isOpenMarketsRequest;
   },
 
   handler: async (
@@ -88,6 +117,7 @@ export const getOpenMarkets: Action = {
       logger.info('[getOpenMarkets] Fetching open markets from API');
       const marketsResponse = await (clobClient as any).getMarkets('', {
         active: true, // Only active markets
+        closed: false, // Only non-closed markets
         limit: params.limit || 50, // Get more to sort and filter
       });
 
@@ -100,17 +130,30 @@ export const getOpenMarkets: Action = {
         );
       }
 
-      // Filter for truly open markets (active=true AND closed=false)
-      // Note: We don't filter by future end_date_iso since Polymarket markets can still be tradeable after end date
-      const openMarkets = allMarkets.filter(
-        (market) => market.active === true && market.closed === false
-      );
+      // Filter for truly open markets (active=true AND closed=false AND current/future end dates)
+      const currentDate = new Date();
+      const openMarkets = allMarkets.filter((market) => {
+        const isActiveAndOpen = market.active === true && market.closed === false;
+        
+        // Also check if market end date is in the future (or at least current year)
+        let isFutureOrCurrent = true;
+        if (market.end_date_iso) {
+          const endDate = new Date(market.end_date_iso);
+          // Only include markets ending in 2025 or later
+          isFutureOrCurrent = endDate.getFullYear() >= 2025;
+        }
+        
+        return isActiveAndOpen && isFutureOrCurrent;
+      });
 
       // Debug: Log filtering results
       const activeMarkets = allMarkets.filter((m) => m.active === true).length;
       const nonClosedMarkets = allMarkets.filter((m) => m.closed === false).length;
       const futureMarkets = allMarkets.filter(
         (m) => m.end_date_iso && new Date(m.end_date_iso) > new Date()
+      ).length;
+      const current2025Markets = allMarkets.filter(
+        (m) => m.end_date_iso && new Date(m.end_date_iso).getFullYear() >= 2025
       ).length;
 
       // Additional debug: Check overlap
@@ -123,7 +166,7 @@ export const getOpenMarkets: Action = {
       ).length;
 
       logger.info(
-        `[getOpenMarkets] Filter breakdown: total=${allMarkets.length}, active=${activeMarkets}, nonClosed=${nonClosedMarkets}, futureEndDate=${futureMarkets}, finalOpen=${openMarkets.length}`
+        `[getOpenMarkets] Filter breakdown: total=${allMarkets.length}, active=${activeMarkets}, nonClosed=${nonClosedMarkets}, futureEndDate=${futureMarkets}, 2025+Markets=${current2025Markets}, finalOpen=${openMarkets.length}`
       );
       logger.info(
         `[getOpenMarkets] Overlap analysis: activeAndNonClosed=${activeAndNonClosed}, activeButClosed=${activeOnly}, nonClosedButInactive=${nonClosedOnly}`

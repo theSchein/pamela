@@ -35,6 +35,8 @@ export const getSimplifiedMarketsAction: Action = {
     'SIMPLE_MARKET_DATA',
     'SHOW_SIMPLE_MARKETS',
     'LIST_SIMPLE_MARKETS',
+    'SIMPLIFIED_SCHEMA',
+    'REDUCED_DATA',
   ],
   description: 'Retrieve simplified prediction market data from Polymarket with reduced schema',
 

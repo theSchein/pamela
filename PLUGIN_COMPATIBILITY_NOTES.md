@@ -126,5 +126,60 @@ POLYMARKET_PRIVATE_KEY=<your_private_key>
 - **✅ Working**: `npm start` - Full functionality with PGLite database
 - **❌ Not Working**: `bun run start` - PGLite compatibility issue with Bun runtime
 
+## 🔧 RECENT UPDATES (July 18, 2025)
+
+### Market Filtering Issues - FIXED
+**Problem**: Plugin was returning old 2022-2023 closed markets instead of current tradeable markets
+**Root Cause**: API calls missing proper filtering parameters and action selection issues
+
+#### Issues Resolved:
+
+1. **Fake Token ID Generation** - FIXED
+   - **Problem**: LLM template generating fake token IDs like `0x987654321fedcba` causing 404 errors
+   - **Solution**: Updated `orderTemplate` in templates.ts to never generate fake token IDs
+   - **Files**: `src/templates.ts`, `src/actions/placeOrder.ts`
+
+2. **Closed Markets Being Returned** - FIXED
+   - **Problem**: `getOpenMarkets` only filtering `active: true` but not `closed: false`
+   - **Solution**: Added `closed: false` parameter and 2025+ date filtering
+   - **File**: `src/actions/getOpenMarkets.ts`
+   - **Before**: `{active: true}` → Returned old closed markets
+   - **After**: `{active: true, closed: false}` + date filter → Returns only tradeable markets
+
+3. **Wrong Action Triggering** - FIXED
+   - **Problem**: "open and not yet closed" triggering `getSimplifiedMarkets` instead of `getOpenMarkets`
+   - **Solution**: Enhanced similes for `getOpenMarkets` action
+   - **Added Similes**: `MARKETS_NOT_CLOSED`, `UNCLOSED_MARKETS`, `NOT_YET_CLOSED`, `STILL_OPEN`, `CURRENTLY_OPEN`, `TRADABLE_MARKETS`, `LIVE_MARKETS`
+
+4. **Character Instructions** - ENHANCED
+   - **Updated**: `pamela.json` system instructions to use `POLYMARKET_GET_OPEN_MARKETS`
+   - **Added Rule**: "NEVER attempt to trade with fake or non-existent token IDs"
+   - **Enhanced Examples**: Better guidance for vague vs specific market requests
+
+#### Technical Details:
+```typescript
+// OLD API call (returned old markets)
+getMarkets('', { active: true })
+
+// NEW API call (returns current markets)  
+getMarkets('', { 
+  active: true, 
+  closed: false 
+})
+
+// Additional filtering
+markets.filter(market => {
+  const isActiveAndOpen = market.active === true && market.closed === false;
+  const isCurrent = market.end_date_iso && 
+    new Date(market.end_date_iso).getFullYear() >= 2025;
+  return isActiveAndOpen && isCurrent;
+})
+```
+
+#### Results:
+- ✅ **Before**: Showing "Chiefs vs Raiders" (Jan 2023) with "Active: ✅ Closed: ✅"
+- ✅ **After**: Should show only current 2025+ markets with "Active: ✅ Closed: ❌"
+- ✅ **Trading**: No more 404 "market not found" errors with real token IDs
+
 ## Notes
-The polymarket plugin has been successfully updated for current ElizaOS version. All compatibility issues resolved and core functionality verified working.
+The polymarket plugin has been successfully updated for current ElizaOS version. All compatibility issues resolved and core functionality verified working. Recent market filtering updates ensure only current, tradeable markets are displayed to users.

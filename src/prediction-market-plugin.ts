@@ -9,6 +9,7 @@ import { getSpreadAction } from '../plugin-polymarket/src/actions/getSpread.ts';
 import { getMidpointPriceAction } from '../plugin-polymarket/src/actions/getMidpointPrice.ts';
 import { retrieveAllMarketsAction } from '../plugin-polymarket/src/actions/retrieveAllMarkets.ts';
 import { getSimplifiedMarketsAction } from '../plugin-polymarket/src/actions/getSimplifiedMarkets.ts';
+import { placeOrderAction } from '../plugin-polymarket/src/actions/placeOrder.ts';
 
 /**
  * Configuration schema for the prediction market trading agent
@@ -39,7 +40,7 @@ const configSchema = z.object({
     .string()
     .transform((val) => val === 'true')
     .optional()
-    .default('false'),
+    .default('true'),
   MAX_POSITION_SIZE: z
     .string()
     .transform((val) => parseFloat(val))
@@ -102,14 +103,15 @@ const predictionMarketPlugin: Plugin = {
     }
   },
   
-  // Core polymarket actions for prediction market analysis
+  // Core polymarket actions for prediction market analysis and trading
   actions: [
     getBestPriceAction,
     getMarketDetailsAction, 
     getSpreadAction,
     getMidpointPriceAction,
     retrieveAllMarketsAction,
-    getSimplifiedMarketsAction
+    getSimplifiedMarketsAction,
+    placeOrderAction
   ],
   
   // Providers, services, routes, events, and models to be added as we integrate

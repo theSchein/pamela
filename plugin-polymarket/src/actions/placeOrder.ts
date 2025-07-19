@@ -129,9 +129,27 @@ export const placeOrderAction: Action = {
       // Handle market name lookup
       if (tokenId === 'MARKET_NAME_LOOKUP' && llmResult?.marketName) {
         logger.info(`[placeOrderAction] Market name lookup requested: ${llmResult.marketName}`);
-        return createErrorResult(
-          `Market name lookup not yet implemented. Please provide a specific token ID. You requested: "${llmResult.marketName}"`
-        );
+        const errorContent: Content = {
+          text: `❌ **I need a specific token ID to execute trades**
+
+I understand you want to trade in "${llmResult.marketName}", but I need the exact token ID.
+
+**Please:**
+1. First ask me to "show open markets" to see available markets
+2. Pick a specific market and provide its token ID
+3. Then I can execute your trade
+
+**Example:**
+- "Show me open markets" 
+- "Buy $1 of YES in token 71321045679252212866628783233817119462965056889756850604436560611652617896321"`,
+          actions: ['POLYMARKET_GET_OPEN_MARKETS'],
+          data: { error: 'Market name lookup requires specific token ID', marketName: llmResult.marketName },
+        };
+
+        if (callback) {
+          await callback(errorContent);
+        }
+        return contentToActionResult(errorContent);
       }
 
       if (!tokenId || !side || price <= 0 || size <= 0) {

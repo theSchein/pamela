@@ -40,7 +40,14 @@ export const retrieveAllMarketsAction: Action = {
       return false;
     }
 
-    return true;
+    // Only validate if message specifically asks for "all markets" or "complete list"
+    const messageText = message.content?.text?.toLowerCase() || '';
+    const isAllMarketsRequest = messageText.includes('all markets') || 
+                               messageText.includes('complete list') ||
+                               messageText.includes('every market') ||
+                               messageText.includes('full list');
+    
+    return isAllMarketsRequest;
   },
 
   handler: async (
@@ -104,15 +111,37 @@ export const retrieveAllMarketsAction: Action = {
       // Initialize CLOB client
       const clobClient = await initializeClobClient(runtime);
 
-      // Fetch markets with optional pagination and filters
-      const response = await clobClient.getMarkets(filterParams?.next_cursor || '');
+      // Fetch markets with proper filtering for current markets
+      const response = await (clobClient as any).getMarkets(filterParams?.next_cursor || '', {
+        active: true, // Only active markets
+        closed: false, // Only non-closed markets
+        limit: filterParams?.limit || 50, // Default limit
+      });
 
       if (!response || !response.data) {
         return createErrorResult('Invalid response from CLOB API');
       }
 
-      const markets: Market[] = response.data;
+      const allMarkets: Market[] = response.data;
+      
+      // Filter for current markets (2025+) to avoid showing old closed markets
+      const currentDate = new Date();
+      const markets = allMarkets.filter((market) => {
+        const isActiveAndOpen = market.active === true && market.closed === false;
+        
+        // Also check if market end date is in the future (or at least current year)
+        let isFutureOrCurrent = true;
+        if (market.end_date_iso) {
+          const endDate = new Date(market.end_date_iso);
+          // Only include markets ending in 2025 or later
+          isFutureOrCurrent = endDate.getFullYear() >= 2025;
+        }
+        
+        return isActiveAndOpen && isFutureOrCurrent;
+      });
+      
       const marketCount = markets.length;
+      logger.info(`[retrieveAllMarkets] Filtered from ${allMarkets.length} to ${marketCount} current markets`);
 
       // Format response text
       let responseText = `📊 **Retrieved ${marketCount} Polymarket prediction markets**\n\n`;

@@ -3,6 +3,13 @@ import starterPlugin from './plugin.ts';
 import predictionMarketPlugin from './prediction-market-plugin.ts';
 import { character } from './character.ts';
 
+// Import ElizaOS plugins for enhanced capabilities
+// TODO: Fix plugin version compatibility issues
+// import webSearchPlugin from '@elizaos/plugin-web-search';
+// import newsPlugin from '@elizaos/plugin-news';
+// import twitterPlugin from '@elizaos/plugin-twitter';
+// import { browserPlugin } from '@elizaos/plugin-browser';
+
 const initCharacter = ({ runtime }: { runtime: IAgentRuntime }) => {
   logger.info('Initializing character');
   logger.info('Name: ', character.name);
@@ -11,7 +18,21 @@ const initCharacter = ({ runtime }: { runtime: IAgentRuntime }) => {
 export const projectAgent: ProjectAgent = {
   character,
   init: async (runtime: IAgentRuntime) => await initCharacter({ runtime }),
-  plugins: [predictionMarketPlugin], // Use the prediction market plugin
+  plugins: [
+    // Core prediction market trading
+    predictionMarketPlugin,
+    
+    // TODO: Re-enable after fixing plugin compatibility issues
+    // Web search and news for market research
+    // webSearchPlugin,
+    // newsPlugin,
+    
+    // Social media monitoring for market sentiment
+    // twitterPlugin,
+    
+    // Web scraping for additional market data
+    // browserPlugin,
+  ],
 };
 const project: Project = {
   agents: [projectAgent],

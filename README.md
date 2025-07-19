@@ -1,47 +1,62 @@
-# Pamela - Prediction Market Trading Agent
+# Pamela - Autonomous Prediction Market Trading Agent
 
-A specialized ElizaOS agent for prediction market trading and analysis, with a focus on Polymarket integration.
+An AI-powered prediction market trading agent built on ElizaOS that can autonomously execute trades on Polymarket with her own Polygon wallet.
 
-## Overview
+## 🚀 Features
 
-Pamela is a prediction market trading agent built on the ElizaOS framework. She specializes in:
-- Analyzing prediction markets and forecasting
-- Providing insights on market trends and probability assessments
-- Risk management and trading strategies
-- Real-time market data analysis
+- **Autonomous Trading**: Executes buy, sell, and redemption orders on Polymarket
+- **Market Analysis**: Retrieves and analyzes prediction market data in real-time
+- **Risk Management**: Implements position sizing and risk controls
+- **CLOB Integration**: Direct connection to Polymarket's Central Limit Order Book
+- **Natural Language Trading**: Accepts trading commands in plain English
+- **Portfolio Management**: Tracks positions and performance
+- **Real-time Data**: WebSocket connections for live market updates
 
-## Features
+## 📊 Available Actions
 
-- **Polymarket Integration**: Connect to Polymarket prediction markets
-- **Market Analysis**: Analyze market trends, pricing, and probability assessments
-- **Risk Management**: Built-in trading limits and confidence thresholds
-- **Real-time Data**: Access to live market data and price feeds
-- **Security**: Secure API key management and private key handling
+### Market Data
+- `retrieveAllMarkets` - Get all available prediction markets
+- `getMarketDetails` - Detailed information about specific markets  
+- `getBestPrice` - Best available prices for market tokens
+- `getSpread` - Price spread calculations
+- `getMidpointPrice` - Midpoint price calculations
+- `getSimplifiedMarkets` - Simplified market data view
 
-## Configuration
+### Trading
+- `placeOrder` - Execute buy/sell orders on Polymarket
+  - Supports limit orders (GTC, GTD, FAK)
+  - Supports market orders (FOK)
+  - Natural language parameter extraction
 
-1. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
+## 🔧 Configuration
 
-2. Configure your environment variables:
-   ```env
-   # Polymarket API Configuration
-   POLYMARKET_API_KEY=your_api_key_here
-   POLYMARKET_PASSPHRASE=your_passphrase_here
-   POLYMARKET_SECRET=your_secret_here
-   POLYMARKET_PRIVATE_KEY=your_private_key_here
+### Environment Variables
 
-   # Trading Configuration
-   TRADING_ENABLED=false
-   MAX_POSITION_SIZE=100
-   MIN_CONFIDENCE_THRESHOLD=0.7
+```env
+# Polymarket Configuration
+POLYMARKET_PRIVATE_KEY=your_polygon_private_key
+CLOB_API_URL=https://clob.polymarket.com/
 
-   # ElizaOS Configuration
-   OPENAI_API_KEY=your_openai_api_key
-   ANTHROPIC_API_KEY=your_anthropic_api_key
-   ```
+# Trading Configuration  
+TRADING_ENABLED=true
+MAX_POSITION_SIZE=100
+MIN_CONFIDENCE_THRESHOLD=0.7
+
+# ElizaOS Configuration
+OPENAI_API_KEY=your_openai_api_key
+PGLITE_DATA_DIR=./.eliza/.elizadb
+
+# Future: Web Search & News (Coming Soon)
+TAVILY_API_KEY=your_tavily_api_key
+NEWS_API_KEY=your_news_api_key
+```
+
+### Required Setup
+
+1. **Polygon Wallet**: Create a new Polygon wallet for the agent
+2. **Fund Wallet**: Add USDC to the wallet for trading
+3. **API Keys**: Set up OpenAI API key for language model
+4. **Polymarket Access**: Ensure wallet can access Polymarket
 
 ## Getting Started
 

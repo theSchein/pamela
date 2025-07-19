@@ -110,14 +110,17 @@ Based on the conversation, identify:
 
 **Token ID Extraction Rules:**
 1. Look for explicit token IDs (long numeric strings like "71321045679252212594626385532706912750332728571942532289631379312455583992563")
-2. Look for market names like "Nuggets NBA Champion", "Chiefs vs Raiders", "Ant-Man movie"
+2. Look for market names like "Nuggets NBA Champion", "Chiefs vs Raiders", "Nobel Peace Prize"
 3. If only market name is provided, set tokenId to "MARKET_NAME_LOOKUP" and include the market name in the response
-4. Accept shorter token IDs (like "123456") for testing purposes
+4. NEVER generate fake or example token IDs - only use real ones from the conversation
+5. If no valid token ID is found, return an error
 
 **Examples:**
-- "Buy 5 shares at $0.75 for the Nuggets NBA Champion market" → tokenId: "MARKET_NAME_LOOKUP", marketName: "Nuggets NBA Champion"
+- "Buy 5 shares at $0.75 for the Nobel Peace Prize market" → tokenId: "MARKET_NAME_LOOKUP", marketName: "Nobel Peace Prize market"
 - "Place buy order for token 71321045679252212594626385532706912750332728571942532289631379312455583992563" → tokenId: "71321045679252212594626385532706912750332728571942532289631379312455583992563"
 - "Buy tokens at 50 cents for Chiefs vs Raiders" → tokenId: "MARKET_NAME_LOOKUP", marketName: "Chiefs vs Raiders"
+
+**IMPORTANT**: NEVER generate fake token IDs like "0x987654321fedcba" or "123456789". Only extract real token IDs from the user's message or set to "MARKET_NAME_LOOKUP" for market name searches.
 
 Respond with a JSON object containing the extracted values:
 {
