@@ -4,7 +4,7 @@
  */
 
 import { type IAgentRuntime, logger, Service } from '@elizaos/core';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { initializeClobClient, type ClobClient } from '../utils/clobClient';
 import { 
   polymarketMarketsTable,
@@ -28,7 +28,7 @@ export class MarketSyncService extends Service {
   private clobClient: ClobClient | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
   private readonly SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
-  private readonly MAX_PAGES = 10; // Maximum pages to fetch (safety limit for testing - increase for production)
+  private readonly MAX_PAGES = 2; // Maximum pages to fetch (testing - increase to 50+ for production)
   private readonly PAGE_SIZE = 100; // Markets per page
   private isRunning = false;
 
@@ -292,18 +292,39 @@ export class MarketSyncService extends Service {
           fpmm: market.fpmm || null,
         };
 
-        // Insert or update market
-        await tx
-          .insert(polymarketMarketsTable)
-          .values(marketData)
-          .onConflictDoUpdate({
-            target: polymarketMarketsTable.conditionId,
-            set: {
-              ...marketData,
-              lastSyncedAt: new Date(),
-              updatedAt: new Date(),
-            },
-          });
+        // Use raw SQL to bypass Drizzle default value issues
+        await tx.execute(sql`
+          INSERT INTO polymarket_markets (
+            condition_id, question_id, market_slug, question, category,
+            end_date_iso, game_start_time, active, closed,
+            minimum_order_size, minimum_tick_size, min_incentive_size,
+            max_incentive_spread, seconds_delay, icon, fpmm
+          ) VALUES (
+            ${marketData.conditionId}, ${marketData.questionId}, ${marketData.marketSlug},
+            ${marketData.question}, ${marketData.category}, ${marketData.endDateIso ? marketData.endDateIso.toISOString() : null},
+            ${marketData.gameStartTime ? marketData.gameStartTime.toISOString() : null}, ${marketData.active}, ${marketData.closed},
+            ${marketData.minimumOrderSize}, ${marketData.minimumTickSize}, ${marketData.minIncentiveSize},
+            ${marketData.maxIncentiveSpread}, ${marketData.secondsDelay}, ${marketData.icon}, ${marketData.fpmm}
+          )
+          ON CONFLICT (condition_id) DO UPDATE SET
+            question_id = EXCLUDED.question_id,
+            market_slug = EXCLUDED.market_slug,
+            question = EXCLUDED.question,
+            category = EXCLUDED.category,
+            end_date_iso = EXCLUDED.end_date_iso,
+            game_start_time = EXCLUDED.game_start_time,
+            active = EXCLUDED.active,
+            closed = EXCLUDED.closed,
+            minimum_order_size = EXCLUDED.minimum_order_size,
+            minimum_tick_size = EXCLUDED.minimum_tick_size,
+            min_incentive_size = EXCLUDED.min_incentive_size,
+            max_incentive_spread = EXCLUDED.max_incentive_spread,
+            seconds_delay = EXCLUDED.seconds_delay,
+            icon = EXCLUDED.icon,
+            fpmm = EXCLUDED.fpmm,
+            last_synced_at = NOW(),
+            updated_at = NOW()
+        `);
 
         // Sync tokens
         if (market.tokens && Array.isArray(market.tokens)) {
@@ -314,16 +335,14 @@ export class MarketSyncService extends Service {
               outcome: token.outcome,
             };
 
-            await tx
-              .insert(polymarketTokensTable)
-              .values(tokenData)
-              .onConflictDoUpdate({
-                target: polymarketTokensTable.tokenId,
-                set: {
-                  ...tokenData,
-                  updatedAt: new Date(),
-                },
-              });
+            await tx.execute(sql`
+              INSERT INTO polymarket_tokens (token_id, condition_id, outcome)
+              VALUES (${tokenData.tokenId}, ${tokenData.conditionId}, ${tokenData.outcome})
+              ON CONFLICT (token_id) DO UPDATE SET
+                condition_id = EXCLUDED.condition_id,
+                outcome = EXCLUDED.outcome,
+                updated_at = NOW()
+            `);
           }
         }
 
@@ -339,16 +358,24 @@ export class MarketSyncService extends Service {
             rewardEpoch: market.rewards.reward_epoch || null,
           };
 
-          await tx
-            .insert(polymarketRewardsTable)
-            .values(rewardData)
-            .onConflictDoUpdate({
-              target: polymarketRewardsTable.conditionId,
-              set: {
-                ...rewardData,
-                updatedAt: new Date(),
-              },
-            });
+          await tx.execute(sql`
+            INSERT INTO polymarket_rewards (
+              condition_id, min_size, max_spread, event_start_date,
+              event_end_date, in_game_multiplier, reward_epoch
+            ) VALUES (
+              ${rewardData.conditionId}, ${rewardData.minSize}, ${rewardData.maxSpread},
+              ${rewardData.eventStartDate}, ${rewardData.eventEndDate},
+              ${rewardData.inGameMultiplier}, ${rewardData.rewardEpoch}
+            )
+            ON CONFLICT (condition_id) DO UPDATE SET
+              min_size = EXCLUDED.min_size,
+              max_spread = EXCLUDED.max_spread,
+              event_start_date = EXCLUDED.event_start_date,
+              event_end_date = EXCLUDED.event_end_date,
+              in_game_multiplier = EXCLUDED.in_game_multiplier,
+              reward_epoch = EXCLUDED.reward_epoch,
+              updated_at = NOW()
+          `);
         }
       });
 
