@@ -129,11 +129,39 @@ export class MarketDetailService extends Service {
   async searchMarkets(searchTerm: string, limit: number = 10): Promise<PolymarketMarket[]> {
     const db = (this.runtime as any).db;
     if (!db) {
-      throw new Error('Database not available');
+      logger.warn('Database not available, returning empty results');
+      return [];
     }
 
     try {
-      const searchPattern = `%${searchTerm.toLowerCase()}%`;
+      // Ensure we have a valid search term and it's not too long
+      if (!searchTerm || searchTerm.trim().length === 0) {
+        logger.warn('Empty search term provided');
+        return [];
+      }
+
+      const cleanSearchTerm = searchTerm.trim().toLowerCase();
+      if (cleanSearchTerm.length > 100) {
+        logger.warn(`Search term too long (${cleanSearchTerm.length} chars), truncating`);
+        const truncatedTerm = cleanSearchTerm.substring(0, 50);
+        return this.searchMarkets(truncatedTerm, limit);
+      }
+
+      const searchPattern = `%${cleanSearchTerm}%`;
+      
+      // First try to check if table exists by doing a simple count
+      try {
+        const testQuery = await db
+          .select()
+          .from(polymarketMarketsTable)
+          .where(eq(polymarketMarketsTable.active, true))
+          .limit(1);
+        
+        logger.info(`Database connection test passed, found ${testQuery.length} active markets in sample`);
+      } catch (testError) {
+        logger.error('Database table access failed:', testError);
+        return [];
+      }
       
       const markets = await db
         .select()
@@ -156,7 +184,8 @@ export class MarketDetailService extends Service {
 
     } catch (error) {
       logger.error(`Failed to search markets for term "${searchTerm}":`, error);
-      throw error;
+      // Instead of throwing, return empty array for graceful degradation
+      return [];
     }
   }
 

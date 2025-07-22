@@ -119,15 +119,20 @@ export const getMarketDetailBySearchAction: Action = {
 
       const messageText = message.content?.text || '';
       
-      // Extract search query from the message
-      let searchQuery = messageText;
+      // Extract search query from the message using better keyword extraction
+      let searchQuery = messageText.toLowerCase();
       
       // Remove common prefixes to extract the actual search term
       const prefixes = [
+        'tell me about a prediction market about',
+        'tell me about prediction markets about',
+        'tell me about a market about',
         'what markets are there about',
         'show me markets about',
         'find markets about',
         'search for markets about',
+        'prediction market about',
+        'markets about',
         'search markets',
         'find market',
         'look up market',
@@ -137,14 +142,32 @@ export const getMarketDetailBySearchAction: Action = {
       ];
       
       for (const prefix of prefixes) {
-        if (searchQuery.toLowerCase().includes(prefix)) {
-          searchQuery = searchQuery.toLowerCase().replace(prefix, '').trim();
+        if (searchQuery.includes(prefix)) {
+          searchQuery = searchQuery.replace(prefix, '').trim();
           break;
         }
       }
 
-      // Remove question marks and clean up
-      searchQuery = searchQuery.replace(/[?]/g, '').trim();
+      // Remove question marks and common words, then extract key terms
+      searchQuery = searchQuery
+        .replace(/[?]/g, '')
+        .replace(/\b(a|an|the|about|for|on|in|at|to|of|with)\b/g, '')
+        .trim();
+
+      // If it's still a long phrase, try to extract key terms (names, nouns)
+      if (searchQuery.split(' ').length > 3) {
+        // Look for capitalized names or important keywords
+        const words = searchQuery.split(' ');
+        const keyWords = words.filter(word => 
+          word.length > 2 && (
+            /^[A-Z]/.test(word) || // Capitalized words (names)
+            ['trump', 'biden', 'election', 'crypto', 'bitcoin', 'ethereum', 'ai', 'climate', 'sports'].includes(word.toLowerCase())
+          )
+        );
+        if (keyWords.length > 0) {
+          searchQuery = keyWords.join(' ');
+        }
+      }
 
       if (!searchQuery) {
         const errorMsg = 'Please provide a search term. For example: "Find markets about AI" or "Show me election markets"';
@@ -160,10 +183,23 @@ export const getMarketDetailBySearchAction: Action = {
       elizaLogger.info(`Searching for markets with query: "${searchQuery}"`);
       
       // Search for markets
-      const markets = await marketDetailService.searchMarkets(searchQuery, 5);
+      let markets = await marketDetailService.searchMarkets(searchQuery, 5);
+      
+      // If database search failed or returned no results, try popular markets as fallback
+      if (markets.length === 0) {
+        elizaLogger.warn(`No database results for "${searchQuery}", trying fallback to popular markets`);
+        try {
+          markets = await marketDetailService.getPopularMarkets(undefined, 3);
+          if (markets.length > 0) {
+            elizaLogger.info(`Fallback successful: showing ${markets.length} popular markets instead`);
+          }
+        } catch (fallbackError) {
+          elizaLogger.error('Fallback to popular markets also failed:', fallbackError);
+        }
+      }
       
       if (markets.length === 0) {
-        const noResultsMsg = `No active markets found matching "${searchQuery}". Try a different search term.`;
+        const noResultsMsg = `No active markets found matching "${searchQuery}". This might be because:\n• The database is not yet populated with market data\n• No markets match your search terms\n• There's a temporary database connection issue\n\nTry running the market sync first or try a different search term.`;
         if (callback) {
           callback({
             text: noResultsMsg,
