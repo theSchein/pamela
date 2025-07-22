@@ -1,4 +1,5 @@
 import { logger, type IAgentRuntime, type Project, type ProjectAgent } from '@elizaos/core';
+import bootstrapPlugin from '@elizaos/plugin-bootstrap';
 import starterPlugin from './plugin.ts';
 import predictionMarketPlugin from './prediction-market-plugin.ts';
 import { character } from './character.ts';
@@ -19,6 +20,12 @@ export const projectAgent: ProjectAgent = {
   character,
   init: async (runtime: IAgentRuntime) => await initCharacter({ runtime }),
   plugins: [
+    // Bootstrap plugin for proper message handling (REQUIRED)
+    bootstrapPlugin,
+    
+    // Basic conversational capabilities
+    starterPlugin,
+    
     // Core prediction market trading
     predictionMarketPlugin,
     

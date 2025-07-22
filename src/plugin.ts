@@ -13,6 +13,7 @@ import {
   Service,
   type State,
   logger,
+  composePromptFromState,
 } from '@elizaos/core';
 import { z } from 'zod';
 
@@ -50,61 +51,104 @@ const configSchema = z.object({
  * @property {Function} handler - The function that handles the action
  * @property {Object[]} examples - Array of examples for the action
  */
-const helloWorldAction: Action = {
-  name: 'HELLO_WORLD',
-  similes: ['GREET', 'SAY_HELLO'],
-  description: 'Responds with a simple hello world message',
+const conversationAction: Action = {
+  name: 'CONVERSATION',
+  similes: [
+    'CHAT',
+    'TALK', 
+    'DISCUSS',
+    'ASK',
+    'QUESTION',
+    'HELP',
+    'EXPLAIN',
+    'GENERAL'
+  ],
+  description: 'Handle general conversation, questions, and requests about prediction markets and trading',
 
-  validate: async (_runtime: IAgentRuntime, _message: Memory, _state: State): Promise<boolean> => {
-    // Always valid
+  validate: async (_runtime: IAgentRuntime, message: Memory, _state: State): Promise<boolean> => {
+    logger.info('=== CONVERSATION ACTION VALIDATE CALLED ===');
+    logger.info('Message content:', message.content.text);
+    logger.info('Message source:', message.content.source);
+    // This is a general fallback action, always valid
+    logger.info('Validation result: true');
     return true;
   },
 
   handler: async (
-    _runtime: IAgentRuntime,
+    runtime: IAgentRuntime,
     message: Memory,
-    _state: State,
+    state: State,
     _options: any,
     callback: HandlerCallback,
     _responses: Memory[]
   ): Promise<ActionResult> => {
     try {
-      logger.info('Handling HELLO_WORLD action');
+      logger.info('=== CONVERSATION ACTION HANDLER STARTED ===');
+      logger.info('Message content:', message.content.text);
+      logger.info('Message ID:', message.id);
+      logger.info('Runtime character name:', runtime.character?.name);
 
-      // Simple response content
+      // Generate a response using the LLM
+      logger.info('Composing state...');
+      const composedState = await runtime.composeState(message, ['RECENT_MESSAGES']);
+      logger.info('Composed state text length:', composedState.text?.length || 0);
+
+      logger.info('Calling useModel...');
+      const responseText = await runtime.useModel(ModelType.TEXT_LARGE, {
+        prompt: `${composedState.text}
+
+Respond naturally as Pamela, a prediction market trading agent. If the user is asking about prediction markets, trading, or Polymarket, provide helpful information. For general questions, respond conversationally and offer to help with prediction market topics.
+
+User message: ${message.content.text}
+
+Response:`,
+        stopSequences: []
+      });
+      logger.info('Generated response text:', responseText);
+
       const responseContent: Content = {
-        text: 'hello world!',
-        actions: ['HELLO_WORLD'],
+        text: responseText,
+        actions: ['CONVERSATION'],
         source: message.content.source,
       };
 
-      // Call back with the hello world message
+      logger.info('Calling callback with response content...');
       await callback(responseContent);
+      logger.info('Callback completed successfully');
 
       return {
-        text: 'Sent hello world greeting',
+        text: 'Responded to conversation',
         values: {
           success: true,
-          greeted: true,
+          responded: true,
         },
         data: {
-          actionName: 'HELLO_WORLD',
+          actionName: 'CONVERSATION',
           messageId: message.id,
           timestamp: Date.now(),
         },
         success: true,
       };
     } catch (error) {
-      logger.error('Error in HELLO_WORLD action:', error);
+      logger.error('Error in CONVERSATION action:', error);
+
+      // Fallback response if LLM fails
+      const fallbackContent: Content = {
+        text: "I'm Pamela, your prediction market trading assistant! I can help you with Polymarket analysis, trading strategies, and market insights. What would you like to know?",
+        actions: ['CONVERSATION'],
+        source: message.content.source,
+      };
+
+      await callback(fallbackContent);
 
       return {
-        text: 'Failed to send hello world greeting',
+        text: 'Responded with fallback message',
         values: {
           success: false,
-          error: 'GREETING_FAILED',
+          error: 'LLM_FAILED',
         },
         data: {
-          actionName: 'HELLO_WORLD',
+          actionName: 'CONVERSATION',
           error: error instanceof Error ? error.message : String(error),
         },
         success: false,
@@ -118,14 +162,29 @@ const helloWorldAction: Action = {
       {
         name: '{{name1}}',
         content: {
-          text: 'Can you say hello?',
+          text: 'show me active prediction markets',
         },
       },
       {
-        name: '{{name2}}',
+        name: 'Pamela',
         content: {
-          text: 'hello world!',
-          actions: ['HELLO_WORLD'],
+          text: 'I can help you find active prediction markets! Let me fetch the current markets for you.',
+          actions: ['CONVERSATION'],
+        },
+      },
+    ],
+    [
+      {
+        name: '{{name1}}',
+        content: {
+          text: 'hello',
+        },
+      },
+      {
+        name: 'Pamela',
+        content: {
+          text: 'Hello! I\'m Pamela, your prediction market trading assistant. I can help you analyze markets, find trading opportunities, and execute trades on Polymarket. What can I help you with?',
+          actions: ['CONVERSATION'],
         },
       },
     ],
@@ -186,8 +245,8 @@ export class StarterService extends Service {
 const plugin: Plugin = {
   name: 'starter',
   description: 'A starter plugin for Eliza',
-  // Set lowest priority so real models take precedence
-  priority: -1000,
+  // Higher priority to ensure conversation action runs
+  priority: 200,
   config: {
     EXAMPLE_PLUGIN_VARIABLE: process.env.EXAMPLE_PLUGIN_VARIABLE,
   },
@@ -209,27 +268,8 @@ const plugin: Plugin = {
       throw error;
     }
   },
-  models: {
-    [ModelType.TEXT_SMALL]: async (
-      _runtime,
-      { prompt, stopSequences = [] }: GenerateTextParams
-    ) => {
-      return 'Never gonna give you up, never gonna let you down, never gonna run around and desert you...';
-    },
-    [ModelType.TEXT_LARGE]: async (
-      _runtime,
-      {
-        prompt,
-        stopSequences = [],
-        maxTokens = 8192,
-        temperature = 0.7,
-        frequencyPenalty = 0.7,
-        presencePenalty = 0.7,
-      }: GenerateTextParams
-    ) => {
-      return 'Never gonna make you cry, never gonna say goodbye, never gonna tell a lie and hurt you...';
-    },
-  },
+  // Removed test models to allow proper LLM providers to work
+  models: {},
   routes: [
     {
       name: 'helloworld',
@@ -244,13 +284,7 @@ const plugin: Plugin = {
     },
   ],
   events: {
-    MESSAGE_RECEIVED: [
-      async (params) => {
-        logger.info('MESSAGE_RECEIVED event received');
-        // print the keys
-        logger.info(Object.keys(params));
-      },
-    ],
+    // Removed MESSAGE_RECEIVED handler - let bootstrap plugin handle it
     VOICE_MESSAGE_RECEIVED: [
       async (params) => {
         logger.info('VOICE_MESSAGE_RECEIVED event received');
@@ -274,7 +308,7 @@ const plugin: Plugin = {
     ],
   },
   services: [StarterService],
-  actions: [helloWorldAction],
+  actions: [conversationAction],
   providers: [helloWorldProvider],
 };
 
