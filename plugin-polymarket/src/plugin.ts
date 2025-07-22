@@ -38,6 +38,8 @@ import { getTradeHistoryAction } from './actions/getTradeHistory';
 import { handleAuthenticationAction } from './actions/handleAuthentication';
 import { setupWebsocketAction } from './actions/setupWebsocket';
 import { handleRealtimeUpdatesAction } from './actions/handleRealtimeUpdates';
+import { polymarketSchema } from './schema';
+import { MarketSyncService } from './services/MarketSyncService';
 
 /**
  * Define the configuration schema for the Polymarket plugin
@@ -173,6 +175,7 @@ const polymarketProvider: Provider = {
 const plugin: Plugin = {
   name: 'polymarket',
   description: 'A plugin for interacting with Polymarket prediction markets',
+  schema: polymarketSchema,
   config: {
     CLOB_API_URL: process.env.CLOB_API_URL,
     WALLET_PRIVATE_KEY: process.env.WALLET_PRIVATE_KEY,
@@ -200,7 +203,7 @@ const plugin: Plugin = {
       throw error;
     }
   },
-  services: [PolymarketService],
+  services: [PolymarketService, MarketSyncService],
   actions: [
     retrieveAllMarketsAction,
     getSimplifiedMarketsAction,

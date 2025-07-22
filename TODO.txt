@@ -1,169 +1,63 @@
-# Pamela Autonomous Trading Agent - SIMPLIFIED TODO
+# Polymarket Data Sync System Implementation Plan
 
-## 🎯 APPROACH CHANGE: Using ElizaOS Simple Character Method
+## Goal
+Pull all active Polymarket markets on agent startup and sync every 12 hours for easier analysis and discussion.
 
-After analysis, we're switching from complex TypeScript project to ElizaOS's intended simple approach.
+## Architecture Overview
 
-**Why?** The ElizaOS team already built everything we need. The `@elizaos/plugin-polymarket` package has:
-- ✅ All trading actions (buy, sell, cancel, redeem)
-- ✅ Market analysis tools
-- ✅ Portfolio management
-- ✅ Risk management
-- ✅ Real-time data feeds
-- ✅ Web interface
-- ✅ Production-ready deployment
+1. **Database Layer**: Use Drizzle ORM tables integrated with ElizaOS plugin-sql
+2. **Sync Service**: Background service that handles periodic market updates  
+3. **Startup Hook**: Initialize data sync when agent starts
+4. **Integration**: Leverage existing Polymarket plugin actions for API calls
 
-## 🚀 IMMEDIATE TASKS (15 minutes total)
+## Implementation Steps
 
-### Phase 1: Get Basic Agent Running (5 minutes)
-- [x] Create `pamela.json` character file
-- [x] Create `.env.simple` environment template
-- [x] Create `SIMPLE_SETUP.md` instructions
-- [ ] Install ElizaOS CLI: `npm install -g @elizaos/cli@beta`
-- [ ] Set up environment variables in `.env`
-- [ ] Test locally: `elizaos start --character pamela.json`
+### Phase 1: Database Schema (High Priority) ✅ COMPLETED
+- [x] Create Drizzle tables for markets, tokens, prices, sync status
+- [x] Register schema with ElizaOS migration service  
+- [x] Add proper indexes and relationships
+- [x] Build and test plugin with schema integration
 
-### Phase 2: Deploy to Railway (5 minutes)
-- [ ] Install Railway CLI: `npm install -g @railway/cli`
-- [ ] Deploy: `railway init && railway up`
-- [ ] Add environment variables in Railway dashboard
-- [ ] Test production deployment
+### Phase 2: Market Sync Service (High Priority) 🚧 IN PROGRESS
+- [ ] Build service class that fetches from Polymarket API
+- [ ] Implement upsert logic (update existing, insert new markets)
+- [ ] Add error handling and logging
+- [ ] Store sync status and timestamps
 
-### Phase 3: Fund and Test Trading (5 minutes)
-- [ ] Fund Polygon wallet with USDC for trading
-- [ ] Test basic commands: "Show me all markets"
-- [ ] Test trading: "Buy 10 shares of token X at $0.65"
-- [ ] Verify transactions on Polygon
+### Phase 3: Scheduler Integration (High Priority) ⏳ PENDING
+- [ ] Create 12-hour interval scheduler using Node.js timers
+- [ ] Add startup initialization hook
+- [ ] Integrate with agent lifecycle events
 
-## 📈 ENHANCEMENT PHASES (Optional)
+### Phase 4: Plugin Integration (Medium Priority) ⏳ PENDING
+- [ ] Use existing Polymarket CLOB client 
+- [ ] Add database queries to existing actions
+- [ ] Enhance market retrieval with local data
 
-### Phase 4: Add Intelligence Plugins (Optional)
-**If we want more features, just add plugins to pamela.json:**
-```json
-{
-  "plugins": [
-    "@elizaos/plugin-polymarket",  // Trading (already included)
-    "@elizaos/plugin-news",        // News monitoring
-    "@elizaos/plugin-twitter",     // Social sentiment
-    "@elizaos/plugin-web-search",  // Market research
-    "@elizaos/plugin-telegram"     // Notifications
-  ]
-}
-```
+## Benefits
+- **Faster Responses**: Local database queries vs API calls
+- **Data Analysis**: Historical tracking and trend analysis
+- **Reliability**: Reduce API rate limiting issues  
+- **Enhanced Features**: Filter, search, and analyze market data locally
 
-### Phase 5: Advanced Features (If Needed)
-- [ ] Add Twitter monitoring for market sentiment
-- [ ] Add news monitoring for market events
-- [ ] Add Telegram notifications for trades
-- [ ] Add web search for market research
-- [ ] Configure risk management parameters
+## Technical Details
 
-## 🎯 WHAT WE GET IMMEDIATELY
+### Database Tables
+- `polymarket_markets` - Core market information
+- `polymarket_tokens` - YES/NO token pairs
+- `polymarket_rewards` - Reward configurations
+- `polymarket_prices` - Current price data
+- `polymarket_volume` - Volume metrics
+- `polymarket_sync_status` - Sync operation tracking
 
-### ✅ Working Features (Day 1):
-- **Full Polymarket Integration**: All markets, prices, trading
-- **Autonomous Trading**: Buy, sell, cancel, redeem orders
-- **Portfolio Management**: Track positions, P&L, performance  
-- **Risk Management**: Position sizing, limits, safeguards
-- **Web Interface**: Professional chat interface at localhost:3000
-- **Natural Language**: "Buy 100 shares of token X at $0.65"
-- **Market Analysis**: Spreads, order books, price history
-- **Real-time Data**: WebSocket connections to Polymarket
+### Sync Schedule
+- **Initial Sync**: On agent startup
+- **Recurring Sync**: Every 12 hours
+- **Error Handling**: Exponential backoff on failures
+- **Status Tracking**: Log all sync operations with timestamps
 
-### ✅ Deployment Ready:
-- **Railway Compatible**: Simple deploy with `railway up`
-- **Docker Support**: Built-in containerization
-- **Environment Config**: Clean variable management
-- **Health Checks**: Built-in monitoring
-- **Auto-scaling**: Handles traffic spikes
-
-### ✅ Production Features:
-- **Security**: Secure wallet management
-- **Logging**: Comprehensive trade logging
-- **Error Handling**: Graceful failure recovery
-- **Rate Limiting**: API protection
-- **Backup**: Database backup and recovery
-
-## 🔥 DELETED UNNECESSARY COMPLEXITY
-
-### ❌ What We Don't Need to Build:
-- ~~Complex TypeScript project setup~~
-- ~~Custom plugin development~~
-- ~~Action handler implementations~~
-- ~~Database schema design~~
-- ~~Build pipeline configuration~~
-- ~~Version compatibility fixes~~
-- ~~Custom API integrations~~
-- ~~Error handling systems~~
-- ~~Security implementations~~
-- ~~Testing frameworks~~
-
-### ✅ What ElizaOS Provides:
-- **Battle-tested plugins** used by real traders
-- **Production-ready infrastructure** 
-- **Comprehensive documentation**
-- **Community support**
-- **Regular updates**
-- **Professional UI**
-
-## 📊 EFFORT COMPARISON
-
-### Old Approach (Complex):
-- **Setup**: 8-12 hours
-- **Plugin Integration**: 6-8 hours  
-- **Testing**: 4-6 hours
-- **Deployment**: 2-4 hours
-- **Bug Fixes**: 4-8 hours
-- **Total**: 24-38 hours
-
-### New Approach (Simple):
-- **Setup**: 5 minutes
-- **Testing**: 5 minutes  
-- **Deployment**: 5 minutes
-- **Total**: 15 minutes
-
-**Time Savings**: 99.7% reduction in development time!
-
-## 🎯 SUCCESS METRICS
-
-### Immediate Success (Day 1):
-- [ ] Agent responds to "Show me all markets"
-- [ ] Agent can execute "Buy 100 shares of token X at $0.65"
-- [ ] Agent shows portfolio balance and positions
-- [ ] Agent explains trading decisions clearly
-- [ ] Agent operates autonomously without crashes
-
-### Production Success (Week 1):
-- [ ] Agent deployed and accessible via Railway
-- [ ] Agent handles multiple concurrent users
-- [ ] Agent executes profitable trades
-- [ ] Agent maintains positive P&L
-- [ ] Agent operates 24/7 without intervention
-
-## 🚀 DEPLOYMENT COMMANDS
-
-```bash
-# 1. Install tools
-npm install -g @elizaos/cli@beta
-npm install -g @railway/cli
-
-# 2. Set up environment
-cp .env.simple .env
-nano .env  # Add your API keys
-
-# 3. Test locally
-elizaos start --character pamela.json
-
-# 4. Deploy to Railway
-railway login
-railway init
-railway up
-```
-
-## 🎉 CONCLUSION
-
-**We went from 38 hours of complex development to 15 minutes of configuration.**
-
-The ElizaOS team already solved all the hard problems. We just need to use their solution!
-
-**Next Step**: Run the setup commands and start trading! 🚀
+### Integration Points
+- ElizaOS Service system for lifecycle management
+- Existing Polymarket plugin actions for API access
+- Database adapter through runtime.databaseAdapter
+- Plugin schema registration for migrations
