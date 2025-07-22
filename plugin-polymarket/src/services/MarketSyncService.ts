@@ -412,7 +412,7 @@ export class MarketSyncService extends Service {
           syncStatus: 'running',
           metadata: {
             startTime: new Date().toISOString(),
-            maxMarkets: this.MAX_MARKETS_PER_SYNC,
+            maxPages: this.MAX_PAGES,
           },
         })
         .where(eq(polymarketSyncStatusTable.id, syncId));

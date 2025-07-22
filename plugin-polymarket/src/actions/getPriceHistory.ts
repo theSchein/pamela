@@ -86,7 +86,7 @@ export const getPriceHistory: Action = {
     'Get historical price data for a Polymarket token - returns time-series of price points with timestamps and prices',
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
-    return contentToActionResult(responseContent);
+    return true;
   },
 
   handler: async (
@@ -135,9 +135,9 @@ export const getPriceHistory: Action = {
       logger.info(
         `[getPriceHistory] Fetching price history for token ${params.tokenId} with interval ${interval}`
       );
-      const priceHistory = await clobClient.getPricesHistory({
-        tokenId: params.tokenId,
-        interval: interval as any,
+      const priceHistory = await (clobClient as any).getPricesHistory({
+        figi: params.tokenId, // Using the correct field name for the API
+        interval: interval,
       });
 
       logger.info(`[getPriceHistory] Retrieved ${priceHistory?.length || 0} price points`);
@@ -163,7 +163,20 @@ export const getPriceHistory: Action = {
         });
       }
 
-      return contentToActionResult(responseContent);
+      const responseContent = {
+        text: responseMessage,
+        success: true,
+        actions: ['POLYMARKET_PRICE_HISTORY'],
+        data: {
+          tokenId: params.tokenId,
+          interval: interval,
+          priceHistory: priceHistory || [],
+          pointsCount: priceHistory?.length || 0,
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return responseContent;
     } catch (error) {
       logger.error('[getPriceHistory] Error retrieving price history:', error);
 
@@ -186,6 +199,11 @@ Please check:
         });
       }
 
+      const errorContent = {
+        action: 'POLYMARKET_PRICE_HISTORY_ERROR',
+        data: { error: error instanceof Error ? error.message : 'Unknown error', timestamp: new Date().toISOString() },
+      };
+      
       return createErrorResult(error, errorContent);
     }
   },

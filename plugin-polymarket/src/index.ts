@@ -27,11 +27,15 @@ export { placeOrderAction } from './actions/placeOrder';
 export { createApiKeyAction } from './actions/createApiKey';
 export { revokeApiKeyAction } from './actions/revokeApiKey';
 export { getAllApiKeysAction } from './actions/getAllApiKeys';
+export { getMarketDetailBySearchAction } from './actions/getMarketDetailBySearch';
+export { getEnhancedMarketInfoAction } from './actions/getEnhancedMarketInfo';
+export { getPopularMarketsAction } from './actions/getPopularMarkets';
 
 // Export utilities and services for advanced use cases
 export { initializeClobClient } from './utils/clobClient';
 export { callLLMWithTimeout } from './utils/llmHelpers';
 export { PolymarketService } from './plugin';
+export { MarketDetailService } from './services/MarketDetailService';
 
 // Export TypeScript interfaces and types
 export type {

@@ -49,7 +49,7 @@ export const getSamplingMarkets: Action = {
     'Get available Polymarket markets with rewards enabled (sampling markets) - markets where users can earn liquidity rewards',
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
-    return contentToActionResult(responseContent);
+    return true;
   },
 
   handler: async (
@@ -110,7 +110,18 @@ export const getSamplingMarkets: Action = {
         });
       }
 
-      return contentToActionResult(responseContent);
+      const responseContent = {
+        text: responseMessage,
+        success: true,
+        actions: ['POLYMARKET_SAMPLING_MARKETS'],
+        data: {
+          markets: markets || [],
+          marketsCount: markets?.length || 0,
+          timestamp: new Date().toISOString(),
+        },
+      };
+      
+      return responseContent;
     } catch (error) {
       logger.error('[getSamplingMarkets] Error retrieving sampling markets:', error);
 
@@ -132,6 +143,11 @@ Please check:
         });
       }
 
+      const errorContent = {
+        action: 'POLYMARKET_SAMPLING_MARKETS_ERROR',
+        data: { error: error instanceof Error ? error.message : 'Unknown error', timestamp: new Date().toISOString() },
+      };
+      
       return createErrorResult(error, errorContent);
     }
   },

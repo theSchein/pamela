@@ -152,7 +152,7 @@ export const getOrderDetailsAction: Action = {
           data: { error: 'Order not found', orderId, timestamp: new Date().toISOString() },
         };
         if (callback) await callback(notFoundContent);
-        return notFoundContent;
+        return { ...notFoundContent, success: false };
       }
 
       const displayOrder = order as OfficialOpenOrder;

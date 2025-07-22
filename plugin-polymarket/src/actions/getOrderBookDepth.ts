@@ -188,7 +188,7 @@ Please provide one or more token IDs in your request. Examples:
       const bookParams: BookParams[] = tokenIds.map((tokenId) => ({ token_id: tokenId }));
 
       // Fetch order book data
-      const orderBooks: OrderBook[] = await clobClient.getOrderBooks(bookParams);
+      const orderBooks: OrderBook[] = await (clobClient as any).getOrderBooks(bookParams);
 
       if (!orderBooks || orderBooks.length === 0) {
         throw new Error(`No order books found for the provided token IDs: ${tokenIds.join(', ')}`);

@@ -132,7 +132,7 @@ export const getOpenMarkets: Action = {
 
       // Filter for truly open markets (active=true AND closed=false AND current/future end dates)
       const currentDate = new Date();
-      const openMarkets = allMarkets.filter((market) => {
+      const openMarkets = allMarkets.filter((market: any) => {
         const isActiveAndOpen = market.active === true && market.closed === false;
         
         // Also check if market end date is in the future (or at least current year)
@@ -147,22 +147,22 @@ export const getOpenMarkets: Action = {
       });
 
       // Debug: Log filtering results
-      const activeMarkets = allMarkets.filter((m) => m.active === true).length;
-      const nonClosedMarkets = allMarkets.filter((m) => m.closed === false).length;
+      const activeMarkets = allMarkets.filter((m: any) => m.active === true).length;
+      const nonClosedMarkets = allMarkets.filter((m: any) => m.closed === false).length;
       const futureMarkets = allMarkets.filter(
-        (m) => m.end_date_iso && new Date(m.end_date_iso) > new Date()
+        (m: any) => m.end_date_iso && new Date(m.end_date_iso) > new Date()
       ).length;
       const current2025Markets = allMarkets.filter(
-        (m) => m.end_date_iso && new Date(m.end_date_iso).getFullYear() >= 2025
+        (m: any) => m.end_date_iso && new Date(m.end_date_iso).getFullYear() >= 2025
       ).length;
 
       // Additional debug: Check overlap
       const activeAndNonClosed = allMarkets.filter(
-        (m) => m.active === true && m.closed === false
+        (m: any) => m.active === true && m.closed === false
       ).length;
-      const activeOnly = allMarkets.filter((m) => m.active === true && m.closed === true).length;
+      const activeOnly = allMarkets.filter((m: any) => m.active === true && m.closed === true).length;
       const nonClosedOnly = allMarkets.filter(
-        (m) => m.active === false && m.closed === false
+        (m: any) => m.active === false && m.closed === false
       ).length;
 
       logger.info(
@@ -178,11 +178,11 @@ export const getOpenMarkets: Action = {
         logger.info(
           `[getOpenMarkets] No active+non-closed markets found, falling back to just non-closed markets`
         );
-        finalMarkets = allMarkets.filter((market) => market.closed === false);
+        finalMarkets = allMarkets.filter((market: any) => market.closed === false);
       }
 
       // Sort by end_date_iso (listing time proxy) - newest first
-      const sortedMarkets = finalMarkets.sort((a, b) => {
+      const sortedMarkets = finalMarkets.sort((a: any, b: any) => {
         const dateA = a.end_date_iso ? new Date(a.end_date_iso).getTime() : 0;
         const dateB = b.end_date_iso ? new Date(b.end_date_iso).getTime() : 0;
         return dateB - dateA; // Descending order (newest first)
@@ -318,8 +318,8 @@ function formatOpenMarketsResponse(
 
     if (tokens.length >= 2) {
       const yesPrice =
-        tokens.find((t) => t.outcome?.toLowerCase().includes('yes'))?.price || '0.50';
-      const noPrice = tokens.find((t) => t.outcome?.toLowerCase().includes('no'))?.price || '0.50';
+        tokens.find((t: any) => t.outcome?.toLowerCase().includes('yes'))?.price || '0.50';
+      const noPrice = tokens.find((t: any) => t.outcome?.toLowerCase().includes('no'))?.price || '0.50';
       response += `├─ Tokens: ${tokens[0]?.outcome || 'Yes'} (${yesPrice}) | ${tokens[1]?.outcome || 'No'} (${noPrice})\n`;
     }
 

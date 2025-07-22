@@ -97,9 +97,11 @@ export const createApiKeyAction: Action = {
         runtime.getSetting('POLYMARKET_PRIVATE_KEY');
 
       if (!privateKey) {
-        return createErrorResult(
+        const errorResult = createErrorResult(
           'No private key found. Please set WALLET_PRIVATE_KEY, PRIVATE_KEY, or POLYMARKET_PRIVATE_KEY in your environment'
         );
+        if (callback) await callback({ text: errorResult.text });
+        return;
       }
 
       // Create ethers wallet for signing
@@ -165,7 +167,9 @@ export const createApiKeyAction: Action = {
             JSON.stringify(apiCredentials, null, 2)
           );
         } else {
-          return createErrorResult(`Derive failed: ${deriveResponse.status}`);
+          const errorResult = createErrorResult(`Derive failed: ${deriveResponse.status}`);
+          if (callback) await callback({ text: errorResult.text });
+          return;
         }
       } catch (deriveError) {
         // If derive fails, try to create a new API key
@@ -186,9 +190,11 @@ export const createApiKeyAction: Action = {
 
         if (!createResponse.ok) {
           const errorText = await createResponse.text();
-          return createErrorResult(
+          const errorResult = createErrorResult(
             `API key creation failed: ${createResponse.status} ${createResponse.statusText}. ${errorText}`
           );
+          if (callback) await callback({ text: errorResult.text });
+          return;
         }
 
         apiCredentials = await createResponse.json();

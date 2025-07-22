@@ -162,9 +162,11 @@ Examples:
       const apiPassphrase = runtime.getSetting('CLOB_API_PASSPHRASE');
 
       if (!apiKey || !apiSecret || !apiPassphrase) {
-        return createErrorResult(
+        const errorResult = createErrorResult(
           'API credentials not found. You need to create API keys first using the CREATE_API_KEY action'
         );
+        if (callback) await callback({ text: errorResult.text });
+        return;
       }
 
       const clobApiUrl = runtime.getSetting('CLOB_API_URL') || 'https://clob.polymarket.com';
@@ -176,9 +178,11 @@ Examples:
         runtime.getSetting('POLYMARKET_PRIVATE_KEY');
 
       if (!privateKey) {
-        return createErrorResult(
+        const errorResult = createErrorResult(
           'No private key found. Please set WALLET_PRIVATE_KEY, PRIVATE_KEY, or POLYMARKET_PRIVATE_KEY in your environment'
         );
+        if (callback) await callback({ text: errorResult.text });
+        return;
       }
 
       // Create ethers wallet for authentication
@@ -216,9 +220,11 @@ Examples:
 
       if (!deleteResponse.ok) {
         const errorText = await deleteResponse.text();
-        return createErrorResult(
+        const errorResult = createErrorResult(
           `Failed to revoke API key: ${deleteResponse.status} ${deleteResponse.statusText}. ${errorText}`
         );
+        if (callback) await callback({ text: errorResult.text });
+        return;
       }
 
       const deleteResult = await deleteResponse.json();

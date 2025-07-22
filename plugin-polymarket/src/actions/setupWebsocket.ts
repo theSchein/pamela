@@ -203,7 +203,7 @@ export const setupWebsocketAction: Action = {
       );
     }
 
-    return new Promise<Content>((resolvePromise, rejectPromise) => {
+    return new Promise<ActionResult>((resolvePromise, rejectPromise) => {
       try {
         logger.info(`[setupWebsocketAction] Creating new WebSocket connection to: ${wsUrl}`);
         const wsClient = new WebSocket(wsUrl);
@@ -245,7 +245,7 @@ export const setupWebsocketAction: Action = {
               },
             };
             if (callback) callback(responseContent);
-            resolvePromise(responseContent);
+            resolvePromise({ ...responseContent, success: true });
           });
         });
 
@@ -253,7 +253,7 @@ export const setupWebsocketAction: Action = {
           logger.error('[setupWebsocketAction] WebSocket connection error:', error);
           setActiveClobSocketClientReference(null);
           // wsClient.terminate(); // No need to terminate, 'close' will be called
-          const errorContent: Content = { text: `❌ WebSocket Error: ${error.message}` };
+          const errorContent = { text: `❌ WebSocket Error: ${error.message}`, success: false };
           if (callback) callback(errorContent);
           rejectPromise(error);
         });

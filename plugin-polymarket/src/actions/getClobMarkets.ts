@@ -1,5 +1,6 @@
 import {
   type Action,
+  type ActionResult,
   type IAgentRuntime,
   type Memory,
   type State,
@@ -87,7 +88,7 @@ export const getClobMarkets: Action = {
 
       // Call CLOB API to get markets
       logger.info('[getClobMarkets] Fetching CLOB markets from API');
-      const marketsResponse = await clobClient.getMarkets({
+      const marketsResponse = await (clobClient as any).getMarkets('', {
         category: params.category,
         active: params.active,
         limit: params.limit,

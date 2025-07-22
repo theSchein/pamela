@@ -164,7 +164,7 @@ export const handleRealtimeUpdatesAction: Action = {
         'No active Polymarket WebSocket client (ws). Please run SETUP_WEBSOCKET first to connect.';
       logger.warn(`[handleRealtimeUpdatesAction] ${errorMsg}`);
       if (callback) await callback({ text: `🟡 ${errorMsg}` });
-      return { text: `🟡 ${errorMsg}` };
+      return { text: `🟡 ${errorMsg}`, success: false };
     }
 
     try {

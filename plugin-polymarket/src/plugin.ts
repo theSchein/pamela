@@ -38,8 +38,12 @@ import { getTradeHistoryAction } from './actions/getTradeHistory';
 import { handleAuthenticationAction } from './actions/handleAuthentication';
 import { setupWebsocketAction } from './actions/setupWebsocket';
 import { handleRealtimeUpdatesAction } from './actions/handleRealtimeUpdates';
+import { getMarketDetailBySearchAction } from './actions/getMarketDetailBySearch';
+import { getEnhancedMarketInfoAction } from './actions/getEnhancedMarketInfo';
+import { getPopularMarketsAction } from './actions/getPopularMarkets';
 import { polymarketSchema } from './schema';
 import { MarketSyncService } from './services/MarketSyncService';
+import { MarketDetailService } from './services/MarketDetailService';
 
 /**
  * Define the configuration schema for the Polymarket plugin
@@ -203,7 +207,7 @@ const plugin: Plugin = {
       throw error;
     }
   },
-  services: [PolymarketService, MarketSyncService],
+  services: [PolymarketService, MarketSyncService, MarketDetailService],
   actions: [
     retrieveAllMarketsAction,
     getSimplifiedMarketsAction,
@@ -229,6 +233,9 @@ const plugin: Plugin = {
     handleAuthenticationAction,
     setupWebsocketAction,
     handleRealtimeUpdatesAction,
+    getMarketDetailBySearchAction,
+    getEnhancedMarketInfoAction,
+    getPopularMarketsAction,
   ],
   providers: [polymarketProvider],
 };
