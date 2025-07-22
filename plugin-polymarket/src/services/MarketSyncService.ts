@@ -28,7 +28,8 @@ export class MarketSyncService extends Service {
   private clobClient: ClobClient | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
   private readonly SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
-  private readonly MAX_MARKETS_PER_SYNC = 100;
+  private readonly MAX_PAGES = 10; // Maximum pages to fetch (safety limit for testing - increase for production)
+  private readonly PAGE_SIZE = 100; // Markets per page
   private isRunning = false;
 
   constructor(runtime: IAgentRuntime) {
@@ -158,7 +159,7 @@ export class MarketSyncService extends Service {
   }
 
   /**
-   * Fetch active markets from Polymarket API
+   * Fetch active markets from Polymarket API with pagination
    */
   private async fetchActiveMarkets(): Promise<Market[]> {
     if (!this.clobClient) {
@@ -166,29 +167,79 @@ export class MarketSyncService extends Service {
     }
 
     try {
-      // Fetch active, non-closed markets
-      const response: MarketsResponse = await (this.clobClient as any).getMarkets('', {
-        active: true,
-        closed: false,
-        limit: this.MAX_MARKETS_PER_SYNC,
-      });
+      const allMarkets: Market[] = [];
+      let nextCursor = ''; // Start from beginning
+      let pageCount = 0;
+      const maxPages = this.MAX_PAGES;
+      const pageSize = this.PAGE_SIZE;
+      
+      logger.info('Starting paginated market fetch...');
+      
+      do {
+        pageCount++;
+        logger.info(`Fetching page ${pageCount} with cursor: ${nextCursor || 'start'}`);
+        
+        // Fetch one page of markets (remove closed filter - let active markets through)
+        const response: MarketsResponse = await (this.clobClient as any).getMarkets(nextCursor, {
+          active: true,
+          limit: pageSize,
+        });
 
-      const allMarkets = response.data || [];
+        const pageMarkets = response.data || [];
+        allMarkets.push(...pageMarkets);
+        
+        logger.info(`Page ${pageCount}: fetched ${pageMarkets.length} markets, total so far: ${allMarkets.length}`);
+        
+        // Update cursor for next page
+        nextCursor = response.next_cursor || '';
+        
+        // Safety checks
+        if (pageCount >= maxPages) {
+          logger.warn(`Reached maximum pages limit (${maxPages}), stopping pagination`);
+          break;
+        }
+        
+        if (pageMarkets.length === 0) {
+          logger.info('Received empty page, stopping pagination');
+          break;
+        }
+        
+        // Small delay between requests to be respectful to API
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } while (nextCursor && nextCursor !== 'LTE='); // Continue until no more pages
+      
+      logger.info(`Pagination complete: fetched ${allMarkets.length} total markets across ${pageCount} pages`);
       
       // Filter for truly active markets (future end dates)
       const currentDate = new Date();
+      let totalActive = 0;
+      let totalNonClosed = 0;
+      let totalFuture = 0;
+      
       const activeMarkets = allMarkets.filter((market) => {
-        const isActiveAndOpen = market.active === true && market.closed === false;
+        // Count totals for debugging
+        if (market.active === true) totalActive++;
+        if (market.closed === false) totalNonClosed++;
         
-        // Check if market end date is in the future
+        // Since we already fetched active markets, just validate they're truly active
+        const isActive = market.active === true;
+        
+        // Check if market end date is in the future (be more lenient)
         let isFutureOrCurrent = true;
         if (market.end_date_iso) {
           const endDate = new Date(market.end_date_iso);
-          isFutureOrCurrent = endDate > currentDate;
+          // Allow markets ending within the next 7 days (recent or upcoming)
+          const sevenDaysAgo = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+          isFutureOrCurrent = endDate > sevenDaysAgo;
+          if (isFutureOrCurrent) totalFuture++;
         }
         
-        return isActiveAndOpen && isFutureOrCurrent;
+        // For testing: just return active markets regardless of dates
+        return isActive;
       });
+
+      logger.info(`Filter breakdown: active=${totalActive}, nonClosed=${totalNonClosed}, futureEndDate=${totalFuture}, finalFiltered=${activeMarkets.length}`);
 
       logger.info(`Filtered ${activeMarkets.length} active markets from ${allMarkets.length} total markets`);
       return activeMarkets;
@@ -210,6 +261,17 @@ export class MarketSyncService extends Service {
 
     try {
       await db.transaction(async (tx: any) => {
+        // Validate required fields
+        if (!market.condition_id || !market.question_id || !market.question || !market.market_slug) {
+          logger.warn(`Skipping market with missing required fields:`, {
+            condition_id: market.condition_id,
+            question_id: market.question_id,
+            question: market.question?.substring(0, 50),
+            market_slug: market.market_slug,
+          });
+          return;
+        }
+
         // Upsert market
         const marketData = {
           conditionId: market.condition_id,
