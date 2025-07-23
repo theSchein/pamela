@@ -5,7 +5,7 @@
  */
 
 import { type IAgentRuntime, logger, Service } from '@elizaos/core';
-import { eq, and, sql, like, or } from 'drizzle-orm';
+import { eq, and, sql, like, or, gte } from 'drizzle-orm';
 import { initializeClobClient, type ClobClient } from '../utils/clobClient';
 import { 
   polymarketMarketsTable,
@@ -163,12 +163,23 @@ export class MarketDetailService extends Service {
         return [];
       }
       
+      // Only show markets that are current or end in the future (no old markets)
+      const currentDate = new Date();
+      const todayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      
       const markets = await db
         .select()
         .from(polymarketMarketsTable)
         .where(
           and(
             eq(polymarketMarketsTable.active, true),
+            eq(polymarketMarketsTable.closed, false),
+            // Only include markets that end today or in the future
+            or(
+              sql`${polymarketMarketsTable.endDateIso} IS NULL`,
+              gte(polymarketMarketsTable.endDateIso, todayStart)
+            ),
+            // Search criteria
             or(
               like(sql`LOWER(${polymarketMarketsTable.question})`, searchPattern),
               like(sql`LOWER(${polymarketMarketsTable.category})`, searchPattern),
@@ -177,7 +188,7 @@ export class MarketDetailService extends Service {
           )
         )
         .limit(limit)
-        .orderBy(polymarketMarketsTable.endDateIso);
+        .orderBy(sql`${polymarketMarketsTable.endDateIso} DESC`);
 
       logger.info(`Found ${markets.length} markets matching search term: "${searchTerm}"`);
       return markets;
@@ -199,17 +210,27 @@ export class MarketDetailService extends Service {
     }
 
     try {
+      // Only show markets that are current or end in the future (no old markets)
+      const currentDate = new Date();
+      const todayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      
       const query = db
         .select()
         .from(polymarketMarketsTable)
         .where(
           and(
             eq(polymarketMarketsTable.active, true),
+            eq(polymarketMarketsTable.closed, false),
+            // Only include markets that end today or in the future
+            or(
+              sql`${polymarketMarketsTable.endDateIso} IS NULL`,
+              gte(polymarketMarketsTable.endDateIso, todayStart)
+            ),
             category ? eq(polymarketMarketsTable.category, category) : sql`1=1`
           )
         )
         .limit(limit)
-        .orderBy(polymarketMarketsTable.lastSyncedAt);
+        .orderBy(sql`${polymarketMarketsTable.endDateIso} DESC`);
 
       const markets = await query;
       

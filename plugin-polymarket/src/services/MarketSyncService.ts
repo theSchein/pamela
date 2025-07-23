@@ -4,7 +4,7 @@
  */
 
 import { type IAgentRuntime, logger, Service } from '@elizaos/core';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, lt } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { initializeClobClient, type ClobClient } from '../utils/clobClient';
 import { initializePolymarketTables, checkPolymarketTablesExist } from '../utils/databaseInit';
@@ -30,8 +30,8 @@ export class MarketSyncService extends Service {
   private clobClient: ClobClient | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
   private readonly SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
-  private readonly MAX_PAGES = 2; // Maximum pages to fetch (testing - increase to 50+ for production)
-  private readonly PAGE_SIZE = 100; // Markets per page
+  private readonly MAX_PAGES = 20; // Fetch up to 20 pages to find current markets
+  private readonly PAGE_SIZE = 500; // Markets per page (use the larger size that's working)
   private isRunning = false;
 
   constructor(runtime: IAgentRuntime) {
@@ -150,6 +150,13 @@ export class MarketSyncService extends Service {
       }
       
       const duration = Date.now() - startTime;
+      // Clean up old/expired markets from database  
+      try {
+        await this.cleanupOldMarkets();
+      } catch (cleanupError) {
+        logger.error('Failed to cleanup old markets:', cleanupError);
+      }
+
       logger.info(`Market sync completed: ${syncedCount}/${markets.length} markets synced in ${duration}ms`);
       
     } catch (error) {
@@ -170,10 +177,12 @@ export class MarketSyncService extends Service {
 
     try {
       const allMarkets: Market[] = [];
+      let currentMarkets: Market[] = []; // Track current/future markets found
       let nextCursor = ''; // Start from beginning
       let pageCount = 0;
       const maxPages = this.MAX_PAGES;
       const pageSize = this.PAGE_SIZE;
+      const targetCurrentMarkets = 100; // Stop when we find enough current markets
       
       logger.info('Starting paginated market fetch...');
       
@@ -190,7 +199,17 @@ export class MarketSyncService extends Service {
         const pageMarkets = response.data || [];
         allMarkets.push(...pageMarkets);
         
-        logger.info(`Page ${pageCount}: fetched ${pageMarkets.length} markets, total so far: ${allMarkets.length}`);
+        // Count current/future markets on this page for early termination
+        const currentDate = new Date();
+        const todayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+        const pageCurrentMarkets = pageMarkets.filter(market => {
+          if (!market.end_date_iso) return true; // No end date = current
+          const endDate = new Date(market.end_date_iso);
+          return market.active && endDate >= todayStart;
+        });
+        
+        currentMarkets.push(...pageCurrentMarkets);
+        logger.info(`Page ${pageCount}: fetched ${pageMarkets.length} markets, current markets found: ${pageCurrentMarkets.length}, total current so far: ${currentMarkets.length}`);
         
         // Update cursor for next page
         nextCursor = response.next_cursor || '';
@@ -198,6 +217,12 @@ export class MarketSyncService extends Service {
         // Safety checks
         if (pageCount >= maxPages) {
           logger.warn(`Reached maximum pages limit (${maxPages}), stopping pagination`);
+          break;
+        }
+
+        // Early termination if we found enough current markets
+        if (currentMarkets.length >= targetCurrentMarkets) {
+          logger.info(`Found ${currentMarkets.length} current markets (target: ${targetCurrentMarkets}), stopping early pagination`);
           break;
         }
         
@@ -213,6 +238,10 @@ export class MarketSyncService extends Service {
       
       logger.info(`Pagination complete: fetched ${allMarkets.length} total markets across ${pageCount} pages`);
       
+      if (currentMarkets.length < 10) {
+        logger.warn(`⚠️  Only found ${currentMarkets.length} current markets out of ${allMarkets.length} total markets. API might be returning mostly historical data.`);
+      }
+      
       // Filter for truly active markets (future end dates)
       const currentDate = new Date();
       let totalActive = 0;
@@ -227,18 +256,29 @@ export class MarketSyncService extends Service {
         // Since we already fetched active markets, just validate they're truly active
         const isActive = market.active === true;
         
-        // Check if market end date is in the future (be more lenient)
+        // Check if market end date is current or in the future
         let isFutureOrCurrent = true;
         if (market.end_date_iso) {
           const endDate = new Date(market.end_date_iso);
-          // Allow markets ending within the next 7 days (recent or upcoming)
-          const sevenDaysAgo = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-          isFutureOrCurrent = endDate > sevenDaysAgo;
+          // Only allow markets that end today or in the future (no old markets)
+          const todayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+          isFutureOrCurrent = endDate >= todayStart;
+          
+          // Debug logging for date comparison
+          if (!isFutureOrCurrent) {
+            logger.debug(`Market "${market.question?.substring(0, 50)}..." ends ${market.end_date_iso} (${endDate.toISOString()}) vs today ${todayStart.toISOString()}`);
+          }
+          
           if (isFutureOrCurrent) totalFuture++;
         }
         
-        // For testing: just return active markets regardless of dates
-        return isActive;
+        // Debug logging for markets being filtered
+        if (isActive && !isFutureOrCurrent && market.end_date_iso) {
+          logger.debug(`Filtering out old market: "${market.question}" (ends: ${market.end_date_iso})`);
+        }
+        
+        // Return markets that are active AND current/future
+        return isActive && isFutureOrCurrent;
       });
 
       logger.info(`Filter breakdown: active=${totalActive}, nonClosed=${totalNonClosed}, futureEndDate=${totalFuture}, finalFiltered=${activeMarkets.length}`);
@@ -304,6 +344,25 @@ export class MarketSyncService extends Service {
             market_slug: market.market_slug,
           });
           return;
+        }
+
+        // Additional safety check: reject old markets before they reach the database
+        if (market.end_date_iso) {
+          const endDate = new Date(market.end_date_iso);
+          const currentDate = new Date();
+          // Be more aggressive - reject markets that ended more than 1 day ago
+          const yesterdayStart = new Date(currentDate.getTime() - 24 * 60 * 60 * 1000);
+          
+          if (endDate < yesterdayStart) {
+            const daysAgo = Math.floor((currentDate.getTime() - endDate.getTime()) / (24 * 60 * 60 * 1000));
+            logger.error(`🚫 BLOCKING OLD MARKET - ended ${daysAgo} days ago:`, {
+              condition_id: market.condition_id,
+              question: market.question?.substring(0, 100),
+              end_date: market.end_date_iso,
+              ended_days_ago: daysAgo
+            });
+            return;
+          }
         }
 
         // Upsert market
@@ -492,6 +551,38 @@ export class MarketSyncService extends Service {
       
       // Don't throw error to prevent stopping the entire sync process
       logger.warn(`Continuing sync process despite database error for market ${market.condition_id}`);
+    }
+  }
+
+  /**
+   * Clean up old/expired markets from the database
+   */
+  private async cleanupOldMarkets(): Promise<void> {
+    const db = (this.runtime as any).db;
+    if (!db) {
+      return;
+    }
+
+    try {
+      const currentDate = new Date();
+      // Delete markets that ended more than 30 days ago
+      const cleanupThreshold = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+      
+      const deletedCount = await db
+        .delete(polymarketMarketsTable)
+        .where(
+          and(
+            sql`${polymarketMarketsTable.endDateIso} IS NOT NULL`,
+            lt(polymarketMarketsTable.endDateIso, cleanupThreshold)
+          )
+        );
+
+      if (deletedCount && deletedCount.rowCount > 0) {
+        logger.info(`Cleaned up ${deletedCount.rowCount} old markets that ended before ${cleanupThreshold.toISOString()}`);
+      }
+    } catch (error) {
+      logger.error('Error during market cleanup:', error);
+      throw error;
     }
   }
 
