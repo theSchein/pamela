@@ -10,27 +10,45 @@ import polymarketPlugin from './plugin.ts';
 // Export the plugin directly for use in other configurations
 export { default as polymarketPlugin } from './plugin.ts';
 
-// Export individual actions for direct use
-export { retrieveAllMarketsAction } from './actions/retrieveAllMarkets';
-export { getSimplifiedMarketsAction } from './actions/getSimplifiedMarkets';
+// === CORE ACTIONS - SIMPLIFIED PLUGIN ===
+
+// Market Discovery
+export { getPopularMarketsAction } from './actions/getPopularMarkets';
 export { getSamplingMarkets } from './actions/getSamplingMarkets';
-export { getClobMarkets } from './actions/getClobMarkets';
-export { getOpenMarkets } from './actions/getOpenMarkets';
-export { getPriceHistory } from './actions/getPriceHistory';
-export { getMarketDetailsAction } from './actions/getMarketDetails';
+
+// Market Details  
+export { getEnhancedMarketInfoAction } from './actions/getEnhancedMarketInfo';
+export { getMarketDetailBySearchAction } from './actions/getMarketDetailBySearch';
+
+// Market Data
 export { getOrderBookSummaryAction } from './actions/getOrderBookSummary';
-export { getOrderBookDepthAction } from './actions/getOrderBookDepth';
-export { getBestPriceAction } from './actions/getBestPrice';
-export { getMidpointPriceAction } from './actions/getMidpointPrice';
-export { getSpreadAction } from './actions/getSpread';
+
+// Trading
 export { placeOrderAction } from './actions/placeOrder';
+
+// Additional functionality
+export { getPriceHistory } from './actions/getPriceHistory';
+
+// Account management
 export { createApiKeyAction } from './actions/createApiKey';
 export { revokeApiKeyAction } from './actions/revokeApiKey';
 export { getAllApiKeysAction } from './actions/getAllApiKeys';
-export { getMarketDetailBySearchAction } from './actions/getMarketDetailBySearch';
-export { getEnhancedMarketInfoAction } from './actions/getEnhancedMarketInfo';
-export { getPopularMarketsAction } from './actions/getPopularMarkets';
-export { showPredictionMarketAction } from './actions/showPredictionMarket';
+
+// === COMMENTED OUT - REDUNDANT EXPORTS ===
+
+// REDUNDANT: Market retrieval overlap
+// export { retrieveAllMarketsAction } from './actions/retrieveAllMarkets';
+// export { getSimplifiedMarketsAction } from './actions/getSimplifiedMarkets';
+// export { getClobMarkets } from './actions/getClobMarkets';
+// export { getOpenMarkets } from './actions/getOpenMarkets';
+// export { getMarketDetailsAction } from './actions/getMarketDetails';
+// export { showPredictionMarketAction } from './actions/showPredictionMarket';
+
+// REDUNDANT: Order book and pricing overlap
+// export { getOrderBookDepthAction } from './actions/getOrderBookDepth';
+// export { getBestPriceAction } from './actions/getBestPrice';
+// export { getMidpointPriceAction } from './actions/getMidpointPrice';
+// export { getSpreadAction } from './actions/getSpread';
 
 // Export utilities and services for advanced use cases
 export { initializeClobClient } from './utils/clobClient';
