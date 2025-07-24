@@ -42,7 +42,10 @@ export async function initializeClobClient(runtime: IAgentRuntime): Promise<Clob
   logger.info(`[initializeClobClient] Initializing CLOB client with HTTP URL: ${clobApiUrl}` + (clobWsUrl ? ` and WS URL: ${clobWsUrl}` : ' (no WS URL provided)'));
 
   try {
-    const wallet = new ethers.Wallet(privateKey);
+    // Ensure private key has 0x prefix for ethers.js
+    const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+    
+    const wallet = new ethers.Wallet(formattedPrivateKey);
     const enhancedWallet = {
       ...wallet,
       _signTypedData: async (domain: any, types: any, value: any) => wallet.signTypedData(domain, types, value),
@@ -119,7 +122,10 @@ export async function initializeClobClientWithCreds(runtime: IAgentRuntime): Pro
   logger.info(`[initializeClobClientWithCreds] Initializing CLOB client with API credentials.`);
 
   try {
-    const wallet = new ethers.Wallet(privateKey);
+    // Ensure private key has 0x prefix for ethers.js
+    const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+    
+    const wallet = new ethers.Wallet(formattedPrivateKey);
     const enhancedWallet = {
       ...wallet,
       _signTypedData: async (domain: any, types: any, value: any) => wallet.signTypedData(domain, types, value),

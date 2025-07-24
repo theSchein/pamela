@@ -15,6 +15,7 @@ import { initializeClobClient } from '../utils/clobClient';
 import { orderTemplate } from '../templates';
 import { OrderSide, OrderType } from '../types';
 import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
+import { checkUSDCBalance, formatBalanceInfo, getMaxPositionSize } from '../utils/balanceChecker';
 import { ClobClient, Side } from '@polymarket/clob-client';
 import { ethers } from 'ethers';
 
@@ -231,6 +232,129 @@ Please provide order details in your request. Examples:
       orderType = 'GTC'; // Default to GTC
     }
 
+    // Calculate total order value
+    const totalValue = price * size;
+
+    // Check USDC balance before placing order
+    logger.info(`[placeOrderAction] Checking balance for order value: $${totalValue.toFixed(2)}`);
+    
+    try {
+      const balanceInfo = await checkUSDCBalance(runtime, totalValue.toString());
+      
+      if (!balanceInfo.hasEnoughBalance) {
+        const balanceDisplay = formatBalanceInfo(balanceInfo);
+        const errorContent: Content = {
+          text: `${balanceDisplay}
+
+**Order Details:**
+• **Token ID**: ${tokenId}
+• **Side**: ${side}
+• **Price**: $${price.toFixed(4)} (${(price * 100).toFixed(2)}%)
+• **Size**: ${size} shares
+• **Total Value**: $${totalValue.toFixed(2)}
+
+Please add more USDC to your wallet and try again.`,
+          actions: ['POLYMARKET_PLACE_ORDER'],
+          data: {
+            error: 'Insufficient USDC balance',
+            balanceInfo,
+            orderDetails: { tokenId, side, price, size, totalValue },
+          },
+        };
+
+        if (callback) {
+          await callback(errorContent);
+        }
+        return createErrorResult('Insufficient USDC balance for order');
+      }
+
+      // Check position size limits
+      const maxPositionSize = await getMaxPositionSize(runtime);
+      if (totalValue > maxPositionSize) {
+        const errorContent: Content = {
+          text: `❌ **Order Exceeds Position Limit**
+
+**Position Limit Check:**
+• **Max Position Size**: $${maxPositionSize.toFixed(2)}
+• **Requested Order**: $${totalValue.toFixed(2)}
+• **Excess Amount**: $${(totalValue - maxPositionSize).toFixed(2)}
+
+**Order Details:**
+• **Token ID**: ${tokenId}
+• **Side**: ${side}
+• **Price**: $${price.toFixed(4)}
+• **Size**: ${size} shares
+
+Please reduce your order size to stay within the configured limit.`,
+          actions: ['POLYMARKET_PLACE_ORDER'],
+          data: {
+            error: 'Order exceeds position limit',
+            maxPositionSize,
+            requestedAmount: totalValue,
+            orderDetails: { tokenId, side, price, size },
+          },
+        };
+
+        if (callback) {
+          await callback(errorContent);
+        }
+        return createErrorResult('Order exceeds maximum position size limit');
+      }
+
+      // Display successful balance check
+      logger.info(`[placeOrderAction] Balance check passed. Proceeding with order.`);
+      const balanceDisplay = formatBalanceInfo(balanceInfo);
+      
+      if (callback) {
+        const balanceContent: Content = {
+          text: `${balanceDisplay}
+
+**Proceeding with Order:**
+• **Token ID**: ${tokenId}
+• **Side**: ${side}
+• **Price**: $${price.toFixed(4)} (${(price * 100).toFixed(2)}%)
+• **Size**: ${size} shares
+• **Total Value**: $${totalValue.toFixed(2)}
+
+Creating order...`,
+          actions: ['POLYMARKET_PLACE_ORDER'],
+          data: { balanceInfo, orderDetails: { tokenId, side, price, size, totalValue } },
+        };
+        await callback(balanceContent);
+      }
+
+    } catch (balanceError) {
+      logger.error(`[placeOrderAction] Balance check failed:`, balanceError);
+      const errorContent: Content = {
+        text: `❌ **Balance Check Failed**
+
+Unable to verify wallet balance before placing order. This could be due to:
+• Network connectivity issues
+• RPC provider problems  
+• Wallet configuration errors
+
+**Order Details:**
+• **Token ID**: ${tokenId}
+• **Side**: ${side}
+• **Price**: $${price.toFixed(4)}
+• **Size**: ${size} shares
+• **Total Value**: $${totalValue.toFixed(2)}
+
+Please check your wallet configuration and try again.`,
+        actions: ['POLYMARKET_PLACE_ORDER'],
+        data: {
+          error: 'Balance check failed',
+          balanceError: balanceError instanceof Error ? balanceError.message : 'Unknown error',
+          orderDetails: { tokenId, side, price, size, totalValue },
+        },
+      };
+
+      if (callback) {
+        await callback(errorContent);
+      }
+      return createErrorResult('Failed to verify wallet balance before order placement');
+    }
+
     try {
       const client = await initializeClobClient(runtime);
 
@@ -246,7 +370,7 @@ Please provide order details in your request. Examples:
       logger.info(`[placeOrderAction] Creating order with args:`, orderArgs);
 
       // Create the signed order with enhanced error handling
-      let signedOrder;
+      let signedOrder: any;
       try {
         signedOrder = await client.createOrder(orderArgs);
         logger.info(`[placeOrderAction] Order created successfully`);
@@ -270,7 +394,7 @@ Please provide order details in your request. Examples:
       }
 
       // Post the order with enhanced error handling
-      let orderResponse;
+      let orderResponse: any;
       try {
         orderResponse = await client.postOrder(signedOrder, orderType as OrderType);
         logger.info(`[placeOrderAction] Order posted successfully`);

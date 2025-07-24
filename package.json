@@ -31,6 +31,7 @@
     "@elizaos/core": "latest",
     "@elizaos/plugin-bootstrap": "latest",
     "@elizaos/plugin-browser": "^1.0.3",
+    "@elizaos/plugin-evm": "latest",
     "@elizaos/plugin-news": "^0.25.6-alpha.1",
     "@elizaos/plugin-openai": "^1.0.7",
     "@elizaos/plugin-sql": "latest",
