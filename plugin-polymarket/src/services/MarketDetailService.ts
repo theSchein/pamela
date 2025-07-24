@@ -163,9 +163,10 @@ export class MarketDetailService extends Service {
         return [];
       }
       
-      // Only show markets that are current or end in the future (no old markets)
+      // Only show markets that are active and haven't ended yet
       const currentDate = new Date();
-      const todayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      // Use 1 hour buffer to exclude recently ended markets
+      const minimumFutureDate = new Date(currentDate.getTime() + 60 * 60 * 1000);
       
       const markets = await db
         .select()
@@ -174,10 +175,10 @@ export class MarketDetailService extends Service {
           and(
             eq(polymarketMarketsTable.active, true),
             eq(polymarketMarketsTable.closed, false),
-            // Only include markets that end today or in the future
+            // Only include markets that end more than 1 hour from now
             or(
               sql`${polymarketMarketsTable.endDateIso} IS NULL`,
-              gte(polymarketMarketsTable.endDateIso, todayStart)
+              sql`${polymarketMarketsTable.endDateIso} > ${minimumFutureDate}`
             ),
             // Search criteria
             or(
@@ -210,9 +211,10 @@ export class MarketDetailService extends Service {
     }
 
     try {
-      // Only show markets that are current or end in the future (no old markets)
+      // Only show markets that are active and haven't ended yet
       const currentDate = new Date();
-      const todayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      // Use 1 hour buffer to exclude recently ended markets
+      const minimumFutureDate = new Date(currentDate.getTime() + 60 * 60 * 1000);
       
       const query = db
         .select()
@@ -221,10 +223,10 @@ export class MarketDetailService extends Service {
           and(
             eq(polymarketMarketsTable.active, true),
             eq(polymarketMarketsTable.closed, false),
-            // Only include markets that end today or in the future
+            // Only include markets that end more than 1 hour from now
             or(
               sql`${polymarketMarketsTable.endDateIso} IS NULL`,
-              gte(polymarketMarketsTable.endDateIso, todayStart)
+              sql`${polymarketMarketsTable.endDateIso} > ${minimumFutureDate}`
             ),
             category ? eq(polymarketMarketsTable.category, category) : sql`1=1`
           )

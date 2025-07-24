@@ -168,163 +168,165 @@ export class MarketSyncService extends Service {
   }
 
   /**
-   * Fetch active markets from Polymarket API with pagination
+   * Fetch active markets from Gamma API with liquidity filtering
+   * Only use markets with real trading activity ($10k+ liquidity)
    */
-  private async fetchActiveMarkets(): Promise<Market[]> {
-    if (!this.clobClient) {
-      throw new Error('CLOB client not initialized');
+   private async fetchActiveMarkets(): Promise<Market[]> {
+    logger.info('Fetching high-liquidity markets from Gamma API only...');
+    
+    const gammaMarkets = await this.fetchFromGammaApi();
+    
+    if (gammaMarkets.length > 0) {
+      logger.info(`Gamma API provided ${gammaMarkets.length} liquid markets with $10k+ liquidity`);
+      return gammaMarkets;
     }
+    
+    logger.warn('Gamma API returned no markets - this may indicate an API issue or no markets meet $10k liquidity threshold');
+    return [];
+  }
 
+
+  /**
+   * Fetch markets from Gamma API with liquidity filtering
+   */
+  private async fetchFromGammaApi(): Promise<Market[]> {
     try {
-      const allMarkets: Market[] = [];
-      let currentMarkets: Market[] = []; // Track current/future markets found
-      let nextCursor = ''; // Start from beginning
-      let pageCount = 0;
-      const maxPages = this.MAX_PAGES;
-      const pageSize = this.PAGE_SIZE;
-      const targetCurrentMarkets = 500; // Stop when we find enough current markets (increased due to mostly old data)
+      logger.info('Attempting to fetch from Gamma API...');
       
-      logger.info('Starting paginated market fetch...');
+      const gammaUrl = 'https://gamma-api.polymarket.com/markets';
       
-      do {
-        pageCount++;
-        logger.info(`Fetching page ${pageCount} with cursor: ${nextCursor || 'start'}`);
-        
-        // Fetch one page of markets (remove closed filter - let active markets through)
-        const response: MarketsResponse = await (this.clobClient as any).getMarkets(nextCursor, {
-          active: true,
-          limit: pageSize,
-        });
-
-        const pageMarkets = response.data || [];
-        allMarkets.push(...pageMarkets);
-        
-        // Count current/future markets on this page for early termination
-        // Use the EXACT same aggressive logic as final filtering for consistency
-        const currentDate = new Date();
-        const minimumFutureDate = new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const pageCurrentMarkets = pageMarkets.filter(market => {
-          // Must be active
-          if (market.active !== true) return false;
-          
-          // Check if market end date is genuinely in the future (aggressive filtering)
-          if (market.end_date_iso) {
-            const endDate = new Date(market.end_date_iso);
-            const isFutureOrCurrent = endDate >= minimumFutureDate;
-            if (!isFutureOrCurrent) {
-              const daysFromNow = Math.floor((endDate.getTime() - currentDate.getTime()) / (24 * 60 * 60 * 1000));
-              logger.debug(`Early filter: excluding market "${market.question?.substring(0, 30)}..." (ends in ${daysFromNow} days, need 7+)`);
-            }
-            return isFutureOrCurrent;
-          }
-          
-          // No end date = assume current (perpetual markets)
-          return true;
-        });
-        
-        currentMarkets.push(...pageCurrentMarkets);
-        logger.info(`Page ${pageCount}: fetched ${pageMarkets.length} markets, current markets found: ${pageCurrentMarkets.length}, total current so far: ${currentMarkets.length}`);
-        
-        // Update cursor for next page
-        nextCursor = response.next_cursor || '';
-        
-        // Safety checks
-        if (pageCount >= maxPages) {
-          logger.warn(`Reached maximum pages limit (${maxPages}), stopping pagination`);
-          break;
-        }
-
-        // Early termination if we found enough current markets
-        if (currentMarkets.length >= targetCurrentMarkets) {
-          logger.info(`Found ${currentMarkets.length} current markets (target: ${targetCurrentMarkets}), stopping early pagination`);
-          break;
-        }
-        
-        if (pageMarkets.length === 0) {
-          logger.info('Received empty page, stopping pagination');
-          break;
-        }
-        
-        // Small delay between requests to be respectful to API
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-      } while (nextCursor && nextCursor !== 'LTE='); // Continue until no more pages
+      // Build query parameters for active markets with real liquidity (indicates actual trading)
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const params = new URLSearchParams({
+        active: 'true',
+        closed: 'false',  // Explicitly exclude closed markets
+        liquidity_num_min: '10000', // Only markets with $10k+ liquidity - real active markets
+        end_date_min: today, // Only markets ending today or later
+        limit: '100'
+      });
       
-      logger.info(`Pagination complete: fetched ${allMarkets.length} total markets across ${pageCount} pages`);
+      logger.info(`Gamma API query: ${gammaUrl}?${params.toString()}`);
       
-      if (currentMarkets.length < 10) {
-        logger.warn(`⚠️  Only found ${currentMarkets.length} current markets out of ${allMarkets.length} total markets. API might be returning mostly historical data.`);
+      const response = await fetch(`${gammaUrl}?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`Gamma API returned ${response.status}: ${response.statusText}`);
       }
       
-      // Log today's date for debugging and set aggressive filtering
-      const currentDate = new Date();
-      const todayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-      // Be more aggressive - only allow markets that end at least 7 days from now or later
-      const minimumFutureDate = new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-      logger.info(`🗓️  Date filtering reference: currentDate=${currentDate.toISOString()}, todayStart=${todayStart.toISOString()}, minimumFutureDate=${minimumFutureDate.toISOString()}`);
+      const data: any = await response.json();
+      // Gamma API returns array directly, not nested in data/markets field
+      const markets = Array.isArray(data) ? data : (data.markets || data.data || []);
       
-      // Filter for truly active markets (future end dates)
-      let totalActive = 0;
-      let totalNonClosed = 0;
-      let totalFuture = 0;
-      let totalWithEndDate = 0;
-      let totalNoEndDate = 0;
+      logger.info(`Gamma API returned ${markets.length} markets`);
       
-      const activeMarkets = allMarkets.filter((market) => {
-        // Count totals for debugging
-        if (market.active === true) totalActive++;
-        if (market.closed === false) totalNonClosed++;
+      // Log first market to debug the transformation
+      if (markets.length > 0) {
+        const firstMarket = markets[0];
+        logger.info(`Debug: First raw market from Gamma API:`, {
+          conditionId: firstMarket.conditionId,
+          question: firstMarket.question?.substring(0, 50),
+          endDate: firstMarket.endDate,
+          endDateIso: firstMarket.endDateIso,
+          liquidity: firstMarket.liquidity,
+          liquidityNum: firstMarket.liquidityNum,
+          active: firstMarket.active,
+          closed: firstMarket.closed
+        });
+      }
+
+      // Transform Gamma API format to match expected Market interface
+      const transformedMarkets = markets.map((market: any) => {
+        const transformed = {
+          condition_id: market.conditionId,
+          question_id: market.questionID || market.id,
+          question: market.question,
+          market_slug: market.slug,
+          category: market.category || 'General',
+          end_date_iso: market.endDate || market.endDateIso,
+          game_start_time: market.startDate || market.startDateIso,
+          active: market.active,
+          closed: market.closed,
+          minimum_order_size: market.orderMinSize || null,
+          minimum_tick_size: market.orderPriceMinTickSize || null,
+          min_incentive_size: market.rewardsMinSize || null,
+          max_incentive_spread: market.rewardsMaxSpread || null,
+          seconds_delay: 0,
+          icon: market.icon || market.image,
+          fpmm: market.marketMakerAddress || null,
+          tokens: market.clobTokenIds ? JSON.parse(market.clobTokenIds).map((tokenId: string, index: number) => ({
+            token_id: tokenId,
+            outcome: market.outcomes ? JSON.parse(market.outcomes)[index] : `Outcome ${index + 1}`
+          })) : [],
+          rewards: market.rewardsMinSize ? {
+            min_size: market.rewardsMinSize,
+            max_spread: market.rewardsMaxSpread
+          } : null,
+          // Add Gamma API specific fields
+          liquidityNum: parseFloat(market.liquidity || market.liquidityNum || '0'),
+          volumeNum: parseFloat(market.volume || market.volumeNum || '0')
+        };
+
+        // Log first transformed market for debugging
+        if (market === markets[0]) {
+          logger.info(`Debug: First transformed market:`, {
+            condition_id: transformed.condition_id,
+            question: transformed.question?.substring(0, 50),
+            end_date_iso: transformed.end_date_iso,
+            liquidityNum: transformed.liquidityNum,
+            active: transformed.active,
+            closed: transformed.closed
+          });
+        }
+
+        return transformed;
+      });
+      
+      // Filter markets - with liquidity filtering, we can be less aggressive on dates
+      const now = new Date();
+      let filteredOutCount = 0;
+      const filteredMarkets = transformedMarkets.filter((market: any, index: number) => {
+        // Keep markets with no end date (often perpetual/ongoing)
+        if (!market.end_date_iso) {
+          if (index < 3) logger.info(`Debug: Keeping market with no end date: "${market.question?.substring(0, 50)}"`);
+          return true; 
+        }
         
-        // Since we already fetched active markets, just validate they're truly active
-        const isActive = market.active === true;
+        // Only filter out markets that ended more than 24 hours ago
+        const endDate = new Date(market.end_date_iso);
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const shouldKeep = endDate > oneDayAgo;
         
-        // Check if market end date is genuinely in the future (aggressive filtering)
-        let isFutureOrCurrent = true;
-        if (market.end_date_iso) {
-          totalWithEndDate++;
-          const endDate = new Date(market.end_date_iso);
-          // Use aggressive filtering - must end at least 7 days from now
-          isFutureOrCurrent = endDate >= minimumFutureDate;
-          
-          // Debug logging for date comparison - show first 10 to avoid spam
-          if (!isFutureOrCurrent && totalWithEndDate <= 10) {
-            const daysFromNow = Math.floor((endDate.getTime() - currentDate.getTime()) / (24 * 60 * 60 * 1000));
-            logger.info(`🚫 TOO SOON MARKET: "${market.question?.substring(0, 50)}..." ends ${market.end_date_iso} (${daysFromNow} days from now, need 7+)`);
-          }
-          
-          if (isFutureOrCurrent) {
-            totalFuture++;
-            // Log first few current markets to verify
-            if (totalFuture <= 5) {
-              const daysFromNow = Math.floor((endDate.getTime() - currentDate.getTime()) / (24 * 60 * 60 * 1000));
-              logger.info(`✅ FUTURE MARKET EXAMPLE: "${market.question?.substring(0, 50)}..." ends ${market.end_date_iso} (${daysFromNow} days from now)`);
-            }
+        if (!shouldKeep) {
+          filteredOutCount++;
+          if (filteredOutCount <= 3) {
+            const hoursAgo = Math.floor((now.getTime() - endDate.getTime()) / (60 * 60 * 1000));
+            logger.info(`Debug: Filtering out old market: "${market.question?.substring(0, 50)}" (ended ${hoursAgo} hours ago)`);
           }
         } else {
-          totalNoEndDate++;
-          // Markets with no end date - these are often perpetual/ongoing markets
-          if (totalNoEndDate <= 5) {
-            logger.info(`⏰ NO END DATE MARKET: "${market.question?.substring(0, 50)}..." (no end_date_iso field - assuming current)`);
+          if (index < 3) {
+            const hoursFromNow = Math.floor((endDate.getTime() - now.getTime()) / (60 * 60 * 1000));
+            logger.info(`Debug: Keeping future market: "${market.question?.substring(0, 50)}" (ends in ${hoursFromNow} hours)`);
           }
         }
         
-        // Debug logging for markets being filtered
-        if (isActive && !isFutureOrCurrent && market.end_date_iso) {
-          logger.debug(`Filtering out old market: "${market.question}" (ends: ${market.end_date_iso})`);
-        }
-        
-        // Return markets that are active AND current/future
-        return isActive && isFutureOrCurrent;
+        return shouldKeep; // Much more permissive - liquidity filter is doing the heavy lifting
       });
-
-      logger.info(`Filter breakdown: active=${totalActive}, nonClosed=${totalNonClosed}, withEndDate=${totalWithEndDate}, noEndDate=${totalNoEndDate}, futureEndDate=${totalFuture}, finalFiltered=${activeMarkets.length}`);
-
-      logger.info(`Filtered ${activeMarkets.length} active markets from ${allMarkets.length} total markets`);
-      return activeMarkets;
+      
+      logger.info(`Debug: Filtered out ${filteredOutCount} old markets, kept ${filteredMarkets.length} current markets`);
+      
+      logger.info(`Gamma API: Transformed and filtered to ${filteredMarkets.length} current markets`);
+      
+      // Log a few examples to verify the transformation
+      if (filteredMarkets.length > 0) {
+        const example = filteredMarkets[0];
+        logger.info(`Example Gamma market: "${example.question?.substring(0, 50)}..." liquidity=$${example.liquidityNum?.toFixed(0)}`);
+      }
+      
+      return filteredMarkets;
       
     } catch (error) {
-      logger.error('Failed to fetch markets from API:', error);
-      throw error;
+      logger.error('Failed to fetch from Gamma API:', error);
+      return []; // Return empty array instead of throwing
     }
   }
 
@@ -382,28 +384,52 @@ export class MarketSyncService extends Service {
           return;
         }
 
-        // Additional safety check: reject markets that don't meet our aggressive future criteria
-        // Use the SAME aggressive filtering as main filter - must end at least 7+ days from now
+        // FINAL SAFETY CHECK: Reject markets from previous years or already ended
         if (market.end_date_iso) {
           const endDate = new Date(market.end_date_iso);
           const currentDate = new Date();
-          const minimumFutureDate = new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+          const marketYear = endDate.getFullYear();
+          const currentYear = currentDate.getFullYear();
           
-          if (endDate < minimumFutureDate) {
-            const daysFromNow = Math.floor((endDate.getTime() - currentDate.getTime()) / (24 * 60 * 60 * 1000));
-            logger.error(`🚫 BLOCKING MARKET - ends too soon (${daysFromNow} days from now, need 7+):`, {
+          // Reject anything from previous years completely
+          if (marketYear < currentYear) {
+            logger.error(`🚫 BLOCKING OLD YEAR MARKET (${marketYear}):`, {
               condition_id: market.condition_id,
               question: market.question?.substring(0, 100),
               end_date: market.end_date_iso,
-              end_date_parsed: endDate.toISOString(),
-              days_from_now: daysFromNow,
-              minimum_required_date: minimumFutureDate.toISOString()
+              market_year: marketYear,
+              current_year: currentYear,
+              market_active_flag: market.active,
+              market_closed_flag: market.closed
+            });
+            return;
+          }
+          
+          // Also reject if already ended
+          if (endDate <= currentDate) {
+            const daysAgo = Math.floor((currentDate.getTime() - endDate.getTime()) / (24 * 60 * 60 * 1000));
+            logger.error(`🚫 BLOCKING EXPIRED MARKET (ended ${daysAgo} days ago):`, {
+              condition_id: market.condition_id,
+              question: market.question?.substring(0, 100),
+              end_date: market.end_date_iso,
+              days_ago: daysAgo,
+              current_time: currentDate.toISOString(),
+              market_active_flag: market.active,
+              market_closed_flag: market.closed
             });
             return;
           } else {
             const daysFromNow = Math.floor((endDate.getTime() - currentDate.getTime()) / (24 * 60 * 60 * 1000));
-            logger.info(`✅ ALLOWING MARKET - ends far enough in future: "${market.question?.substring(0, 50)}..." (${daysFromNow} days from now)`);
+            logger.info(`✅ ALLOWING CURRENT MARKET: "${market.question?.substring(0, 50)}..." (ends ${daysFromNow} days from now)`);
           }
+        } else {
+          // Market has no end date - log this case for debugging
+          logger.warn(`⚠️  MARKET WITH NO END DATE:`, {
+            condition_id: market.condition_id,
+            question: market.question?.substring(0, 100),
+            market_active_flag: market.active,
+            market_closed_flag: market.closed
+          });
         }
 
         // Upsert market
