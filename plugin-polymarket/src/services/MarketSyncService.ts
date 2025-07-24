@@ -30,7 +30,7 @@ export class MarketSyncService extends Service {
   private clobClient: ClobClient | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
   private readonly SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
-  private readonly MAX_PAGES = 20; // Fetch up to 20 pages to find current markets
+  private readonly MAX_PAGES = 100; // Fetch up to 100 pages to find current markets (API returns mostly old data)
   private readonly PAGE_SIZE = 500; // Markets per page (use the larger size that's working)
   private isRunning = false;
 
@@ -182,7 +182,7 @@ export class MarketSyncService extends Service {
       let pageCount = 0;
       const maxPages = this.MAX_PAGES;
       const pageSize = this.PAGE_SIZE;
-      const targetCurrentMarkets = 100; // Stop when we find enough current markets
+      const targetCurrentMarkets = 500; // Stop when we find enough current markets (increased due to mostly old data)
       
       logger.info('Starting paginated market fetch...');
       
@@ -200,12 +200,26 @@ export class MarketSyncService extends Service {
         allMarkets.push(...pageMarkets);
         
         // Count current/future markets on this page for early termination
+        // Use the EXACT same aggressive logic as final filtering for consistency
         const currentDate = new Date();
-        const todayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+        const minimumFutureDate = new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000);
         const pageCurrentMarkets = pageMarkets.filter(market => {
-          if (!market.end_date_iso) return true; // No end date = current
-          const endDate = new Date(market.end_date_iso);
-          return market.active && endDate >= todayStart;
+          // Must be active
+          if (market.active !== true) return false;
+          
+          // Check if market end date is genuinely in the future (aggressive filtering)
+          if (market.end_date_iso) {
+            const endDate = new Date(market.end_date_iso);
+            const isFutureOrCurrent = endDate >= minimumFutureDate;
+            if (!isFutureOrCurrent) {
+              const daysFromNow = Math.floor((endDate.getTime() - currentDate.getTime()) / (24 * 60 * 60 * 1000));
+              logger.debug(`Early filter: excluding market "${market.question?.substring(0, 30)}..." (ends in ${daysFromNow} days, need 7+)`);
+            }
+            return isFutureOrCurrent;
+          }
+          
+          // No end date = assume current (perpetual markets)
+          return true;
         });
         
         currentMarkets.push(...pageCurrentMarkets);
@@ -242,11 +256,19 @@ export class MarketSyncService extends Service {
         logger.warn(`⚠️  Only found ${currentMarkets.length} current markets out of ${allMarkets.length} total markets. API might be returning mostly historical data.`);
       }
       
-      // Filter for truly active markets (future end dates)
+      // Log today's date for debugging and set aggressive filtering
       const currentDate = new Date();
+      const todayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      // Be more aggressive - only allow markets that end at least 7 days from now or later
+      const minimumFutureDate = new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+      logger.info(`🗓️  Date filtering reference: currentDate=${currentDate.toISOString()}, todayStart=${todayStart.toISOString()}, minimumFutureDate=${minimumFutureDate.toISOString()}`);
+      
+      // Filter for truly active markets (future end dates)
       let totalActive = 0;
       let totalNonClosed = 0;
       let totalFuture = 0;
+      let totalWithEndDate = 0;
+      let totalNoEndDate = 0;
       
       const activeMarkets = allMarkets.filter((market) => {
         // Count totals for debugging
@@ -256,20 +278,34 @@ export class MarketSyncService extends Service {
         // Since we already fetched active markets, just validate they're truly active
         const isActive = market.active === true;
         
-        // Check if market end date is current or in the future
+        // Check if market end date is genuinely in the future (aggressive filtering)
         let isFutureOrCurrent = true;
         if (market.end_date_iso) {
+          totalWithEndDate++;
           const endDate = new Date(market.end_date_iso);
-          // Only allow markets that end today or in the future (no old markets)
-          const todayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-          isFutureOrCurrent = endDate >= todayStart;
+          // Use aggressive filtering - must end at least 7 days from now
+          isFutureOrCurrent = endDate >= minimumFutureDate;
           
-          // Debug logging for date comparison
-          if (!isFutureOrCurrent) {
-            logger.debug(`Market "${market.question?.substring(0, 50)}..." ends ${market.end_date_iso} (${endDate.toISOString()}) vs today ${todayStart.toISOString()}`);
+          // Debug logging for date comparison - show first 10 to avoid spam
+          if (!isFutureOrCurrent && totalWithEndDate <= 10) {
+            const daysFromNow = Math.floor((endDate.getTime() - currentDate.getTime()) / (24 * 60 * 60 * 1000));
+            logger.info(`🚫 TOO SOON MARKET: "${market.question?.substring(0, 50)}..." ends ${market.end_date_iso} (${daysFromNow} days from now, need 7+)`);
           }
           
-          if (isFutureOrCurrent) totalFuture++;
+          if (isFutureOrCurrent) {
+            totalFuture++;
+            // Log first few current markets to verify
+            if (totalFuture <= 5) {
+              const daysFromNow = Math.floor((endDate.getTime() - currentDate.getTime()) / (24 * 60 * 60 * 1000));
+              logger.info(`✅ FUTURE MARKET EXAMPLE: "${market.question?.substring(0, 50)}..." ends ${market.end_date_iso} (${daysFromNow} days from now)`);
+            }
+          }
+        } else {
+          totalNoEndDate++;
+          // Markets with no end date - these are often perpetual/ongoing markets
+          if (totalNoEndDate <= 5) {
+            logger.info(`⏰ NO END DATE MARKET: "${market.question?.substring(0, 50)}..." (no end_date_iso field - assuming current)`);
+          }
         }
         
         // Debug logging for markets being filtered
@@ -281,7 +317,7 @@ export class MarketSyncService extends Service {
         return isActive && isFutureOrCurrent;
       });
 
-      logger.info(`Filter breakdown: active=${totalActive}, nonClosed=${totalNonClosed}, futureEndDate=${totalFuture}, finalFiltered=${activeMarkets.length}`);
+      logger.info(`Filter breakdown: active=${totalActive}, nonClosed=${totalNonClosed}, withEndDate=${totalWithEndDate}, noEndDate=${totalNoEndDate}, futureEndDate=${totalFuture}, finalFiltered=${activeMarkets.length}`);
 
       logger.info(`Filtered ${activeMarkets.length} active markets from ${allMarkets.length} total markets`);
       return activeMarkets;
@@ -346,22 +382,27 @@ export class MarketSyncService extends Service {
           return;
         }
 
-        // Additional safety check: reject old markets before they reach the database
+        // Additional safety check: reject markets that don't meet our aggressive future criteria
+        // Use the SAME aggressive filtering as main filter - must end at least 7+ days from now
         if (market.end_date_iso) {
           const endDate = new Date(market.end_date_iso);
           const currentDate = new Date();
-          // Be more aggressive - reject markets that ended more than 1 day ago
-          const yesterdayStart = new Date(currentDate.getTime() - 24 * 60 * 60 * 1000);
+          const minimumFutureDate = new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000);
           
-          if (endDate < yesterdayStart) {
-            const daysAgo = Math.floor((currentDate.getTime() - endDate.getTime()) / (24 * 60 * 60 * 1000));
-            logger.error(`🚫 BLOCKING OLD MARKET - ended ${daysAgo} days ago:`, {
+          if (endDate < minimumFutureDate) {
+            const daysFromNow = Math.floor((endDate.getTime() - currentDate.getTime()) / (24 * 60 * 60 * 1000));
+            logger.error(`🚫 BLOCKING MARKET - ends too soon (${daysFromNow} days from now, need 7+):`, {
               condition_id: market.condition_id,
               question: market.question?.substring(0, 100),
               end_date: market.end_date_iso,
-              ended_days_ago: daysAgo
+              end_date_parsed: endDate.toISOString(),
+              days_from_now: daysFromNow,
+              minimum_required_date: minimumFutureDate.toISOString()
             });
             return;
+          } else {
+            const daysFromNow = Math.floor((endDate.getTime() - currentDate.getTime()) / (24 * 60 * 60 * 1000));
+            logger.info(`✅ ALLOWING MARKET - ends far enough in future: "${market.question?.substring(0, 50)}..." (${daysFromNow} days from now)`);
           }
         }
 

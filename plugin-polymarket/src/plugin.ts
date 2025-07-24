@@ -41,6 +41,7 @@ import { handleRealtimeUpdatesAction } from './actions/handleRealtimeUpdates';
 import { getMarketDetailBySearchAction } from './actions/getMarketDetailBySearch';
 import { getEnhancedMarketInfoAction } from './actions/getEnhancedMarketInfo';
 import { getPopularMarketsAction } from './actions/getPopularMarkets';
+import { showPredictionMarketAction } from './actions/showPredictionMarket';
 import { polymarketSchema } from './schema';
 import { MarketSyncService } from './services/MarketSyncService';
 import { MarketDetailService } from './services/MarketDetailService';
@@ -209,6 +210,15 @@ const plugin: Plugin = {
   },
   services: [PolymarketService, MarketSyncService, MarketDetailService],
   actions: [
+    // Database-first actions (highest priority for common queries)
+    showPredictionMarketAction,
+    getPopularMarketsAction,
+    getMarketDetailBySearchAction,
+    
+    // Enhanced data actions
+    getEnhancedMarketInfoAction,
+    
+    // API-heavy actions (lower priority to reduce redundant calls)
     retrieveAllMarketsAction,
     getSimplifiedMarketsAction,
     getSamplingMarkets,
@@ -216,12 +226,16 @@ const plugin: Plugin = {
     getOpenMarkets,
     getPriceHistory,
     getMarketDetailsAction,
+    
+    // Trading and order management
     getOrderBookSummaryAction,
     getOrderBookDepthAction,
     getBestPriceAction,
     getMidpointPriceAction,
     getSpreadAction,
     placeOrderAction,
+    
+    // Account management
     createApiKeyAction,
     revokeApiKeyAction,
     getAllApiKeysAction,
@@ -230,12 +244,11 @@ const plugin: Plugin = {
     getActiveOrdersAction,
     getAccountAccessStatusAction,
     getTradeHistoryAction,
+    
+    // WebSocket and real-time
     handleAuthenticationAction,
     setupWebsocketAction,
     handleRealtimeUpdatesAction,
-    getMarketDetailBySearchAction,
-    getEnhancedMarketInfoAction,
-    getPopularMarketsAction,
   ],
   providers: [polymarketProvider],
 };

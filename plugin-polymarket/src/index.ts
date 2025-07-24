@@ -30,6 +30,7 @@ export { getAllApiKeysAction } from './actions/getAllApiKeys';
 export { getMarketDetailBySearchAction } from './actions/getMarketDetailBySearch';
 export { getEnhancedMarketInfoAction } from './actions/getEnhancedMarketInfo';
 export { getPopularMarketsAction } from './actions/getPopularMarkets';
+export { showPredictionMarketAction } from './actions/showPredictionMarket';
 
 // Export utilities and services for advanced use cases
 export { initializeClobClient } from './utils/clobClient';

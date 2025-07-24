@@ -66,16 +66,29 @@ export const getOpenMarkets: Action = {
       return false;
     }
 
-    // Check if message requests open/active/tradeable markets
+    // Check if message specifically requests open/active/tradeable markets
+    // BUT not simple "show me a prediction market" requests
     const messageText = message.content?.text?.toLowerCase() || '';
-    const isOpenMarketsRequest = messageText.includes('open') ||
-                                messageText.includes('active') ||
-                                messageText.includes('tradeable') ||
-                                messageText.includes('tradable') ||
-                                messageText.includes('available') ||
-                                messageText.includes('not closed') ||
-                                messageText.includes('live') ||
-                                messageText.includes('current');
+    
+    // Exclude simple show requests that should go to our database-first action
+    if (messageText.includes('show me a prediction market') || 
+        messageText.includes('show me prediction market') ||
+        (messageText.includes('show') && messageText.includes('market') && messageText.split(' ').length <= 5)) {
+      return false;
+    }
+    
+    // More specific validation - must explicitly mention "open" or "active" with context
+    const isOpenMarketsRequest = (messageText.includes('open markets') ||
+                                messageText.includes('active markets') ||
+                                messageText.includes('tradeable markets') ||
+                                messageText.includes('tradable markets') ||
+                                messageText.includes('available markets') ||
+                                messageText.includes('not closed markets') ||
+                                messageText.includes('live markets') ||
+                                messageText.includes('current markets') ||
+                                messageText.includes('get open') ||
+                                messageText.includes('list open') ||
+                                messageText.includes('fetch open'));
     
     logger.info(`[getOpenMarkets] Validating message: "${messageText}", isOpenMarketsRequest: ${isOpenMarketsRequest}`);
     return isOpenMarketsRequest;

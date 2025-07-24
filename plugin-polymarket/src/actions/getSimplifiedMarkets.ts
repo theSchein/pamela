@@ -48,7 +48,16 @@ export const getSimplifiedMarketsAction: Action = {
       return false;
     }
 
-    return true;
+    const messageText = message.content?.text?.toLowerCase() || '';
+    
+    // Only trigger for explicit simplified schema requests
+    const isSimplifiedRequest = messageText.includes('simplified') ||
+                               messageText.includes('simple') ||
+                               messageText.includes('reduced schema') ||
+                               messageText.includes('basic data') ||
+                               messageText.includes('minimal data');
+
+    return isSimplifiedRequest;
   },
 
   handler: async (
