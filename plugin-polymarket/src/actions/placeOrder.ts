@@ -16,6 +16,7 @@ import { orderTemplate } from '../templates';
 import { OrderSide, OrderType } from '../types';
 import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
 import { checkUSDCBalance, formatBalanceInfo, getMaxPositionSize } from '../utils/balanceChecker';
+import { findMarketByName } from '../utils/marketLookup';
 import { ClobClient, Side } from '@polymarket/clob-client';
 import { ethers } from 'ethers';
 
@@ -27,6 +28,7 @@ interface PlaceOrderParams {
   orderType?: string;
   feeRateBps?: string;
   marketName?: string;
+  outcome?: string; // YES/NO for outcome-based trading
 }
 
 /**
@@ -127,30 +129,125 @@ export const placeOrderAction: Action = {
       orderType = llmResult?.orderType?.toUpperCase() || 'GTC';
       feeRateBps = llmResult?.feeRateBps || '0';
 
-      // Handle market name lookup
-      if (tokenId === 'MARKET_NAME_LOOKUP' && llmResult?.marketName) {
+      // Handle market name lookup - try to resolve to token ID
+      if ((tokenId === 'MARKET_NAME_LOOKUP' || !tokenId || tokenId.length < 10) && llmResult?.marketName) {
         logger.info(`[placeOrderAction] Market name lookup requested: ${llmResult.marketName}`);
-        const errorContent: Content = {
-          text: `❌ **I need a specific token ID to execute trades**
+        
+        try {
+          const marketResult = await findMarketByName(runtime, llmResult.marketName);
+          
+          if (!marketResult) {
+            const errorContent: Content = {
+              text: `❌ **Market not found: "${llmResult.marketName}"**
 
-I understand you want to trade in "${llmResult.marketName}", but I need the exact token ID.
+I couldn't find an active market matching that name.
 
-**Please:**
-1. First ask me to "show open markets" to see available markets
-2. Pick a specific market and provide its token ID
-3. Then I can execute your trade
+**Please try:**
+1. "Show me open markets" to see available markets
+2. Be more specific with the market name
+3. Use quotes around the exact market name
 
 **Example:**
-- "Show me open markets" 
-- "Buy $1 of YES in token 71321045679252212866628783233817119462965056889756850604436560611652617896321"`,
-          actions: ['POLYMARKET_GET_OPEN_MARKETS'],
-          data: { error: 'Market name lookup requires specific token ID', marketName: llmResult.marketName },
-        };
+- "Show me open markets"
+- "Buy YES in 'Macron out in 2025?'" 
+- "Trade on the Chiefs vs Raiders market"`,
+              actions: ['POLYMARKET_GET_OPEN_MARKETS'],
+              data: { error: 'Market not found', marketName: llmResult.marketName },
+            };
 
-        if (callback) {
-          await callback(errorContent);
+            if (callback) {
+              await callback(errorContent);
+            }
+            return contentToActionResult(errorContent);
+          }
+
+          // Determine which token to use based on outcome (YES/NO)
+          const outcome = llmResult.outcome?.toUpperCase() || side.toUpperCase() === 'BUY' ? 'YES' : 'NO';
+          const targetToken = marketResult.tokens.find(t => t.outcome.toUpperCase() === outcome);
+          
+          if (!targetToken) {
+            const availableOutcomes = marketResult.tokens.map(t => t.outcome).join(', ');
+            const errorContent: Content = {
+              text: `❌ **Outcome not found in market**
+
+Market: "${marketResult.market.question}"
+Available outcomes: ${availableOutcomes}
+Requested outcome: ${outcome}
+
+**Please specify:**
+- "Buy YES in [market name]"
+- "Buy NO in [market name]"
+- Or use the exact outcome names listed above`,
+              actions: ['POLYMARKET_PLACE_ORDER'],
+              data: { 
+                error: 'Outcome not found',
+                market: marketResult.market,
+                availableOutcomes: marketResult.tokens.map(t => t.outcome),
+                requestedOutcome: outcome,
+              },
+            };
+
+            if (callback) {
+              await callback(errorContent);
+            }
+            return contentToActionResult(errorContent);
+          }
+
+          // Success! Update tokenId with resolved token
+          tokenId = targetToken.token_id;
+          logger.info(`[placeOrderAction] Resolved "${llmResult.marketName}" -> ${outcome} -> ${tokenId.slice(0, 12)}...`);
+
+          // Show market resolution to user
+          if (callback) {
+            const resolutionContent: Content = {
+              text: `✅ **Market Resolved**
+
+**Market**: ${marketResult.market.question}
+**Outcome**: ${targetToken.outcome}
+**Token ID**: ${tokenId.slice(0, 12)}...
+
+Proceeding with order verification...`,
+              actions: ['POLYMARKET_PLACE_ORDER'],
+              data: { 
+                marketResolution: {
+                  market: marketResult.market,
+                  selectedToken: targetToken,
+                  resolvedTokenId: tokenId,
+                }
+              },
+            };
+            await callback(resolutionContent);
+          }
+
+        } catch (lookupError) {
+          logger.error(`[placeOrderAction] Market lookup failed:`, lookupError);
+          const errorContent: Content = {
+            text: `❌ **Market lookup failed**
+
+Error finding market: "${llmResult.marketName}"
+
+This could be due to:
+• Database connectivity issues
+• Market not synchronized
+• Invalid market name
+
+**Please try:**
+- "Show me open markets" to browse available markets
+- Use more specific market names
+- Check spelling and try again`,
+            actions: ['POLYMARKET_GET_OPEN_MARKETS'],
+            data: { 
+              error: 'Market lookup failed',
+              marketName: llmResult.marketName,
+              lookupError: lookupError instanceof Error ? lookupError.message : 'Unknown error',
+            },
+          };
+
+          if (callback) {
+            await callback(errorContent);
+          }
+          return createErrorResult('Market lookup failed');
         }
-        return contentToActionResult(errorContent);
       }
 
       if (!tokenId || !side || price <= 0 || size <= 0) {

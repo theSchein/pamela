@@ -53,6 +53,7 @@ import { getMarketDetailBySearchAction } from './actions/getMarketDetailBySearch
 import { getEnhancedMarketInfoAction } from './actions/getEnhancedMarketInfo';
 import { getPopularMarketsAction } from './actions/getPopularMarkets';
 import { getWalletBalanceAction } from './actions/getWalletBalance';
+import { getMarketByNameAction } from './actions/getMarketByName';
 // import { showPredictionMarketAction } from './actions/showPredictionMarket'; // REDUNDANT
 import { polymarketSchema } from './schema';
 import { MarketSyncService } from './services/MarketSyncService';
@@ -228,9 +229,10 @@ const plugin: Plugin = {
     getPopularMarketsAction,        // Fast database lookup
     getSamplingMarkets,            // Reward-enabled markets
     
-    // Market Details (2 actions)  
+    // Market Details (3 actions)  
     getEnhancedMarketInfoAction,   // Comprehensive market details
     getMarketDetailBySearchAction, // Search functionality
+    getMarketByNameAction,         // Market lookup by name/description
     
     // Market Data (1 action)
     getOrderBookSummaryAction,     // Complete order book with pricing info

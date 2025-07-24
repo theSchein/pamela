@@ -107,18 +107,29 @@ Based on the conversation, identify:
 - price: The price per share (0-1.0) (required)
 - size: The quantity/size of the order (required)
 - orderType: "limit" or "market" (optional, defaults to "limit")
+- marketName: Name/description of the market (if mentioned)
+- outcome: "YES", "NO", or specific outcome name (if mentioned)
 
 **Token ID Extraction Rules:**
 1. Look for explicit token IDs (long numeric strings like "71321045679252212594626385532706912750332728571942532289631379312455583992563")
-2. Look for market names like "Nuggets NBA Champion", "Chiefs vs Raiders", "Nobel Peace Prize"
-3. If only market name is provided, set tokenId to "MARKET_NAME_LOOKUP" and include the market name in the response
+2. Look for market names like "Nuggets NBA Champion", "Chiefs vs Raiders", "Nobel Peace Prize", "Macron out in 2025?"
+3. If only market name is provided, set tokenId to "MARKET_NAME_LOOKUP" and include the market name and outcome
 4. NEVER generate fake or example token IDs - only use real ones from the conversation
 5. If no valid token ID is found, return an error
 
 **Examples:**
-- "Buy 5 shares at $0.75 for the Nobel Peace Prize market" → tokenId: "MARKET_NAME_LOOKUP", marketName: "Nobel Peace Prize market"
+- "Buy 5 shares at $0.75 for the Nobel Peace Prize market" → tokenId: "MARKET_NAME_LOOKUP", marketName: "Nobel Peace Prize market", side: "buy", price: 0.75, size: 5
+- "Buy YES in Macron out in 2025?" → tokenId: "MARKET_NAME_LOOKUP", marketName: "Macron out in 2025?", outcome: "YES", side: "buy"
+- "Sell NO position in Trump election" → tokenId: "MARKET_NAME_LOOKUP", marketName: "Trump election", outcome: "NO", side: "sell"
 - "Place buy order for token 71321045679252212594626385532706912750332728571942532289631379312455583992563" → tokenId: "71321045679252212594626385532706912750332728571942532289631379312455583992563"
-- "Buy tokens at 50 cents for Chiefs vs Raiders" → tokenId: "MARKET_NAME_LOOKUP", marketName: "Chiefs vs Raiders"
+- "Buy $10 of Chiefs to win" → tokenId: "MARKET_NAME_LOOKUP", marketName: "Chiefs", outcome: "YES" (inferred)
+
+**Pattern Recognition:**
+- "Buy/Sell YES/NO in [market]" → outcome-based trading
+- "[market]" in quotes → exact market name
+- Dollar amounts like "$10" → convert to size if price given
+- "win", "victory" → YES outcome
+- "lose", "defeat" → NO outcome
 
 **IMPORTANT**: NEVER generate fake token IDs like "0x987654321fedcba" or "123456789". Only extract real token IDs from the user's message or set to "MARKET_NAME_LOOKUP" for market name searches.
 
@@ -129,12 +140,13 @@ Respond with a JSON object containing the extracted values:
     "price": number,
     "size": number,
     "orderType"?: "limit" | "market",
-    "marketName"?: string
+    "marketName"?: string,
+    "outcome"?: string
 }
 
 If any required parameters are missing, respond with:
 {
-    "error": "Missing required order parameters. Please specify tokenId (or market name), side (buy/sell), price, and size."
+    "error": "Missing required order parameters. Please specify market name/tokenId, side (buy/sell), price, and size."
 }`;
 
 export const getOrderBookTemplate = `You are an AI assistant. Your task is to extract token identification parameters for retrieving order book data.
