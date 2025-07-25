@@ -16,6 +16,8 @@ build/
 
 # Database
 .eliza/
+.elizadb/
+.elizadb-test/
 
 # Logs
 npm-debug.log*

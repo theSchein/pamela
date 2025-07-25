@@ -479,25 +479,87 @@ Please check your wallet configuration and try again.`,
     }
 
     try {
-      // Initialize CLOB client with L1 authentication (wallet-only)
-      logger.info(`[placeOrderAction] Initializing CLOB client for L1-only authentication`);
+      // Check if we have API credentials, if not try to derive them
+      logger.info(`[placeOrderAction] Checking for API credentials`);
       
-      if (callback) {
-        const authContent: Content = {
-          text: `🔐 **L1 Authentication Ready**
+      const hasApiKey = runtime.getSetting('CLOB_API_KEY');
+      const hasApiSecret = runtime.getSetting('CLOB_API_SECRET') || runtime.getSetting('CLOB_SECRET');
+      const hasApiPassphrase = runtime.getSetting('CLOB_API_PASSPHRASE') || runtime.getSetting('CLOB_PASS_PHRASE');
+      
+      if (!hasApiKey || !hasApiSecret || !hasApiPassphrase) {
+        logger.info(`[placeOrderAction] API credentials missing, attempting to derive them`);
+        
+        if (callback) {
+          const derivingContent: Content = {
+            text: `🔑 **Deriving API Credentials**
 
-**Authentication Mode**: Wallet-based (L1)
-• **Wallet**: ✅ Connected
-• **Order Posting**: ✅ Enabled (L1 signatures)
-• **Mode**: Direct wallet authentication
+**Status**: Generating L2 API credentials from wallet
+• **Method**: deriveApiKey() from wallet signature
+• **Purpose**: Enable order posting to Polymarket
 
-Initializing CLOB client for order placement...`,
-          actions: ['POLYMARKET_PLACE_ORDER'],
-          data: { authMode: 'L1', walletReady: true },
-        };
-        await callback(authContent);
+Deriving credentials...`,
+            actions: ['POLYMARKET_PLACE_ORDER'],
+            data: { derivingCredentials: true },
+          };
+          await callback(derivingContent);
+        }
+
+        try {
+          const client = await initializeClobClient(runtime);
+          const derivedCreds = await client.deriveApiKey();
+          
+          // Store the derived credentials in runtime
+          await runtime.setSetting('CLOB_API_KEY', derivedCreds.key);
+          await runtime.setSetting('CLOB_API_SECRET', derivedCreds.secret);
+          await runtime.setSetting('CLOB_API_PASSPHRASE', derivedCreds.passphrase);
+          
+          logger.info(`[placeOrderAction] Successfully derived and stored API credentials`);
+          
+          if (callback) {
+            const successContent: Content = {
+              text: `✅ **API Credentials Derived Successfully**
+
+**Credential Details:**
+• **API Key**: ${derivedCreds.key}
+• **Status**: ✅ Ready for Trading
+• **Method**: Wallet-derived L2 credentials
+
+Reinitializing client with credentials...`,
+              actions: ['POLYMARKET_PLACE_ORDER'],
+              data: { credentialsReady: true, apiKey: derivedCreds.key },
+            };
+            await callback(successContent);
+          }
+        } catch (deriveError) {
+          logger.error(`[placeOrderAction] Failed to derive API credentials:`, deriveError);
+          const errorContent: Content = {
+            text: `❌ **Failed to Derive API Credentials**
+
+**Error**: ${deriveError instanceof Error ? deriveError.message : 'Unknown error'}
+
+This could be due to:
+• Network connectivity issues
+• Wallet signature problems
+• Polymarket API issues
+
+Please ensure your wallet is properly configured and try again.`,
+            actions: ['POLYMARKET_PLACE_ORDER'],
+            data: { 
+              error: 'Failed to derive API credentials',
+              deriveError: deriveError instanceof Error ? deriveError.message : 'Unknown error',
+            },
+          };
+          
+          if (callback) {
+            await callback(errorContent);
+          }
+          return createErrorResult('Failed to derive API credentials for order posting');
+        }
+      } else {
+        logger.info(`[placeOrderAction] API credentials already available`);
       }
 
+      // Now initialize client with credentials
       const client = await initializeClobClient(runtime);
 
       // Create order arguments matching the official ClobClient interface

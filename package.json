@@ -1,18 +1,29 @@
 {
   "name": "pamela",
-  "description": "Project starter for elizaOS",
+  "description": "Autonomous prediction market trading agent built on ElizaOS",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/src/index.js",
   "module": "dist/src/index.js",
   "types": "dist/index.d.ts",
   "keywords": [
-    "project",
-    "elizaos"
+    "prediction-markets",
+    "polymarket",
+    "trading",
+    "autonomous-agent",
+    "elizaos",
+    "blockchain",
+    "polygon"
   ],
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/your-org/pamela"
+  },
+  "license": "MIT",
+  "author": "Pamela Contributors",
+  "homepage": "https://github.com/your-org/pamela#readme",
+  "bugs": {
+    "url": "https://github.com/your-org/pamela/issues"
   },
   "exports": {
     "./package.json": "./package.json",
