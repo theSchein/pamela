@@ -1,14 +1,14 @@
-import { describe, expect, it, beforeAll, afterAll } from 'bun:test';
-import fs from 'node:fs';
-import path from 'node:path';
-import { $ } from 'bun';
-import { getViteOutDir } from './vite-config-utils';
+import { describe, expect, it, beforeAll, afterAll } from "bun:test";
+import fs from "node:fs";
+import path from "node:path";
+import { $ } from "bun";
+import { getViteOutDir } from "./vite-config-utils";
 
-describe('Build Order Integration Test', () => {
-  const rootDir = path.resolve(__dirname, '../..');
-  const distDir = path.join(rootDir, 'dist');
+describe("Build Order Integration Test", () => {
+  const rootDir = path.resolve(__dirname, "../..");
+  const distDir = path.join(rootDir, "dist");
   let viteBuildDir: string;
-  const tsupBuildMarker = path.join(distDir, 'index.js'); // TSup creates this
+  const tsupBuildMarker = path.join(distDir, "index.js"); // TSup creates this
 
   beforeAll(async () => {
     // Get the actual vite build directory from config
@@ -28,7 +28,7 @@ describe('Build Order Integration Test', () => {
     }
   });
 
-  it('should ensure vite build outputs persist after tsup build', async () => {
+  it("should ensure vite build outputs persist after tsup build", async () => {
     // Run the full build process
     await $`cd ${rootDir} && bun run build`;
 
@@ -41,16 +41,16 @@ describe('Build Order Integration Test', () => {
     expect(frontendFiles.length).toBeGreaterThan(0);
 
     // Should have HTML entry point
-    expect(frontendFiles.some((file) => file.endsWith('.html'))).toBe(true);
+    expect(frontendFiles.some((file) => file.endsWith(".html"))).toBe(true);
 
     // Should have assets directory (CSS/JS files are in assets/)
-    expect(frontendFiles.includes('assets')).toBe(true);
+    expect(frontendFiles.includes("assets")).toBe(true);
 
     // Verify tsup also produced its expected outputs
     const distFiles = fs.readdirSync(distDir);
 
     // Should have tsup outputs (index.js)
-    expect(distFiles.some((file) => file === 'index.js')).toBe(true);
+    expect(distFiles.some((file) => file === "index.js")).toBe(true);
 
     // Should still have vite build directory
     const viteBuildDirName = path.basename(viteBuildDir);

@@ -20,12 +20,12 @@ declare global {
 }
 
 // Custom command to check if element is in dark mode
-Cypress.Commands.add('shouldBeDarkMode', () => {
-  cy.get('html').should('have.class', 'dark');
+Cypress.Commands.add("shouldBeDarkMode", () => {
+  cy.get("html").should("have.class", "dark");
 });
 
 // Custom command to set ELIZA_CONFIG
-Cypress.Commands.add('setElizaConfig', (config) => {
+Cypress.Commands.add("setElizaConfig", (config) => {
   cy.window().then((win) => {
     win.ELIZA_CONFIG = config;
   });
@@ -36,7 +36,10 @@ declare global {
   namespace Cypress {
     interface Chainable {
       shouldBeDarkMode(): Chainable<JQuery<HTMLElement>>;
-      setElizaConfig(config: { agentId: string; apiBase: string }): Chainable<Window>;
+      setElizaConfig(config: {
+        agentId: string;
+        apiBase: string;
+      }): Chainable<Window>;
     }
   }
 }

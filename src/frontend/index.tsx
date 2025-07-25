@@ -1,8 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createRoot } from 'react-dom/client';
-import './index.css';
-import React from 'react';
-import type { UUID } from '@elizaos/core';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createRoot } from "react-dom/client";
+import "./index.css";
+import React from "react";
+import type { UUID } from "@elizaos/core";
 
 const queryClient = new QueryClient();
 
@@ -28,13 +28,15 @@ function ExampleRoute() {
 
   // Apply dark mode to the root element
   React.useEffect(() => {
-    document.documentElement.classList.add('dark');
+    document.documentElement.classList.add("dark");
   }, []);
 
   if (!agentId) {
     return (
       <div className="p-4 text-center">
-        <div className="text-red-600 font-medium">Error: Agent ID not found</div>
+        <div className="text-red-600 font-medium">
+          Error: Agent ID not found
+        </div>
         <div className="text-sm text-gray-600 mt-2">
           The server should inject the agent ID configuration.
         </div>
@@ -57,7 +59,7 @@ function ExampleProvider({ agentId }: { agentId: UUID }) {
 }
 
 // Initialize the application - no router needed for iframe
-const rootElement = document.getElementById('root');
+const rootElement = document.getElementById("root");
 if (rootElement) {
   createRoot(rootElement).render(<ExampleRoute />);
 }
@@ -86,13 +88,13 @@ const PanelComponent: React.FC<PanelProps> = ({ agentId }) => {
 // Export the panel configuration for integration with the agent UI
 export const panels: AgentPanel[] = [
   {
-    name: 'Example',
-    path: 'example',
+    name: "Example",
+    path: "example",
     component: PanelComponent,
-    icon: 'Book',
+    icon: "Book",
     public: false,
-    shortLabel: 'Example',
+    shortLabel: "Example",
   },
 ];
 
-export * from './utils';
+export * from "./utils";

@@ -1,5 +1,6 @@
 import { type IAgentRuntime, logger } from '@elizaos/core';
 import { ClobClient } from '@polymarket/clob-client';
+import { SignatureType } from '@polymarket/order-utils';
 import { ethers } from 'ethers';
 
 
@@ -20,7 +21,7 @@ export interface BookParams {
 }
 
 /**
- * Initialize CLOB client with wallet-based authentication
+ * Initialize CLOB client with wallet-based authentication and optional API credentials
  * @param runtime - The agent runtime containing configuration
  * @returns Configured CLOB client instance
  */
@@ -39,7 +40,18 @@ export async function initializeClobClient(runtime: IAgentRuntime): Promise<Clob
     );
   }
 
-  logger.info(`[initializeClobClient] Initializing CLOB client with HTTP URL: ${clobApiUrl}` + (clobWsUrl ? ` and WS URL: ${clobWsUrl}` : ' (no WS URL provided)'));
+  // Check for API credentials
+  const apiKey = runtime.getSetting('CLOB_API_KEY');
+  const apiSecret = runtime.getSetting('CLOB_API_SECRET') || runtime.getSetting('CLOB_SECRET');
+  const apiPassphrase = runtime.getSetting('CLOB_API_PASSPHRASE') || runtime.getSetting('CLOB_PASS_PHRASE');
+  
+  const hasApiCreds = !!(apiKey && apiSecret && apiPassphrase);
+
+  logger.info(`[initializeClobClient] Initializing CLOB client:`, {
+    httpUrl: clobApiUrl,
+    hasApiCredentials: hasApiCreds,
+    authType: hasApiCreds ? 'L1 + L2 (API creds)' : 'L1 only (wallet)',
+  });
 
   try {
     // Ensure private key has 0x prefix for ethers.js
@@ -55,16 +67,26 @@ export async function initializeClobClient(runtime: IAgentRuntime): Promise<Clob
     logger.info(`[initializeClobClient] Wallet address: ${wallet.address}`);
     logger.info(`[initializeClobClient] Chain ID: 137`);
 
+    // Create API credentials object if available
+    let creds: ApiKeyCreds | undefined = undefined;
+    if (hasApiCreds) {
+      creds = {
+        key: apiKey!,
+        secret: apiSecret!,
+        passphrase: apiPassphrase!,
+      };
+    }
+
     const client = new ClobClient(
       clobApiUrl,
       137, // Polygon chain ID
       enhancedWallet as any,
-      undefined, // No API creds for this basic client
-      clobWsUrl  // Pass WebSocket URL
+      creds, // API credentials (undefined if not available)
+      SignatureType.EOA // Use EOA signature type for regular private key wallets
     );
 
     logger.info(
-      `[initializeClobClient] CLOB client initialized successfully with direct EOA wallet` + (clobWsUrl ? ' and WebSocket support.' : '.')
+      `[initializeClobClient] CLOB client initialized successfully with ${hasApiCreds ? 'API credentials and wallet' : 'wallet only'}.`
     );
     return client;
   } catch (error) {
@@ -146,11 +168,11 @@ export async function initializeClobClientWithCreds(runtime: IAgentRuntime): Pro
       137, // Polygon chain ID
       enhancedWallet as any,
       creds, // API credentials for L2 authentication
-      clobWsUrl // Pass WebSocket URL
+      SignatureType.EOA // Use EOA signature type for regular private key wallets
     );
 
     logger.info(
-      `[initializeClobClientWithCreds] CLOB client initialized successfully with API credentials` + (clobWsUrl ? ' and WebSocket support.' : '.')
+      `[initializeClobClientWithCreds] CLOB client initialized successfully with API credentials.`
     );
     return client;
   } catch (error) {

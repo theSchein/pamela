@@ -1,13 +1,21 @@
-import { describe, expect, it, beforeEach, afterEach, mock, spyOn } from 'bun:test';
-import plugin from '../plugin';
-import { StarterService } from '../plugin';
-import { logger } from '@elizaos/core';
-import type { IAgentRuntime, Memory, State } from '@elizaos/core';
-import { v4 as uuidv4 } from 'uuid';
+import {
+  describe,
+  expect,
+  it,
+  beforeEach,
+  afterEach,
+  mock,
+  spyOn,
+} from "bun:test";
+import plugin from "../plugin";
+import { StarterService } from "../plugin";
+import { logger } from "@elizaos/core";
+import type { IAgentRuntime, Memory, State } from "@elizaos/core";
+import { v4 as uuidv4 } from "uuid";
 
 // Mock logger
-mock.module('@elizaos/core', () => {
-  const actual = require('@elizaos/core');
+mock.module("@elizaos/core", () => {
+  const actual = require("@elizaos/core");
   return {
     ...actual,
     logger: {
@@ -18,7 +26,7 @@ mock.module('@elizaos/core', () => {
   };
 });
 
-describe('Error Handling', () => {
+describe("Error Handling", () => {
   beforeEach(() => {
     mock.restore();
   });
@@ -27,15 +35,15 @@ describe('Error Handling', () => {
     // No global restore needed in bun:test;
   });
 
-  describe('HELLO_WORLD Action Error Handling', () => {
-    it('should log errors in action handlers', async () => {
+  describe("HELLO_WORLD Action Error Handling", () => {
+    it("should log errors in action handlers", async () => {
       // Find the action
-      const action = plugin.actions?.find((a) => a.name === 'HELLO_WORLD');
+      const action = plugin.actions?.find((a) => a.name === "HELLO_WORLD");
 
       if (action && action.handler) {
         // Force the handler to throw an error
-        const mockError = new Error('Test error in action');
-        spyOn(console, 'error').mockImplementation(() => {});
+        const mockError = new Error("Test error in action");
+        spyOn(console, "error").mockImplementation(() => {});
 
         // Create a custom mock runtime
         const mockRuntime = {
@@ -46,25 +54,32 @@ describe('Error Handling', () => {
           entityId: uuidv4(),
           roomId: uuidv4(),
           content: {
-            text: 'Hello!',
-            source: 'test',
+            text: "Hello!",
+            source: "test",
           },
         } as Memory;
 
         const mockState = {
           values: {},
           data: {},
-          text: '',
+          text: "",
         } as State;
 
         const mockCallback = mock();
 
         // Mock the logger.error to verify it's called
-        spyOn(logger, 'error');
+        spyOn(logger, "error");
 
         // Test the error handling by observing the behavior
         try {
-          await action.handler(mockRuntime, mockMessage, mockState, {}, mockCallback, []);
+          await action.handler(
+            mockRuntime,
+            mockMessage,
+            mockState,
+            {},
+            mockCallback,
+            [],
+          );
 
           // If we get here, no error was thrown, which is okay
           // In a real application, error handling might be internal
@@ -77,8 +92,8 @@ describe('Error Handling', () => {
     });
   });
 
-  describe('Service Error Handling', () => {
-    it('should throw an error when stopping non-existent service', async () => {
+  describe("Service Error Handling", () => {
+    it("should throw an error when stopping non-existent service", async () => {
       const mockRuntime = {
         getService: mock().mockReturnValue(null),
       } as unknown as IAgentRuntime;
@@ -88,17 +103,17 @@ describe('Error Handling', () => {
         await StarterService.stop(mockRuntime);
       } catch (error: any) {
         caughtError = error;
-        expect(error.message).toBe('Starter service not found');
+        expect(error.message).toBe("Starter service not found");
       }
 
       expect(caughtError).not.toBeNull();
-      expect(mockRuntime.getService).toHaveBeenCalledWith('starter');
+      expect(mockRuntime.getService).toHaveBeenCalledWith("starter");
     });
 
-    it('should handle service stop errors gracefully', async () => {
+    it("should handle service stop errors gracefully", async () => {
       const mockServiceWithError = {
         stop: mock().mockImplementation(() => {
-          throw new Error('Error stopping service');
+          throw new Error("Error stopping service");
         }),
       };
 
@@ -112,32 +127,32 @@ describe('Error Handling', () => {
         await StarterService.stop(mockRuntime);
       } catch (error: any) {
         caughtError = error;
-        expect(error.message).toBe('Error stopping service');
+        expect(error.message).toBe("Error stopping service");
       }
 
       expect(caughtError).not.toBeNull();
-      expect(mockRuntime.getService).toHaveBeenCalledWith('starter');
+      expect(mockRuntime.getService).toHaveBeenCalledWith("starter");
       expect(mockServiceWithError.stop).toHaveBeenCalled();
     });
   });
 
-  describe('Plugin Events Error Handling', () => {
-    it('should handle errors in event handlers gracefully', async () => {
+  describe("Plugin Events Error Handling", () => {
+    it("should handle errors in event handlers gracefully", async () => {
       if (plugin.events && plugin.events.MESSAGE_RECEIVED) {
         const messageHandler = plugin.events.MESSAGE_RECEIVED[0];
 
         // Create a mock that will trigger an error
         const mockParams = {
           message: {
-            id: 'test-id',
-            content: { text: 'Hello!' },
+            id: "test-id",
+            content: { text: "Hello!" },
           },
-          source: 'test',
+          source: "test",
           runtime: {},
         };
 
         // Spy on the logger
-        spyOn(logger, 'error');
+        spyOn(logger, "error");
 
         // This is a partial test - in a real handler, we'd have more robust error handling
         try {
@@ -152,9 +167,11 @@ describe('Error Handling', () => {
     });
   });
 
-  describe('Provider Error Handling', () => {
-    it('should handle errors in provider.get method', async () => {
-      const provider = plugin.providers?.find((p) => p.name === 'HELLO_WORLD_PROVIDER');
+  describe("Provider Error Handling", () => {
+    it("should handle errors in provider.get method", async () => {
+      const provider = plugin.providers?.find(
+        (p) => p.name === "HELLO_WORLD_PROVIDER",
+      );
 
       if (provider) {
         // Create invalid inputs to test error handling

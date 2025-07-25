@@ -54,6 +54,8 @@ import { getEnhancedMarketInfoAction } from './actions/getEnhancedMarketInfo';
 import { getPopularMarketsAction } from './actions/getPopularMarkets';
 import { getWalletBalanceAction } from './actions/getWalletBalance';
 import { getMarketByNameAction } from './actions/getMarketByName';
+import { depositUSDCAction } from './actions/depositUSDC';
+import { getDepositAddressAction } from './actions/getDepositAddress';
 // import { showPredictionMarketAction } from './actions/showPredictionMarket'; // REDUNDANT
 import { polymarketSchema } from './schema';
 import { MarketSyncService } from './services/MarketSyncService';
@@ -237,9 +239,11 @@ const plugin: Plugin = {
     // Market Data (1 action)
     getOrderBookSummaryAction,     // Complete order book with pricing info
     
-    // Trading (5 actions)
+    // Trading (7 actions)
     placeOrderAction,              // Order placement
     getWalletBalanceAction,        // Balance checking
+    depositUSDCAction,             // USDC deposits to Polymarket
+    getDepositAddressAction,       // Get deposit address info
     getOrderDetailsAction,         // Order status  
     getActiveOrdersAction,         // Open orders
     getTradeHistoryAction,         // Trade history

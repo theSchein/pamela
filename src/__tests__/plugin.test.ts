@@ -1,18 +1,27 @@
-import { describe, expect, it, spyOn, beforeEach, afterEach, beforeAll, afterAll } from 'bun:test';
-import plugin from '../plugin';
-import { ModelType, logger } from '@elizaos/core';
-import { StarterService } from '../plugin';
-import dotenv from 'dotenv';
+import {
+  describe,
+  expect,
+  it,
+  spyOn,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+} from "bun:test";
+import plugin from "../plugin";
+import { ModelType, logger } from "@elizaos/core";
+import { StarterService } from "../plugin";
+import dotenv from "dotenv";
 
 // Setup environment variables
 dotenv.config();
 
 // Need to spy on logger for documentation
 beforeAll(() => {
-  spyOn(logger, 'info');
-  spyOn(logger, 'error');
-  spyOn(logger, 'warn');
-  spyOn(logger, 'debug');
+  spyOn(logger, "info");
+  spyOn(logger, "error");
+  spyOn(logger, "warn");
+  spyOn(logger, "debug");
 });
 
 afterAll(() => {
@@ -20,7 +29,11 @@ afterAll(() => {
 });
 
 // Helper function to document test results
-function documentTestResult(testName: string, result: any, error: Error | null = null) {
+function documentTestResult(
+  testName: string,
+  result: any,
+  error: Error | null = null,
+) {
   // Clean, useful test documentation for developers
   logger.info(`✓ Testing: ${testName}`);
 
@@ -33,18 +46,19 @@ function documentTestResult(testName: string, result: any, error: Error | null =
   }
 
   if (result) {
-    if (typeof result === 'string') {
+    if (typeof result === "string") {
       if (result.trim() && result.length > 0) {
-        const preview = result.length > 60 ? `${result.substring(0, 60)}...` : result;
+        const preview =
+          result.length > 60 ? `${result.substring(0, 60)}...` : result;
         logger.info(`  → ${preview}`);
       }
-    } else if (typeof result === 'object') {
+    } else if (typeof result === "object") {
       try {
         // Show key information in a clean format
         const keys = Object.keys(result);
         if (keys.length > 0) {
-          const preview = keys.slice(0, 3).join(', ');
-          const more = keys.length > 3 ? ` +${keys.length - 3} more` : '';
+          const preview = keys.slice(0, 3).join(", ");
+          const more = keys.length > 3 ? ` +${keys.length - 3} more` : "";
           logger.info(`  → {${preview}${more}}`);
         }
       } catch (e) {
@@ -63,8 +77,8 @@ function createRealRuntime() {
     if (serviceType === StarterService.serviceType) {
       return new StarterService({
         character: {
-          name: 'Test Character',
-          system: 'You are a helpful assistant for testing.',
+          name: "Test Character",
+          system: "You are a helpful assistant for testing.",
         },
       } as any);
     }
@@ -73,8 +87,8 @@ function createRealRuntime() {
 
   return {
     character: {
-      name: 'Test Character',
-      system: 'You are a helpful assistant for testing.',
+      name: "Test Character",
+      system: "You are a helpful assistant for testing.",
       plugins: [],
       settings: {},
     },
@@ -100,67 +114,72 @@ function createRealRuntime() {
   };
 }
 
-describe('Plugin Configuration', () => {
-  it('should have correct plugin metadata', () => {
-    expect(plugin.name).toBe('starter');
-    expect(plugin.description).toBe('A starter plugin for Eliza');
+describe("Plugin Configuration", () => {
+  it("should have correct plugin metadata", () => {
+    expect(plugin.name).toBe("starter");
+    expect(plugin.description).toBe("A starter plugin for Eliza");
     expect(plugin.config).toBeDefined();
 
-    documentTestResult('Plugin metadata check', {
+    documentTestResult("Plugin metadata check", {
       name: plugin.name,
       description: plugin.description,
       hasConfig: !!plugin.config,
     });
   });
 
-  it('should include the EXAMPLE_PLUGIN_VARIABLE in config', () => {
-    expect(plugin.config).toHaveProperty('EXAMPLE_PLUGIN_VARIABLE');
+  it("should include the EXAMPLE_PLUGIN_VARIABLE in config", () => {
+    expect(plugin.config).toHaveProperty("EXAMPLE_PLUGIN_VARIABLE");
 
-    documentTestResult('Plugin config check', {
-      hasExampleVariable: plugin.config ? 'EXAMPLE_PLUGIN_VARIABLE' in plugin.config : false,
+    documentTestResult("Plugin config check", {
+      hasExampleVariable: plugin.config
+        ? "EXAMPLE_PLUGIN_VARIABLE" in plugin.config
+        : false,
       configKeys: Object.keys(plugin.config || {}),
     });
   });
 
-  it('should initialize properly', async () => {
+  it("should initialize properly", async () => {
     const originalEnv = process.env.EXAMPLE_PLUGIN_VARIABLE;
 
     try {
-      process.env.EXAMPLE_PLUGIN_VARIABLE = 'test-value';
+      process.env.EXAMPLE_PLUGIN_VARIABLE = "test-value";
 
       // Initialize with config - using real runtime
       const runtime = createRealRuntime();
 
       let error: Error | null = null;
       try {
-        await plugin.init?.({ EXAMPLE_PLUGIN_VARIABLE: 'test-value' }, runtime as any);
+        await plugin.init?.(
+          { EXAMPLE_PLUGIN_VARIABLE: "test-value" },
+          runtime as any,
+        );
         expect(true).toBe(true); // If we got here, init succeeded
       } catch (e) {
         error = e as Error;
-        logger.error('Plugin initialization error:', e);
+        logger.error("Plugin initialization error:", e);
       }
 
       documentTestResult(
-        'Plugin initialization',
+        "Plugin initialization",
         {
           success: !error,
           configValue: process.env.EXAMPLE_PLUGIN_VARIABLE,
         },
-        error
+        error,
       );
     } finally {
       process.env.EXAMPLE_PLUGIN_VARIABLE = originalEnv;
     }
   });
 
-  it('should throw an error on invalid config', async () => {
+  it("should throw an error on invalid config", async () => {
     // Test with empty string (less than min length 1)
     if (plugin.init) {
       const runtime = createRealRuntime();
       let error: Error | null = null;
 
       try {
-        await plugin.init({ EXAMPLE_PLUGIN_VARIABLE: '' }, runtime as any);
+        await plugin.init({ EXAMPLE_PLUGIN_VARIABLE: "" }, runtime as any);
         // Should not reach here
         expect(true).toBe(false);
       } catch (e) {
@@ -170,106 +189,108 @@ describe('Plugin Configuration', () => {
       }
 
       documentTestResult(
-        'Plugin invalid config',
+        "Plugin invalid config",
         {
           errorThrown: !!error,
-          errorMessage: error?.message || 'No error message',
+          errorMessage: error?.message || "No error message",
         },
-        error
+        error,
       );
     }
   });
 
-  it('should have a valid config', () => {
+  it("should have a valid config", () => {
     expect(plugin.config).toBeDefined();
     if (plugin.config) {
       // Check if the config has expected EXAMPLE_PLUGIN_VARIABLE property
-      expect(Object.keys(plugin.config)).toContain('EXAMPLE_PLUGIN_VARIABLE');
+      expect(Object.keys(plugin.config)).toContain("EXAMPLE_PLUGIN_VARIABLE");
     }
   });
 });
 
-describe('Plugin Models', () => {
-  it('should have TEXT_SMALL model defined', () => {
+describe("Plugin Models", () => {
+  it("should have TEXT_SMALL model defined", () => {
     if (plugin.models) {
       expect(plugin.models).toHaveProperty(ModelType.TEXT_SMALL);
-      expect(typeof plugin.models[ModelType.TEXT_SMALL]).toBe('function');
+      expect(typeof plugin.models[ModelType.TEXT_SMALL]).toBe("function");
 
-      documentTestResult('TEXT_SMALL model check', {
+      documentTestResult("TEXT_SMALL model check", {
         defined: ModelType.TEXT_SMALL in plugin.models,
-        isFunction: typeof plugin.models[ModelType.TEXT_SMALL] === 'function',
+        isFunction: typeof plugin.models[ModelType.TEXT_SMALL] === "function",
       });
     }
   });
 
-  it('should have TEXT_LARGE model defined', () => {
+  it("should have TEXT_LARGE model defined", () => {
     if (plugin.models) {
       expect(plugin.models).toHaveProperty(ModelType.TEXT_LARGE);
-      expect(typeof plugin.models[ModelType.TEXT_LARGE]).toBe('function');
+      expect(typeof plugin.models[ModelType.TEXT_LARGE]).toBe("function");
 
-      documentTestResult('TEXT_LARGE model check', {
+      documentTestResult("TEXT_LARGE model check", {
         defined: ModelType.TEXT_LARGE in plugin.models,
-        isFunction: typeof plugin.models[ModelType.TEXT_LARGE] === 'function',
+        isFunction: typeof plugin.models[ModelType.TEXT_LARGE] === "function",
       });
     }
   });
 
-  it('should return a response from TEXT_SMALL model', async () => {
+  it("should return a response from TEXT_SMALL model", async () => {
     if (plugin.models && plugin.models[ModelType.TEXT_SMALL]) {
       const runtime = createRealRuntime();
 
-      let result = '';
+      let result = "";
       let error: Error | null = null;
 
       try {
-        logger.info('Using OpenAI for TEXT_SMALL model');
-        result = await plugin.models[ModelType.TEXT_SMALL](runtime as any, { prompt: 'test' });
+        logger.info("Using OpenAI for TEXT_SMALL model");
+        result = await plugin.models[ModelType.TEXT_SMALL](runtime as any, {
+          prompt: "test",
+        });
 
         // Check that we get a non-empty string response
         expect(result).toBeTruthy();
-        expect(typeof result).toBe('string');
+        expect(typeof result).toBe("string");
         expect(result.length).toBeGreaterThan(10);
       } catch (e) {
         error = e as Error;
-        logger.error('TEXT_SMALL model test failed:', e);
+        logger.error("TEXT_SMALL model test failed:", e);
       }
 
-      documentTestResult('TEXT_SMALL model plugin test', result, error);
+      documentTestResult("TEXT_SMALL model plugin test", result, error);
     }
   });
 });
 
-describe('StarterService', () => {
-  it('should start the service', async () => {
+describe("StarterService", () => {
+  it("should start the service", async () => {
     const runtime = createRealRuntime();
     let startResult;
     let error: Error | null = null;
 
     try {
-      logger.info('Using OpenAI for TEXT_SMALL model');
+      logger.info("Using OpenAI for TEXT_SMALL model");
       startResult = await StarterService.start(runtime as any);
 
       expect(startResult).toBeDefined();
-      expect(startResult.constructor.name).toBe('StarterService');
+      expect(startResult.constructor.name).toBe("StarterService");
 
       // Test real functionality - check stop method is available
-      expect(typeof startResult.stop).toBe('function');
+      expect(typeof startResult.stop).toBe("function");
     } catch (e) {
       error = e as Error;
-      logger.error('Service start error:', e);
+      logger.error("Service start error:", e);
     }
 
     documentTestResult(
-      'StarterService start',
+      "StarterService start",
       {
         success: !!startResult,
         serviceType: startResult?.constructor.name,
       },
-      error
+      error,
     );
   });
 
-  it('should throw an error on startup if the service is already registered', async () => {
+  it("should throw an error on startup if the service is already registered", async () => {
     const runtime = createRealRuntime();
 
     // First registration should succeed
@@ -288,16 +309,16 @@ describe('StarterService', () => {
     }
 
     documentTestResult(
-      'StarterService double start',
+      "StarterService double start",
       {
         errorThrown: !!startupError,
-        errorMessage: startupError?.message || 'No error message',
+        errorMessage: startupError?.message || "No error message",
       },
-      startupError
+      startupError,
     );
   });
 
-  it('should stop the service', async () => {
+  it("should stop the service", async () => {
     const runtime = createRealRuntime();
     let error: Error | null = null;
 
@@ -307,7 +328,7 @@ describe('StarterService', () => {
       runtime.registerService(StarterService.serviceType, service);
 
       // Spy on the real service's stop method
-      const stopSpy = spyOn(service, 'stop');
+      const stopSpy = spyOn(service, "stop");
 
       // Call the static stop method
       await StarterService.stop(runtime as any);
@@ -316,19 +337,19 @@ describe('StarterService', () => {
       expect(stopSpy).toHaveBeenCalled();
     } catch (e) {
       error = e as Error;
-      logger.error('Service stop error:', e);
+      logger.error("Service stop error:", e);
     }
 
     documentTestResult(
-      'StarterService stop',
+      "StarterService stop",
       {
         success: !error,
       },
-      error
+      error,
     );
   });
 
-  it('should throw an error when stopping a non-existent service', async () => {
+  it("should throw an error when stopping a non-existent service", async () => {
     const runtime = createRealRuntime();
     // Don't register a service, so getService will return null
 
@@ -347,21 +368,21 @@ describe('StarterService', () => {
       // This is expected - verify it's the right error
       expect(error).toBeTruthy();
       if (error instanceof Error) {
-        expect(error.message).toContain('Starter service not found');
+        expect(error.message).toContain("Starter service not found");
       }
     }
 
     documentTestResult(
-      'StarterService non-existent stop',
+      "StarterService non-existent stop",
       {
         errorThrown: !!error,
-        errorMessage: error?.message || 'No error message',
+        errorMessage: error?.message || "No error message",
       },
-      error
+      error,
     );
   });
 
-  it('should stop a registered service', async () => {
+  it("should stop a registered service", async () => {
     const runtime = createRealRuntime();
 
     // First start the service
@@ -381,13 +402,14 @@ describe('StarterService', () => {
     }
 
     documentTestResult(
-      'StarterService stop',
+      "StarterService stop",
       {
         success: stopSuccess,
         errorThrown: !!stopError,
-        errorMessage: stopError instanceof Error ? stopError.message : String(stopError),
+        errorMessage:
+          stopError instanceof Error ? stopError.message : String(stopError),
       },
-      stopError instanceof Error ? stopError : null
+      stopError instanceof Error ? stopError : null,
     );
   });
 });

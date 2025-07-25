@@ -12,16 +12,16 @@
 // ***********************************************************
 
 // Import commands (shared with component tests)
-import './commands';
+import "./commands";
 
 // Import Testing Library Cypress commands
-import '@testing-library/cypress/add-commands';
+import "@testing-library/cypress/add-commands";
 
 // E2E-specific configurations
-Cypress.on('uncaught:exception', (err, runnable) => {
+Cypress.on("uncaught:exception", (err, runnable) => {
   // Prevent Cypress from failing the test on uncaught exceptions
   // This is useful for E2E tests where third-party scripts might throw errors
-  console.error('Uncaught exception:', err);
+  console.error("Uncaught exception:", err);
   return false;
 });
 
@@ -62,63 +62,83 @@ declare global {
 }
 
 // Login command
-Cypress.Commands.add('login', (username = 'testuser', password = 'testpass') => {
-  // Check if login is required
-  cy.get('body').then(($body) => {
-    if ($body.find('[data-testid="login"], form[name="login"], input[name="username"]').length) {
-      cy.get('input[name="username"], input[type="email"]').first().type(username);
-      cy.get('input[name="password"], input[type="password"]').first().type(password);
-      cy.get('button[type="submit"], button:contains("Login")').first().click();
-      cy.wait(1000);
-    }
-  });
-});
+Cypress.Commands.add(
+  "login",
+  (username = "testuser", password = "testpass") => {
+    // Check if login is required
+    cy.get("body").then(($body) => {
+      if (
+        $body.find(
+          '[data-testid="login"], form[name="login"], input[name="username"]',
+        ).length
+      ) {
+        cy.get('input[name="username"], input[type="email"]')
+          .first()
+          .type(username);
+        cy.get('input[name="password"], input[type="password"]')
+          .first()
+          .type(password);
+        cy.get('button[type="submit"], button:contains("Login")')
+          .first()
+          .click();
+        cy.wait(1000);
+      }
+    });
+  },
+);
 
 // Wait for app to be ready
-Cypress.Commands.add('waitForApp', () => {
+Cypress.Commands.add("waitForApp", () => {
   // Wait for any loading indicators to disappear
-  cy.get('[data-testid="loading"], .loading, .spinner', { timeout: 10000 }).should('not.exist');
+  cy.get('[data-testid="loading"], .loading, .spinner', {
+    timeout: 10000,
+  }).should("not.exist");
 
   // Ensure the app container is visible
-  cy.get('#root, #app, [data-testid="app"]').should('be.visible');
+  cy.get('#root, #app, [data-testid="app"]').should("be.visible");
 
   // Wait a bit for any animations
   cy.wait(500);
 });
 
 // Navigate to agent
-Cypress.Commands.add('navigateToAgent', (agentId?: string) => {
+Cypress.Commands.add("navigateToAgent", (agentId?: string) => {
   if (agentId) {
     cy.visit(`/agent/${agentId}`);
   } else {
-    cy.get('a[href*="agent"], button:contains("agent")').first().click({ force: true });
+    cy.get('a[href*="agent"], button:contains("agent")')
+      .first()
+      .click({ force: true });
   }
   cy.waitForApp();
 });
 
 // Send chat message
-Cypress.Commands.add('sendChatMessage', (message: string) => {
+Cypress.Commands.add("sendChatMessage", (message: string) => {
   // Find and type in the input
   cy.get('input[type="text"], textarea, [contenteditable="true"]')
-    .filter(':visible')
+    .filter(":visible")
     .first()
     .clear()
     .type(message);
 
   // Send the message
-  cy.get('button').filter(':contains("Send"), [aria-label*="send"]').first().click();
+  cy.get("button")
+    .filter(':contains("Send"), [aria-label*="send"]')
+    .first()
+    .click();
 
   // Wait for the message to appear
-  cy.contains(message, { timeout: 5000 }).should('be.visible');
+  cy.contains(message, { timeout: 5000 }).should("be.visible");
 
   // Wait for agent response
   cy.get('[data-testid*="agent"], [class*="agent"], [data-sender="agent"]', {
     timeout: 15000,
-  }).should('exist');
+  }).should("exist");
 });
 
 // Clear app data
-Cypress.Commands.add('clearAppData', () => {
+Cypress.Commands.add("clearAppData", () => {
   cy.window().then((win) => {
     // Clear local storage
     (win as any).localStorage.clear();
@@ -143,10 +163,10 @@ beforeEach(() => {
 });
 
 // Screenshot on failure
-Cypress.on('fail', (error, runnable) => {
+Cypress.on("fail", (error, runnable) => {
   // Take a screenshot when a test fails
   cy.screenshot(`failed-${runnable.parent?.title}-${runnable.title}`, {
-    capture: 'runner',
+    capture: "runner",
   });
   throw error;
 });

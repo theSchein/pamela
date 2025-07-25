@@ -1,5 +1,6 @@
 import { type IAgentRuntime, logger } from '@elizaos/core';
 import { ethers } from 'ethers';
+import { initializeClobClient } from './clobClient';
 
 // USDC contract address on Polygon
 const USDC_CONTRACT_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
@@ -20,6 +21,73 @@ export interface BalanceInfo {
   usdcBalanceRaw: string; // Raw balance in wei
   hasEnoughBalance: boolean;
   requiredAmount: string;
+}
+
+/**
+ * Check Polymarket trading balance using CLOB client
+ * This checks the actual USDC available for trading (proxy wallet balance)
+ * @param runtime - Agent runtime for configuration
+ * @param requiredAmount - Required amount in USDC (human readable, e.g., "10.5")
+ * @returns Balance information including sufficiency check
+ */
+export async function checkPolymarketBalance(
+  runtime: IAgentRuntime,
+  requiredAmount: string
+): Promise<BalanceInfo> {
+  logger.info(`[balanceChecker] Checking Polymarket trading balance for required amount: ${requiredAmount}`);
+
+  try {
+    // Initialize CLOB client
+    const client = await initializeClobClient(runtime);
+
+    // Get balance allowance from Polymarket (this checks actual trading balance)
+    const balanceResponse = await client.getBalanceAllowance();
+    
+    // Extract USDC balance from response
+    // The response should contain balance information for USDC (collateral)
+    const usdcBalance = balanceResponse.balance || '0';
+    const usdcBalanceRaw = ethers.parseUnits(usdcBalance, 6).toString(); // USDC has 6 decimals
+    
+    // Check if balance is sufficient
+    const requiredAmountNum = parseFloat(requiredAmount);
+    const balanceNum = parseFloat(usdcBalance);
+    const hasEnoughBalance = balanceNum >= requiredAmountNum;
+
+    // Get wallet address for display
+    const privateKey = runtime.getSetting('WALLET_PRIVATE_KEY') ||
+                      runtime.getSetting('PRIVATE_KEY') ||
+                      runtime.getSetting('POLYMARKET_PRIVATE_KEY');
+    
+    if (!privateKey) {
+      throw new Error('No private key found for address resolution');
+    }
+
+    const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+    const wallet = new ethers.Wallet(formattedPrivateKey);
+
+    const balanceInfo: BalanceInfo = {
+      address: wallet.address,
+      usdcBalance: usdcBalance,
+      usdcBalanceRaw: usdcBalanceRaw,
+      hasEnoughBalance,
+      requiredAmount,
+    };
+
+    logger.info(`[balanceChecker] Polymarket balance check complete:`, {
+      address: wallet.address,
+      balance: usdcBalance,
+      required: requiredAmount,
+      sufficient: hasEnoughBalance,
+    });
+
+    return balanceInfo;
+  } catch (error) {
+    logger.error(`[balanceChecker] Error checking Polymarket balance:`, error);
+    
+    // Fallback to wallet balance checking if CLOB balance fails
+    logger.warn(`[balanceChecker] Falling back to wallet balance check`);
+    return await checkUSDCBalance(runtime, requiredAmount);
+  }
 }
 
 /**
@@ -49,8 +117,36 @@ export async function checkUSDCBalance(
     // Ensure private key has 0x prefix for ethers.js
     const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
 
-    // Create provider for Polygon mainnet
-    const provider = new ethers.JsonRpcProvider('https://polygon-rpc.com');
+    // Create provider for Polygon mainnet with fallbacks
+    const rpcProviders = [
+      'https://polygon-rpc.com',
+      'https://rpc-mainnet.matic.network',
+      'https://rpc-mainnet.maticvigil.com',
+      'https://matic-mainnet.chainstacklabs.com',
+    ];
+    
+    let provider: ethers.JsonRpcProvider | null = null;
+    let lastError: Error | null = null;
+    
+    // Try each RPC provider until one works
+    for (const rpcUrl of rpcProviders) {
+      try {
+        const testProvider = new ethers.JsonRpcProvider(rpcUrl);
+        // Test the connection
+        await testProvider.getBlockNumber();
+        provider = testProvider;
+        logger.info(`[balanceChecker] Successfully connected to RPC: ${rpcUrl}`);
+        break;
+      } catch (error) {
+        logger.warn(`[balanceChecker] RPC provider ${rpcUrl} failed:`, error);
+        lastError = error instanceof Error ? error : new Error('Unknown RPC error');
+        continue;
+      }
+    }
+    
+    if (!provider) {
+      throw new Error(`All RPC providers failed. Last error: ${lastError?.message}`);
+    }
     const wallet = new ethers.Wallet(formattedPrivateKey, provider);
     const walletAddress = wallet.address;
 
@@ -59,9 +155,30 @@ export async function checkUSDCBalance(
     // Create USDC contract instance
     const usdcContract = new ethers.Contract(USDC_CONTRACT_ADDRESS, ERC20_ABI, provider);
 
-    // Get USDC balance
-    const balanceRaw = await usdcContract.balanceOf(walletAddress);
-    const decimals = await usdcContract.decimals();
+    // Get USDC balance with retry logic
+    let balanceRaw: bigint | undefined;
+    let decimals: number | undefined;
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        logger.info(`[balanceChecker] Balance check attempt ${attempt}/${maxRetries}`);
+        balanceRaw = await usdcContract.balanceOf(walletAddress);
+        decimals = await usdcContract.decimals();
+        break;
+      } catch (error) {
+        logger.warn(`[balanceChecker] Attempt ${attempt} failed:`, error);
+        if (attempt === maxRetries) {
+          throw new Error(`Balance check failed after ${maxRetries} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+        // Wait before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+
+    if (balanceRaw === undefined || decimals === undefined) {
+      throw new Error('Failed to retrieve balance information');
+    }
     
     // Convert to human readable format
     const balanceFormatted = ethers.formatUnits(balanceRaw, decimals);

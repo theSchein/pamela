@@ -15,7 +15,7 @@ import { initializeClobClient } from '../utils/clobClient';
 import { orderTemplate } from '../templates';
 import { OrderSide, OrderType } from '../types';
 import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
-import { checkUSDCBalance, formatBalanceInfo, getMaxPositionSize } from '../utils/balanceChecker';
+import { checkUSDCBalance, checkPolymarketBalance, formatBalanceInfo, getMaxPositionSize } from '../utils/balanceChecker';
 import { findMarketByName } from '../utils/marketLookup';
 import { ClobClient, Side } from '@polymarket/clob-client';
 import { ethers } from 'ethers';
@@ -125,9 +125,21 @@ export const placeOrderAction: Action = {
       tokenId = llmResult?.tokenId || '';
       side = llmResult?.side?.toUpperCase() || '';
       price = llmResult?.price || 0;
-      size = llmResult?.size || 0;
-      orderType = llmResult?.orderType?.toUpperCase() || 'GTC';
+      size = llmResult?.size || 1; // Default to 1 share if not specified
+      orderType = llmResult?.orderType?.toLowerCase() || (price > 0 ? 'limit' : 'market');
       feeRateBps = llmResult?.feeRateBps || '0';
+
+      // Convert order types to CLOB client format
+      if (orderType === 'limit') {
+        orderType = 'GTC'; // Good Till Cancelled
+      } else if (orderType === 'market') {
+        orderType = 'FOK'; // Fill Or Kill (market order)
+        // For market orders, we need to get the current market price
+        if (price <= 0) {
+          // We'll set a reasonable price for market orders - this will be updated later
+          price = side === 'BUY' ? 0.999 : 0.001; // Aggressive pricing for market orders
+        }
+      }
 
       // Handle market name lookup - try to resolve to token ID
       if ((tokenId === 'MARKET_NAME_LOOKUP' || !tokenId || tokenId.length < 10) && llmResult?.marketName) {
@@ -250,8 +262,14 @@ This could be due to:
         }
       }
 
-      if (!tokenId || !side || price <= 0 || size <= 0) {
+      // Updated validation - price can be 0 for market orders
+      if (!tokenId || !side || size <= 0) {
         return createErrorResult('Invalid order parameters');
+      }
+      
+      // For market orders without explicit price, price will be set later
+      if (orderType === 'GTC' && price <= 0) {
+        return createErrorResult('Limit orders require a valid price');
       }
     } catch (error) {
       logger.warn('[placeOrderAction] LLM extraction failed, trying regex fallback');
@@ -275,16 +293,24 @@ This could be due to:
       const sizeMatch = text.match(
         /(?:size|amount|quantity)\s*([0-9]*\.?[0-9]+)|([0-9]*\.?[0-9]+)\s*(?:shares|tokens)/i
       );
-      size = sizeMatch ? parseFloat(sizeMatch[1] || sizeMatch[2]) : 0;
+      size = sizeMatch ? parseFloat(sizeMatch[1] || sizeMatch[2]) : 1; // Default to 1 share
 
       // Extract order type
       const orderTypeMatch = text.match(/\b(GTC|FOK|GTD|FAK|limit|market)\b/i);
       if (orderTypeMatch) {
         const matched = orderTypeMatch[1].toUpperCase();
         orderType = matched === 'LIMIT' ? 'GTC' : matched === 'MARKET' ? 'FOK' : matched;
+      } else {
+        // Default to market order if no price specified
+        orderType = price > 0 ? 'GTC' : 'FOK';
       }
 
-      if (!tokenId || price <= 0 || size <= 0) {
+      // Set market order pricing if no price given
+      if (orderType === 'FOK' && price <= 0) {
+        price = side === 'BUY' ? 0.999 : 0.001; // Aggressive pricing for market orders
+      }
+
+      if (!tokenId || size <= 0 || (orderType === 'GTC' && price <= 0)) {
         const errorMessage = 'Please provide valid order parameters: token ID, price, and size.';
         logger.error(`[placeOrderAction] Parameter extraction failed`);
 
@@ -332,11 +358,11 @@ Please provide order details in your request. Examples:
     // Calculate total order value
     const totalValue = price * size;
 
-    // Check USDC balance before placing order
-    logger.info(`[placeOrderAction] Checking balance for order value: $${totalValue.toFixed(2)}`);
+    // Check Polymarket trading balance before placing order
+    logger.info(`[placeOrderAction] Checking Polymarket trading balance for order value: $${totalValue.toFixed(2)}`);
     
     try {
-      const balanceInfo = await checkUSDCBalance(runtime, totalValue.toString());
+      const balanceInfo = await checkPolymarketBalance(runtime, totalValue.toString());
       
       if (!balanceInfo.hasEnoughBalance) {
         const balanceDisplay = formatBalanceInfo(balanceInfo);
@@ -453,6 +479,25 @@ Please check your wallet configuration and try again.`,
     }
 
     try {
+      // Initialize CLOB client with L1 authentication (wallet-only)
+      logger.info(`[placeOrderAction] Initializing CLOB client for L1-only authentication`);
+      
+      if (callback) {
+        const authContent: Content = {
+          text: `🔐 **L1 Authentication Ready**
+
+**Authentication Mode**: Wallet-based (L1)
+• **Wallet**: ✅ Connected
+• **Order Posting**: ✅ Enabled (L1 signatures)
+• **Mode**: Direct wallet authentication
+
+Initializing CLOB client for order placement...`,
+          actions: ['POLYMARKET_PLACE_ORDER'],
+          data: { authMode: 'L1', walletReady: true },
+        };
+        await callback(authContent);
+      }
+
       const client = await initializeClobClient(runtime);
 
       // Create order arguments matching the official ClobClient interface

@@ -1,6 +1,6 @@
-import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import '../../../frontend/index.css';
+import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import "../../../frontend/index.css";
 
 // We need to import the component directly since it's not exported
 // In a real scenario, you'd export the component from index.tsx
@@ -8,13 +8,15 @@ const ExampleRoute = () => {
   const [config, setConfig] = React.useState(window.ELIZA_CONFIG);
 
   React.useEffect(() => {
-    document.documentElement.classList.add('dark');
+    document.documentElement.classList.add("dark");
   }, []);
 
   if (!config?.agentId) {
     return (
       <div className="p-4 text-center">
-        <div className="text-red-600 font-medium">Error: Agent ID not found</div>
+        <div className="text-red-600 font-medium">
+          Error: Agent ID not found
+        </div>
         <div className="text-sm text-gray-600 mt-2">
           The server should inject the agent ID configuration.
         </div>
@@ -29,14 +31,14 @@ const ExampleRoute = () => {
   );
 };
 
-describe('ExampleRoute Component Tests', () => {
-  describe('Component Rendering', () => {
-    it('should apply dark mode on mount', () => {
+describe("ExampleRoute Component Tests", () => {
+  describe("Component Rendering", () => {
+    it("should apply dark mode on mount", () => {
       cy.mount(<ExampleRoute />);
       cy.shouldBeDarkMode();
     });
 
-    it('should show error when agent ID is missing', () => {
+    it("should show error when agent ID is missing", () => {
       // Clear the config before mounting
       cy.window().then((win) => {
         win.ELIZA_CONFIG = undefined;
@@ -45,43 +47,45 @@ describe('ExampleRoute Component Tests', () => {
       cy.mount(<ExampleRoute />);
 
       // Check error message is displayed
-      cy.contains('Error: Agent ID not found').should('be.visible');
-      cy.contains('The server should inject the agent ID configuration.').should('be.visible');
+      cy.contains("Error: Agent ID not found").should("be.visible");
+      cy.contains(
+        "The server should inject the agent ID configuration.",
+      ).should("be.visible");
     });
 
-    it('should render correctly with agent ID', () => {
-      const testAgentId = '12345678-1234-1234-1234-123456789abc';
+    it("should render correctly with agent ID", () => {
+      const testAgentId = "12345678-1234-1234-1234-123456789abc";
 
       // Set config before mounting
       cy.window().then((win) => {
         win.ELIZA_CONFIG = {
           agentId: testAgentId,
-          apiBase: 'http://localhost:3000',
+          apiBase: "http://localhost:3000",
         };
       });
 
       cy.mount(<ExampleRoute />);
 
       // Check that the agent ID is displayed
-      cy.contains(`Hello ${testAgentId}`).should('be.visible');
+      cy.contains(`Hello ${testAgentId}`).should("be.visible");
     });
   });
 
-  describe('Configuration Handling', () => {
-    it('should handle ELIZA_CONFIG changes', () => {
-      const initialAgentId = 'initial-agent-id';
-      const updatedAgentId = 'updated-agent-id';
+  describe("Configuration Handling", () => {
+    it("should handle ELIZA_CONFIG changes", () => {
+      const initialAgentId = "initial-agent-id";
+      const updatedAgentId = "updated-agent-id";
 
       // Set initial config
       cy.window().then((win) => {
         win.ELIZA_CONFIG = {
           agentId: initialAgentId,
-          apiBase: 'http://localhost:3000',
+          apiBase: "http://localhost:3000",
         };
       });
 
       cy.mount(<ExampleRoute />);
-      cy.contains(`Hello ${initialAgentId}`).should('be.visible');
+      cy.contains(`Hello ${initialAgentId}`).should("be.visible");
     });
   });
 });

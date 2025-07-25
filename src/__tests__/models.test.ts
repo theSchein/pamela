@@ -1,9 +1,9 @@
-import { describe, expect, it, spyOn, beforeAll, afterAll } from 'bun:test';
-import plugin from '../plugin';
-import { ModelType, logger } from '@elizaos/core';
-import type { IAgentRuntime } from '@elizaos/core';
-import dotenv from 'dotenv';
-import { documentTestResult, createMockRuntime } from './utils/core-test-utils';
+import { describe, expect, it, spyOn, beforeAll, afterAll } from "bun:test";
+import plugin from "../plugin";
+import { ModelType, logger } from "@elizaos/core";
+import type { IAgentRuntime } from "@elizaos/core";
+import dotenv from "dotenv";
+import { documentTestResult, createMockRuntime } from "./utils/core-test-utils";
 
 // Define a simplified version of the GenerateTextParams for testing
 interface TestGenerateParams {
@@ -20,9 +20,9 @@ dotenv.config();
 
 // Spy on logger to capture logs for documentation
 beforeAll(() => {
-  spyOn(logger, 'info');
-  spyOn(logger, 'error');
-  spyOn(logger, 'warn');
+  spyOn(logger, "info");
+  spyOn(logger, "error");
+  spyOn(logger, "warn");
 });
 
 afterAll(() => {
@@ -36,7 +36,10 @@ afterAll(() => {
  */
 const runCoreModelTests = async (
   modelType: keyof typeof ModelType,
-  modelFn: (runtime: IAgentRuntime, params: TestGenerateParams) => Promise<string>
+  modelFn: (
+    runtime: IAgentRuntime,
+    params: TestGenerateParams,
+  ) => Promise<string>,
 ) => {
   // Create a mock runtime for model testing
   const mockRuntime = createMockRuntime();
@@ -44,7 +47,7 @@ const runCoreModelTests = async (
   // Test with basic parameters
   const basicParams: TestGenerateParams = {
     prompt: `Test prompt for ${modelType}`,
-    stopSequences: ['STOP'],
+    stopSequences: ["STOP"],
     maxTokens: 100,
   };
 
@@ -54,7 +57,7 @@ const runCoreModelTests = async (
   try {
     basicResponse = await modelFn(mockRuntime, basicParams);
     expect(basicResponse).toBeTruthy();
-    expect(typeof basicResponse).toBe('string');
+    expect(typeof basicResponse).toBe("string");
   } catch (e) {
     basicError = e as Error;
     logger.error(`${modelType} model call failed:`, e);
@@ -62,7 +65,7 @@ const runCoreModelTests = async (
 
   // Test with empty prompt
   const emptyParams: TestGenerateParams = {
-    prompt: '',
+    prompt: "",
   };
 
   let emptyResponse: string | null = null;
@@ -78,7 +81,7 @@ const runCoreModelTests = async (
   // Test with all parameters
   const fullParams: TestGenerateParams = {
     prompt: `Comprehensive test prompt for ${modelType}`,
-    stopSequences: ['STOP1', 'STOP2'],
+    stopSequences: ["STOP1", "STOP2"],
     maxTokens: 200,
     temperature: 0.8,
     frequencyPenalty: 0.6,
@@ -102,50 +105,50 @@ const runCoreModelTests = async (
   };
 };
 
-describe('Plugin Models', () => {
-  it('should have models defined', () => {
+describe("Plugin Models", () => {
+  it("should have models defined", () => {
     expect(plugin.models).toBeDefined();
     if (plugin.models) {
-      expect(typeof plugin.models).toBe('object');
+      expect(typeof plugin.models).toBe("object");
     }
   });
 
-  describe('TEXT_SMALL Model', () => {
-    it('should have a TEXT_SMALL model defined', () => {
+  describe("TEXT_SMALL Model", () => {
+    it("should have a TEXT_SMALL model defined", () => {
       if (plugin.models) {
         expect(plugin.models).toHaveProperty(ModelType.TEXT_SMALL);
-        expect(typeof plugin.models[ModelType.TEXT_SMALL]).toBe('function');
+        expect(typeof plugin.models[ModelType.TEXT_SMALL]).toBe("function");
       }
     });
 
-    it('should run core tests for TEXT_SMALL model', async () => {
+    it("should run core tests for TEXT_SMALL model", async () => {
       if (plugin.models && plugin.models[ModelType.TEXT_SMALL]) {
         const results = await runCoreModelTests(
           ModelType.TEXT_SMALL,
-          plugin.models[ModelType.TEXT_SMALL]
+          plugin.models[ModelType.TEXT_SMALL],
         );
 
-        documentTestResult('TEXT_SMALL core model tests', results);
+        documentTestResult("TEXT_SMALL core model tests", results);
       }
     });
   });
 
-  describe('TEXT_LARGE Model', () => {
-    it('should have a TEXT_LARGE model defined', () => {
+  describe("TEXT_LARGE Model", () => {
+    it("should have a TEXT_LARGE model defined", () => {
       if (plugin.models) {
         expect(plugin.models).toHaveProperty(ModelType.TEXT_LARGE);
-        expect(typeof plugin.models[ModelType.TEXT_LARGE]).toBe('function');
+        expect(typeof plugin.models[ModelType.TEXT_LARGE]).toBe("function");
       }
     });
 
-    it('should run core tests for TEXT_LARGE model', async () => {
+    it("should run core tests for TEXT_LARGE model", async () => {
       if (plugin.models && plugin.models[ModelType.TEXT_LARGE]) {
         const results = await runCoreModelTests(
           ModelType.TEXT_LARGE,
-          plugin.models[ModelType.TEXT_LARGE]
+          plugin.models[ModelType.TEXT_LARGE],
         );
 
-        documentTestResult('TEXT_LARGE core model tests', results);
+        documentTestResult("TEXT_LARGE core model tests", results);
       }
     });
   });

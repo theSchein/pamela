@@ -1,4 +1,4 @@
-import { type TestSuite } from '@elizaos/core';
+import { type TestSuite } from "@elizaos/core";
 
 /**
  * Project E2E Test Suite
@@ -26,12 +26,12 @@ import { type TestSuite } from '@elizaos/core';
  * - Each test should be independent and not rely on previous test state
  */
 export class ProjectTestSuite implements TestSuite {
-  name = 'project';
-  description = 'E2E tests for project-specific features';
+  name = "project";
+  description = "E2E tests for project-specific features";
 
   tests = [
     {
-      name: 'Project runtime environment test',
+      name: "Project runtime environment test",
       fn: async (runtime: any) => {
         /**
          * This test verifies that the project's runtime environment is set up correctly.
@@ -40,43 +40,47 @@ export class ProjectTestSuite implements TestSuite {
         try {
           // Verify character is loaded
           if (!runtime.character) {
-            throw new Error('Character not loaded in runtime');
+            throw new Error("Character not loaded in runtime");
           }
 
           // Verify expected character properties
           const character = runtime.character;
           if (!character.name) {
-            throw new Error('Character name is missing');
+            throw new Error("Character name is missing");
           }
 
           // Verify the character has the expected name
-          if (character.name !== 'Eliza') {
-            throw new Error(`Expected character name 'Eliza', got '${character.name}'`);
+          if (character.name !== "Eliza") {
+            throw new Error(
+              `Expected character name 'Eliza', got '${character.name}'`,
+            );
           }
 
           // Verify character has required configuration
           if (!character.system) {
-            throw new Error('Character system prompt is missing');
+            throw new Error("Character system prompt is missing");
           }
 
           if (!Array.isArray(character.bio)) {
-            throw new Error('Character bio should be an array');
+            throw new Error("Character bio should be an array");
           }
 
           if (!Array.isArray(character.messageExamples)) {
-            throw new Error('Character message examples should be an array');
+            throw new Error("Character message examples should be an array");
           }
 
           // Verify plugins are loaded (if specified in character)
           if (character.plugins && !Array.isArray(character.plugins)) {
-            throw new Error('Character plugins should be an array');
+            throw new Error("Character plugins should be an array");
           }
 
           // Test passed - no need to return anything
           // The test framework considers it successful if no error is thrown
         } catch (error) {
           // Re-throw with more context for debugging
-          throw new Error(`Project runtime environment test failed: ${(error as Error).message}`);
+          throw new Error(
+            `Project runtime environment test failed: ${(error as Error).message}`,
+          );
         }
       },
     },

@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
 
 /**
  * Starter Plugin E2E Test Suite
@@ -71,8 +71,9 @@ interface Content {
 }
 
 export class StarterTestSuite implements TestSuite {
-  name = 'starter';
-  description = 'E2E tests for the starter project demonstrating comprehensive testing patterns';
+  name = "starter";
+  description =
+    "E2E tests for the starter project demonstrating comprehensive testing patterns";
 
   tests = [
     {
@@ -81,31 +82,43 @@ export class StarterTestSuite implements TestSuite {
        * This test ensures that the character is properly configured with all required fields.
        * It's a good first test because it validates the basic setup before testing functionality.
        */
-      name: 'Character configuration test',
+      name: "Character configuration test",
       fn: async (runtime: any) => {
         const character = runtime.character;
-        const requiredFields = ['name', 'bio', 'plugins', 'system', 'messageExamples'];
-        const missingFields = requiredFields.filter((field) => !(field in character));
+        const requiredFields = [
+          "name",
+          "bio",
+          "plugins",
+          "system",
+          "messageExamples",
+        ];
+        const missingFields = requiredFields.filter(
+          (field) => !(field in character),
+        );
 
         if (missingFields.length > 0) {
-          throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+          throw new Error(
+            `Missing required fields: ${missingFields.join(", ")}`,
+          );
         }
 
         // Additional character property validations
-        if (character.name !== 'Eliza') {
-          throw new Error(`Expected character name to be 'Eliza', got '${character.name}'`);
+        if (character.name !== "Eliza") {
+          throw new Error(
+            `Expected character name to be 'Eliza', got '${character.name}'`,
+          );
         }
         if (!Array.isArray(character.plugins)) {
-          throw new Error('Character plugins should be an array');
+          throw new Error("Character plugins should be an array");
         }
         if (!character.system) {
-          throw new Error('Character system prompt is required');
+          throw new Error("Character system prompt is required");
         }
         if (!Array.isArray(character.bio)) {
-          throw new Error('Character bio should be an array');
+          throw new Error("Character bio should be an array");
         }
         if (!Array.isArray(character.messageExamples)) {
-          throw new Error('Character message examples should be an array');
+          throw new Error("Character message examples should be an array");
         }
       },
     },
@@ -116,18 +129,20 @@ export class StarterTestSuite implements TestSuite {
        * This test verifies that plugins can be registered with the runtime.
        * It's important to test this separately from action execution to isolate issues.
        */
-      name: 'Plugin initialization test',
+      name: "Plugin initialization test",
       fn: async (runtime: any) => {
         // Test plugin initialization with empty config
         try {
           await runtime.registerPlugin({
-            name: 'starter',
-            description: 'A starter plugin for Eliza',
+            name: "starter",
+            description: "A starter plugin for Eliza",
             init: async () => {},
             config: {},
           });
         } catch (error) {
-          throw new Error(`Failed to register plugin: ${(error as Error).message}`);
+          throw new Error(
+            `Failed to register plugin: ${(error as Error).message}`,
+          );
         }
       },
     },
@@ -139,37 +154,47 @@ export class StarterTestSuite implements TestSuite {
        * This is useful for testing that the action itself is functioning before testing
        * natural language understanding.
        */
-      name: 'Hello world action test - Direct execution',
+      name: "Hello world action test - Direct execution",
       fn: async (runtime: any) => {
         const message: Memory = {
           entityId: uuidv4() as UUID,
           roomId: uuidv4() as UUID,
           content: {
-            text: 'Can you say hello?',
-            source: 'test',
-            actions: ['HELLO_WORLD'], // Explicitly request the HELLO_WORLD action
+            text: "Can you say hello?",
+            source: "test",
+            actions: ["HELLO_WORLD"], // Explicitly request the HELLO_WORLD action
           },
         };
 
         const state: State = {
           values: {},
           data: {},
-          text: '',
+          text: "",
         };
         let responseReceived = false;
 
         // Test the hello world action
         try {
-          await runtime.processActions(message, [], state, async (content: Content) => {
-            if (content.text === 'hello world!' && content.actions?.includes('HELLO_WORLD')) {
-              responseReceived = true;
-            }
-            return [];
-          });
+          await runtime.processActions(
+            message,
+            [],
+            state,
+            async (content: Content) => {
+              if (
+                content.text === "hello world!" &&
+                content.actions?.includes("HELLO_WORLD")
+              ) {
+                responseReceived = true;
+              }
+              return [];
+            },
+          );
 
           if (!responseReceived) {
             // Try directly executing the action if processActions didn't work
-            const helloWorldAction = runtime.actions.find((a: any) => a.name === 'HELLO_WORLD');
+            const helloWorldAction = runtime.actions.find(
+              (a: any) => a.name === "HELLO_WORLD",
+            );
             if (helloWorldAction) {
               await helloWorldAction.handler(
                 runtime,
@@ -177,23 +202,32 @@ export class StarterTestSuite implements TestSuite {
                 state,
                 {},
                 async (content: Content) => {
-                  if (content.text === 'hello world!' && content.actions?.includes('HELLO_WORLD')) {
+                  if (
+                    content.text === "hello world!" &&
+                    content.actions?.includes("HELLO_WORLD")
+                  ) {
                     responseReceived = true;
                   }
                   return [];
                 },
-                []
+                [],
               );
             } else {
-              throw new Error('HELLO_WORLD action not found in runtime.actions');
+              throw new Error(
+                "HELLO_WORLD action not found in runtime.actions",
+              );
             }
           }
 
           if (!responseReceived) {
-            throw new Error('Hello world action did not produce expected response');
+            throw new Error(
+              "Hello world action did not produce expected response",
+            );
           }
         } catch (error) {
-          throw new Error(`Hello world action test failed: ${(error as Error).message}`);
+          throw new Error(
+            `Hello world action test failed: ${(error as Error).message}`,
+          );
         }
       },
     },
@@ -211,7 +245,7 @@ export class StarterTestSuite implements TestSuite {
        *
        * This tests the full AI pipeline: understanding → decision making → action execution
        */
-      name: 'Natural language hello world test',
+      name: "Natural language hello world test",
       fn: async (runtime: any) => {
         // Create a unique room for this conversation
         const roomId = uuidv4() as UUID;
@@ -224,8 +258,8 @@ export class StarterTestSuite implements TestSuite {
             entityId: userId,
             roomId: roomId,
             content: {
-              text: 'Please say hello world', // Natural language request
-              source: 'test',
+              text: "Please say hello world", // Natural language request
+              source: "test",
               // No actions specified - agent must understand the intent
             },
           };
@@ -260,17 +294,33 @@ export class StarterTestSuite implements TestSuite {
               text: userMessage.content.text,
             };
 
-            const result = await runtime.evaluate(userMessage, state, responseCallback);
+            const result = await runtime.evaluate(
+              userMessage,
+              state,
+              responseCallback,
+            );
 
             // If evaluate doesn't work, try the action selection pipeline
             if (!agentResponse && runtime.evaluateActions) {
-              const selectedActions = await runtime.evaluateActions(userMessage, state);
+              const selectedActions = await runtime.evaluateActions(
+                userMessage,
+                state,
+              );
 
               if (selectedActions && selectedActions.length > 0) {
                 // Execute the selected action
-                const action = runtime.actions.find((a: any) => a.name === selectedActions[0]);
+                const action = runtime.actions.find(
+                  (a: any) => a.name === selectedActions[0],
+                );
                 if (action) {
-                  await action.handler(runtime, userMessage, state, {}, responseCallback, []);
+                  await action.handler(
+                    runtime,
+                    userMessage,
+                    state,
+                    {},
+                    responseCallback,
+                    [],
+                  );
                 }
               }
             }
@@ -278,26 +328,32 @@ export class StarterTestSuite implements TestSuite {
 
           // Step 3: Verify the agent understood and responded correctly
           if (!agentResponse) {
-            throw new Error('Agent did not respond to natural language request');
+            throw new Error(
+              "Agent did not respond to natural language request",
+            );
           }
 
           // Check that the response contains "hello world" (case insensitive)
-          const responseText = (agentResponse || '') as string;
-          if (!responseText.toLowerCase().includes('hello world')) {
+          const responseText = (agentResponse || "") as string;
+          if (!responseText.toLowerCase().includes("hello world")) {
             throw new Error(
-              `Agent response did not contain "hello world". Got: "${agentResponse}"`
+              `Agent response did not contain "hello world". Got: "${agentResponse}"`,
             );
           }
 
           // Optionally verify that the HELLO_WORLD action was used
-          if (actionUsed && actionUsed !== 'HELLO_WORLD') {
-            console.log(`Note: Agent used action "${actionUsed}" instead of "HELLO_WORLD"`);
+          if (actionUsed && actionUsed !== "HELLO_WORLD") {
+            console.log(
+              `Note: Agent used action "${actionUsed}" instead of "HELLO_WORLD"`,
+            );
           }
 
           // Test passed! The agent successfully understood the natural language request
           // and responded with "hello world"
         } catch (error) {
-          throw new Error(`Natural language hello world test failed: ${(error as Error).message}`);
+          throw new Error(
+            `Natural language hello world test failed: ${(error as Error).message}`,
+          );
         }
       },
     },
@@ -308,45 +364,51 @@ export class StarterTestSuite implements TestSuite {
        * Providers supply context to the agent. This test verifies that our
        * HELLO_WORLD_PROVIDER is functioning and returning the expected data.
        */
-      name: 'Hello world provider test',
+      name: "Hello world provider test",
       fn: async (runtime: any) => {
         const message: Memory = {
           entityId: uuidv4() as UUID,
           roomId: uuidv4() as UUID,
           content: {
-            text: 'What can you provide?',
-            source: 'test',
+            text: "What can you provide?",
+            source: "test",
           },
         };
 
         const state: State = {
           values: {},
           data: {},
-          text: '',
+          text: "",
         };
 
         // Test the hello world provider
         try {
           if (!runtime.providers || runtime.providers.length === 0) {
-            throw new Error('No providers found in runtime');
+            throw new Error("No providers found in runtime");
           }
 
           // Find the specific provider we want to test
           const helloWorldProvider = runtime.providers.find(
-            (p: any) => p.name === 'HELLO_WORLD_PROVIDER'
+            (p: any) => p.name === "HELLO_WORLD_PROVIDER",
           );
 
           if (!helloWorldProvider) {
-            throw new Error('HELLO_WORLD_PROVIDER not found in runtime providers');
+            throw new Error(
+              "HELLO_WORLD_PROVIDER not found in runtime providers",
+            );
           }
 
           const result = await helloWorldProvider.get(runtime, message, state);
 
-          if (result.text !== 'I am a provider') {
-            throw new Error(`Expected provider to return "I am a provider", got "${result.text}"`);
+          if (result.text !== "I am a provider") {
+            throw new Error(
+              `Expected provider to return "I am a provider", got "${result.text}"`,
+            );
           }
         } catch (error) {
-          throw new Error(`Hello world provider test failed: ${(error as Error).message}`);
+          throw new Error(
+            `Hello world provider test failed: ${(error as Error).message}`,
+          );
         }
       },
     },
@@ -357,25 +419,27 @@ export class StarterTestSuite implements TestSuite {
        * Services are long-running components. This test verifies that our
        * starter service can be properly started, accessed, and stopped.
        */
-      name: 'Starter service test',
+      name: "Starter service test",
       fn: async (runtime: any) => {
         // Test service registration and lifecycle
         try {
-          const service = runtime.getService('starter');
+          const service = runtime.getService("starter");
           if (!service) {
-            throw new Error('Starter service not found');
+            throw new Error("Starter service not found");
           }
 
           if (
             service.capabilityDescription !==
-            'This is a starter service which is attached to the agent through the starter plugin.'
+            "This is a starter service which is attached to the agent through the starter plugin."
           ) {
-            throw new Error('Incorrect service capability description');
+            throw new Error("Incorrect service capability description");
           }
 
           await service.stop();
         } catch (error) {
-          throw new Error(`Starter service test failed: ${(error as Error).message}`);
+          throw new Error(
+            `Starter service test failed: ${(error as Error).message}`,
+          );
         }
       },
     },

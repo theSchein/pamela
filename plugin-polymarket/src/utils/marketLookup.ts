@@ -35,7 +35,7 @@ export async function findMarketByName(
   logger.info(`[marketLookup] Searching for market: "${searchTerm}"`);
 
   try {
-    const db = (runtime as any).databaseAdapter?.db;
+    const db = (runtime as any).db;
     if (!db) {
       throw new Error('Database not available');
     }
@@ -132,7 +132,7 @@ export async function getMarketSuggestions(
   logger.info(`[marketLookup] Getting suggestions for: "${searchTerm}"`);
 
   try {
-    const db = (runtime as any).databaseAdapter?.db;
+    const db = (runtime as any).db;
     if (!db) {
       throw new Error('Database not available');
     }

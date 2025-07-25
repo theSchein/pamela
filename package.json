@@ -38,6 +38,7 @@
     "@elizaos/plugin-twitter": "^1.2.17",
     "@elizaos/plugin-web-search": "^0.25.6-alpha.1",
     "@polymarket/clob-client": "^4.16.0",
+    "@polymarket/sdk": "^6.0.0",
     "@tanstack/react-query": "^5.29.0",
     "clsx": "^2.1.1",
     "ethers": "^6.13.1",

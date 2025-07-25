@@ -1,14 +1,16 @@
-import React from 'react';
-import '../../../frontend/index.css';
+import React from "react";
+import "../../../frontend/index.css";
 
 /**
  * Example accessible form component
  */
-const AccessibleForm: React.FC<{ onSubmit: (data: any) => void }> = ({ onSubmit }) => {
+const AccessibleForm: React.FC<{ onSubmit: (data: any) => void }> = ({
+  onSubmit,
+}) => {
   const [formData, setFormData] = React.useState({
-    name: '',
-    email: '',
-    message: '',
+    name: "",
+    email: "",
+    message: "",
   });
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
@@ -16,10 +18,10 @@ const AccessibleForm: React.FC<{ onSubmit: (data: any) => void }> = ({ onSubmit 
     e.preventDefault();
     const newErrors: Record<string, string> = {};
 
-    if (!formData.name) newErrors.name = 'Name is required';
-    if (!formData.email) newErrors.email = 'Email is required';
-    if (formData.email && !formData.email.includes('@')) {
-      newErrors.email = 'Please enter a valid email';
+    if (!formData.name) newErrors.name = "Name is required";
+    if (!formData.email) newErrors.email = "Email is required";
+    if (formData.email && !formData.email.includes("@")) {
+      newErrors.email = "Please enter a valid email";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -36,7 +38,7 @@ const AccessibleForm: React.FC<{ onSubmit: (data: any) => void }> = ({ onSubmit 
 
       <div>
         <label htmlFor="name" className="block text-sm font-medium mb-1">
-          Name{' '}
+          Name{" "}
           <span className="text-red-500" aria-label="required">
             *
           </span>
@@ -47,7 +49,7 @@ const AccessibleForm: React.FC<{ onSubmit: (data: any) => void }> = ({ onSubmit 
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           aria-invalid={!!errors.name}
-          aria-describedby={errors.name ? 'name-error' : undefined}
+          aria-describedby={errors.name ? "name-error" : undefined}
           className="w-full px-3 py-2 border rounded-md"
         />
         {errors.name && (
@@ -59,7 +61,7 @@ const AccessibleForm: React.FC<{ onSubmit: (data: any) => void }> = ({ onSubmit 
 
       <div>
         <label htmlFor="email" className="block text-sm font-medium mb-1">
-          Email{' '}
+          Email{" "}
           <span className="text-red-500" aria-label="required">
             *
           </span>
@@ -70,11 +72,15 @@ const AccessibleForm: React.FC<{ onSubmit: (data: any) => void }> = ({ onSubmit 
           value={formData.email}
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
           aria-invalid={!!errors.email}
-          aria-describedby={errors.email ? 'email-error' : undefined}
+          aria-describedby={errors.email ? "email-error" : undefined}
           className="w-full px-3 py-2 border rounded-md"
         />
         {errors.email && (
-          <p id="email-error" role="alert" className="text-red-500 text-sm mt-1">
+          <p
+            id="email-error"
+            role="alert"
+            className="text-red-500 text-sm mt-1"
+          >
             {errors.email}
           </p>
         )}
@@ -87,7 +93,9 @@ const AccessibleForm: React.FC<{ onSubmit: (data: any) => void }> = ({ onSubmit 
         <textarea
           id="message"
           value={formData.message}
-          onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, message: e.target.value })
+          }
           rows={4}
           className="w-full px-3 py-2 border rounded-md"
         />
@@ -103,100 +111,114 @@ const AccessibleForm: React.FC<{ onSubmit: (data: any) => void }> = ({ onSubmit 
   );
 };
 
-describe('Accessibility Tests', () => {
-  describe('Form Accessibility', () => {
-    it('should have proper labels for all form fields', () => {
+describe("Accessibility Tests", () => {
+  describe("Form Accessibility", () => {
+    it("should have proper labels for all form fields", () => {
       cy.mount(<AccessibleForm onSubmit={cy.stub()} />);
 
       // Check that labels are properly associated
-      cy.get('label[for="name"]').should('exist');
-      cy.get('label[for="email"]').should('exist');
-      cy.get('label[for="message"]').should('exist');
+      cy.get('label[for="name"]').should("exist");
+      cy.get('label[for="email"]').should("exist");
+      cy.get('label[for="message"]').should("exist");
 
       // Check that inputs have matching IDs
-      cy.get('input#name').should('exist');
-      cy.get('input#email').should('exist');
-      cy.get('textarea#message').should('exist');
+      cy.get("input#name").should("exist");
+      cy.get("input#email").should("exist");
+      cy.get("textarea#message").should("exist");
     });
 
-    it('should indicate required fields', () => {
+    it("should indicate required fields", () => {
       cy.mount(<AccessibleForm onSubmit={cy.stub()} />);
 
       // Check for required field indicators
       cy.get('label[for="name"]').within(() => {
-        cy.get('[aria-label="required"]').should('exist');
+        cy.get('[aria-label="required"]').should("exist");
       });
       cy.get('label[for="email"]').within(() => {
-        cy.get('[aria-label="required"]').should('exist');
+        cy.get('[aria-label="required"]').should("exist");
       });
     });
 
-    it('should show accessible error messages', () => {
+    it("should show accessible error messages", () => {
       cy.mount(<AccessibleForm onSubmit={cy.stub()} />);
 
       // Submit empty form
       cy.get('button[type="submit"]').click();
 
       // Check error messages have proper ARIA attributes
-      cy.get('#name-error').should('have.attr', 'role', 'alert');
-      cy.get('#email-error').should('have.attr', 'role', 'alert');
+      cy.get("#name-error").should("have.attr", "role", "alert");
+      cy.get("#email-error").should("have.attr", "role", "alert");
 
       // Check inputs are marked as invalid
-      cy.get('input#name').should('have.attr', 'aria-invalid', 'true');
-      cy.get('input#email').should('have.attr', 'aria-invalid', 'true');
+      cy.get("input#name").should("have.attr", "aria-invalid", "true");
+      cy.get("input#email").should("have.attr", "aria-invalid", "true");
 
       // Check aria-describedby links errors to inputs
-      cy.get('input#name').should('have.attr', 'aria-describedby', 'name-error');
-      cy.get('input#email').should('have.attr', 'aria-describedby', 'email-error');
+      cy.get("input#name").should(
+        "have.attr",
+        "aria-describedby",
+        "name-error",
+      );
+      cy.get("input#email").should(
+        "have.attr",
+        "aria-describedby",
+        "email-error",
+      );
     });
 
-    it('should be keyboard navigable', () => {
+    it("should be keyboard navigable", () => {
       cy.mount(<AccessibleForm onSubmit={cy.stub()} />);
 
       // Verify all form elements can receive focus
-      cy.get('input#name').focus();
-      cy.focused().should('have.attr', 'id', 'name');
+      cy.get("input#name").focus();
+      cy.focused().should("have.attr", "id", "name");
 
-      cy.get('input#email').focus();
-      cy.focused().should('have.attr', 'id', 'email');
+      cy.get("input#email").focus();
+      cy.focused().should("have.attr", "id", "email");
 
-      cy.get('textarea#message').focus();
-      cy.focused().should('have.attr', 'id', 'message');
+      cy.get("textarea#message").focus();
+      cy.focused().should("have.attr", "id", "message");
 
       cy.get('button[type="submit"]').focus();
-      cy.focused().should('contain', 'Send Message');
+      cy.focused().should("contain", "Send Message");
 
       // Verify tabindex is not preventing keyboard access
-      cy.get('input, textarea, button').should('not.have.attr', 'tabindex', '-1');
+      cy.get("input, textarea, button").should(
+        "not.have.attr",
+        "tabindex",
+        "-1",
+      );
     });
 
-    it('should have proper focus indicators', () => {
+    it("should have proper focus indicators", () => {
       cy.mount(<AccessibleForm onSubmit={cy.stub()} />);
 
       // Check focus ring on button
       cy.get('button[type="submit"]').focus();
-      cy.get('button[type="submit"]').should('have.class', 'focus:ring-2');
+      cy.get('button[type="submit"]').should("have.class", "focus:ring-2");
     });
   });
 
-  describe('Color Contrast', () => {
-    it('should maintain readable contrast in dark mode', () => {
+  describe("Color Contrast", () => {
+    it("should maintain readable contrast in dark mode", () => {
       cy.mount(
         <div className="dark bg-gray-900 p-4">
           <h1 className="text-white">High Contrast Title</h1>
           <p className="text-gray-300">Body text with good contrast</p>
-          <button className="bg-blue-600 text-white px-4 py-2">Action Button</button>
-        </div>
+          <button className="bg-blue-600 text-white px-4 py-2">
+            Action Button
+          </button>
+        </div>,
       );
 
       // Visual check - in real tests you might use cypress-axe
-      cy.get('h1').should('have.class', 'text-white');
-      cy.get('p').should('have.class', 'text-gray-300');
+      cy.get("h1").should("have.class", "text-white");
+      cy.get("p").should("have.class", "text-gray-300");
     });
   });
 
-  describe('Screen Reader Support', () => {
-    it('should have proper heading hierarchy', () => {
+  describe("Screen Reader Support", () => {
+    it("should have proper heading hierarchy", () => {
       cy.mount(
         <article>
           <h1>Main Title</h1>
@@ -206,16 +228,16 @@ describe('Accessibility Tests', () => {
             <h3>Subsection</h3>
             <p>More content</p>
           </section>
-        </article>
+        </article>,
       );
 
       // Check heading hierarchy
-      cy.get('h1').should('have.length', 1);
-      cy.get('h2').should('exist');
-      cy.get('h3').should('exist');
+      cy.get("h1").should("have.length", 1);
+      cy.get("h2").should("exist");
+      cy.get("h3").should("exist");
     });
 
-    it('should use semantic HTML elements', () => {
+    it("should use semantic HTML elements", () => {
       cy.mount(
         <nav aria-label="Main navigation">
           <ul>
@@ -226,12 +248,12 @@ describe('Accessibility Tests', () => {
               <a href="#about">About</a>
             </li>
           </ul>
-        </nav>
+        </nav>,
       );
 
-      cy.get('nav').should('have.attr', 'aria-label', 'Main navigation');
-      cy.get('nav ul').should('exist');
-      cy.get('nav a').should('have.length', 2);
+      cy.get("nav").should("have.attr", "aria-label", "Main navigation");
+      cy.get("nav ul").should("exist");
+      cy.get("nav a").should("have.length", 2);
     });
   });
 });
