@@ -42,6 +42,7 @@ import { sellOrderAction } from './actions/sellOrder';
 import { cancelOrderAction } from './actions/cancelOrder';
 import { getMarketPriceAction } from './actions/getMarketPrice';
 import { directPlaceOrderAction } from './actions/directPlaceOrder';
+import { getPortfolioPositionsAction } from './actions/getPortfolioPositions';
 import { polymarketSchema } from './schema';
 import { MarketSyncService } from './services/MarketSyncService';
 import { MarketDetailService } from './services/MarketDetailService';
@@ -216,6 +217,7 @@ const plugin: Plugin = {
     setupTradingAction,            // Complete trading setup (approvals + credentials)
     approveUSDCAction,             // Legacy USDC approval (kept for compatibility)
     getWalletBalanceAction,        // Balance checking
+    getPortfolioPositionsAction,   // Portfolio positions and holdings
     
     // Core Trading
     placeOrderAction,              // Buy orders (enhanced with market lookup)
