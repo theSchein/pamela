@@ -117,7 +117,8 @@ export const approveUSDCAction: Action = {
 1. Check current allowances
 2. Approve USDC for Conditional Tokens Framework
 3. Approve USDC for CTF Exchange
-4. Set CTF approval for Exchange
+4. Approve USDC for Neg Risk Exchange
+5. Set CTF approval for both Exchanges
 
 Checking current approvals...`,
           actions: ['APPROVE_USDC'],
@@ -142,17 +143,21 @@ Checking current approvals...`,
 
       logger.info(`[approveUSDCAction] Using ${usdcType} (${ethers.formatUnits(useNativeUSDC ? nativeBalance : bridgedBalance, 6)} USDC)`);
 
-      // Check current approval status
-      const [usdcForCTFAllowance, usdcForExchangeAllowance, ctfForExchangeApproval] = await Promise.all([
+      // Check current approval status for both exchanges
+      const [usdcForCTFAllowance, usdcForExchangeAllowance, usdcForNegRiskAllowance, ctfForExchangeApproval, ctfForNegRiskApproval] = await Promise.all([
         usdcContract.allowance(wallet.address, CTF_ADDRESS),
         usdcContract.allowance(wallet.address, EXCHANGE_ADDRESS),
+        usdcContract.allowance(wallet.address, NEG_RISK_EXCHANGE_ADDRESS),
         ctfContract.isApprovedForAll(wallet.address, EXCHANGE_ADDRESS),
+        ctfContract.isApprovedForAll(wallet.address, NEG_RISK_EXCHANGE_ADDRESS),
       ]);
 
       const currentStatus: ApprovalStatus = {
         usdcForCTF: usdcForCTFAllowance > 0,
         usdcForExchange: usdcForExchangeAllowance > 0,
         ctfForExchange: ctfForExchangeApproval,
+        usdcForNegRisk: usdcForNegRiskAllowance > 0,
+        ctfForNegRisk: ctfForNegRiskApproval,
       };
 
       if (callback) {
@@ -164,10 +169,12 @@ Checking current approvals...`,
 
 **Current Allowances:**
 • USDC → CTF: ${currentStatus.usdcForCTF ? '✅ Approved' : '❌ Not Approved'}
-• USDC → Exchange: ${currentStatus.usdcForExchange ? '✅ Approved' : '❌ Not Approved'}
-• CTF → Exchange: ${currentStatus.ctfForExchange ? '✅ Approved' : '❌ Not Approved'}
+• USDC → CTF Exchange: ${currentStatus.usdcForExchange ? '✅ Approved' : '❌ Not Approved'}
+• USDC → Neg Risk Exchange: ${currentStatus.usdcForNegRisk ? '✅ Approved' : '❌ Not Approved'}
+• CTF → CTF Exchange: ${currentStatus.ctfForExchange ? '✅ Approved' : '❌ Not Approved'}
+• CTF → Neg Risk Exchange: ${currentStatus.ctfForNegRisk ? '✅ Approved' : '❌ Not Approved'}
 
-${currentStatus.usdcForCTF && currentStatus.usdcForExchange && currentStatus.ctfForExchange
+${currentStatus.usdcForCTF && currentStatus.usdcForExchange && currentStatus.ctfForExchange && currentStatus.usdcForNegRisk && currentStatus.ctfForNegRisk
   ? '✅ All approvals already set - ready for trading!'
   : 'Setting missing approvals...'
 }`,
@@ -178,7 +185,7 @@ ${currentStatus.usdcForCTF && currentStatus.usdcForExchange && currentStatus.ctf
       }
 
       // If all approvals are already set, return success
-      if (currentStatus.usdcForCTF && currentStatus.usdcForExchange && currentStatus.ctfForExchange) {
+      if (currentStatus.usdcForCTF && currentStatus.usdcForExchange && currentStatus.ctfForExchange && currentStatus.usdcForNegRisk && currentStatus.ctfForNegRisk) {
         const successContent: Content = {
           text: `✅ **All Approvals Already Set**
 
@@ -187,8 +194,10 @@ ${currentStatus.usdcForCTF && currentStatus.usdcForExchange && currentStatus.ctf
 
 **✅ Ready for Trading:**
 • USDC → CTF: Approved
-• USDC → Exchange: Approved  
-• CTF → Exchange: Approved
+• USDC → CTF Exchange: Approved  
+• USDC → Neg Risk Exchange: Approved
+• CTF → CTF Exchange: Approved
+• CTF → Neg Risk Exchange: Approved
 
 You can now place orders on Polymarket!`,
           actions: ['APPROVE_USDC'],
@@ -217,7 +226,7 @@ You can now place orders on Polymarket!`,
         
         if (callback) {
           const step1Content: Content = {
-            text: `🔧 **Step 1/3: Approving USDC for CTF**
+            text: `🔧 **Step 1/5: Approving USDC for CTF**
 
 Setting unlimited allowance for Conditional Tokens Framework...
 **Contract**: ${CTF_ADDRESS}`,
@@ -240,7 +249,7 @@ Setting unlimited allowance for Conditional Tokens Framework...
         
         if (callback) {
           const step2Content: Content = {
-            text: `🔧 **Step 2/3: Approving USDC for Exchange**
+            text: `🔧 **Step 2/5: Approving USDC for CTF Exchange**
 
 Setting unlimited allowance for CTF Exchange...
 **Contract**: ${EXCHANGE_ADDRESS}`,
@@ -263,7 +272,7 @@ Setting unlimited allowance for CTF Exchange...
         
         if (callback) {
           const step3Content: Content = {
-            text: `🔧 **Step 3/3: Approving CTF for Exchange**
+            text: `🔧 **Step 3/5: Approving CTF for CTF Exchange**
 
 Setting approval for all CTF tokens on Exchange...
 **Contract**: ${EXCHANGE_ADDRESS}`,
@@ -280,6 +289,52 @@ Setting approval for all CTF tokens on Exchange...
         logger.info(`[approveUSDCAction] CTF approval tx: ${receipt3.hash}`);
       }
 
+      // Step 4: Approve USDC for Neg Risk Exchange if needed
+      if (!currentStatus.usdcForNegRisk) {
+        logger.info('[approveUSDCAction] Setting USDC allowance for Neg Risk Exchange...');
+        
+        if (callback) {
+          const step4Content: Content = {
+            text: `🔧 **Step 4/5: Approving USDC for Neg Risk Exchange**
+
+Setting unlimited allowance for Neg Risk Exchange...
+**Contract**: ${NEG_RISK_EXCHANGE_ADDRESS}`,
+            actions: ['APPROVE_USDC'],
+            data: { step: 4, contract: 'Neg Risk Exchange' },
+          };
+          await callback(step4Content);
+        }
+
+        const tx4 = await usdcContract.approve(NEG_RISK_EXCHANGE_ADDRESS, ethers.MaxUint256, { gasLimit });
+        const receipt4 = await tx4.wait();
+        transactions.push({ step: 4, contract: 'Neg Risk Exchange', txHash: receipt4.hash });
+        
+        logger.info(`[approveUSDCAction] Neg Risk Exchange approval tx: ${receipt4.hash}`);
+      }
+
+      // Step 5: Set CTF approval for Neg Risk Exchange if needed
+      if (!currentStatus.ctfForNegRisk) {
+        logger.info('[approveUSDCAction] Setting CTF approval for Neg Risk Exchange...');
+        
+        if (callback) {
+          const step5Content: Content = {
+            text: `🔧 **Step 5/5: Approving CTF for Neg Risk Exchange**
+
+Setting approval for all CTF tokens on Neg Risk Exchange...
+**Contract**: ${NEG_RISK_EXCHANGE_ADDRESS}`,
+            actions: ['APPROVE_USDC'],
+            data: { step: 5, contract: 'CTF for Neg Risk Exchange' },
+          };
+          await callback(step5Content);
+        }
+
+        const tx5 = await ctfContract.setApprovalForAll(NEG_RISK_EXCHANGE_ADDRESS, true, { gasLimit });
+        const receipt5 = await tx5.wait();
+        transactions.push({ step: 5, contract: 'CTF for Neg Risk Exchange', txHash: receipt5.hash });
+        
+        logger.info(`[approveUSDCAction] CTF approval for Neg Risk Exchange tx: ${receipt5.hash}`);
+      }
+
       // Success response
       const successContent: Content = {
         text: `🎉 **USDC Approvals Successfully Set!**
@@ -293,8 +348,10 @@ ${transactions.map(tx => `• Step ${tx.step} - ${tx.contract}: [${tx.txHash.sli
 
 **✅ Trading Ready:**
 • USDC → CTF: ✅ Approved
-• USDC → Exchange: ✅ Approved
-• CTF → Exchange: ✅ Approved
+• USDC → CTF Exchange: ✅ Approved
+• USDC → Neg Risk Exchange: ✅ Approved
+• CTF → CTF Exchange: ✅ Approved
+• CTF → Neg Risk Exchange: ✅ Approved
 
 🚀 **You can now place orders on Polymarket!**`,
         actions: ['APPROVE_USDC'],
@@ -307,6 +364,8 @@ ${transactions.map(tx => `• Step ${tx.step} - ${tx.contract}: [${tx.txHash.sli
             usdcForCTF: true,
             usdcForExchange: true,
             ctfForExchange: true,
+            usdcForNegRisk: true,
+            ctfForNegRisk: true,
           },
         },
       };

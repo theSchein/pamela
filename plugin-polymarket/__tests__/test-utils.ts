@@ -30,7 +30,7 @@ export function createMockRuntime(overrides: Partial<IAgentRuntime> = {}): IAgen
     initialize: vi.fn(),
     getService: vi.fn(),
     getSetting: vi.fn().mockReturnValue(null),
-    useModel: vi.fn().mockResolvedValue('Test model response'),
+    useModel: vi.fn().mockRejectedValue(new Error('LLM calls disabled - use direct API actions')),
     getProviderResults: vi.fn().mockResolvedValue([]),
     evaluateProviders: vi.fn().mockResolvedValue([]),
     evaluate: vi.fn().mockResolvedValue([]),
@@ -140,7 +140,11 @@ export async function createTestRuntime(envOverrides: Record<string, string> = {
     updateRecentMessageState: async () => ({}),
     evaluate: async () => [],
     getProviderResults: async () => [],
-    getSetting: (key: string) => envOverrides[key] || process.env[key] || null,
+    getSetting: (key: string) => {
+      const value = envOverrides[key] || process.env[key] || null;
+      console.log(`[test-utils] getSetting(${key}) = ${value ? 'FOUND' : 'NOT_FOUND'}`);
+      return value;
+    },
     setSetting: async (key: string, value: string) => {
       envOverrides[key] = value;
     },
@@ -149,7 +153,9 @@ export async function createTestRuntime(envOverrides: Record<string, string> = {
     services: new Map(),
     registerPlugin: async () => {},
     initialize: async () => {},
-    useModel: async () => 'Test response',
+    useModel: async (request: any) => {
+      throw new Error('LLM disabled in test runtime - use directPlaceOrderAction instead');
+    },
     getService: () => null,
   } as unknown as IAgentRuntime;
 

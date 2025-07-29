@@ -43,13 +43,16 @@ export async function checkPolymarketBalance(
     // Initialize CLOB client
     const client = await initializeClobClient(runtime);
 
-    // Get balance allowance from Polymarket (this checks actual trading balance)
-    const balanceResponse = await client.getBalanceAllowance();
+    // Get USDC balance from Polymarket L2 (collateral balance)  
+    // This checks the actual trading balance deposited to Polymarket
+    const balanceResponse = await client.getBalanceAllowance({
+      asset_type: 'COLLATERAL' as any, // USDC is the collateral asset
+    });
     
-    // Extract USDC balance from response
-    // The response should contain balance information for USDC (collateral)
-    const usdcBalance = balanceResponse.balance || '0';
-    const usdcBalanceRaw = ethers.parseUnits(usdcBalance, 6).toString(); // USDC has 6 decimals
+    const usdcBalanceRaw = balanceResponse.balance || '0';
+    // Convert from microunits (6 decimals) to USDC decimal format
+    const usdcBalance = ethers.formatUnits(usdcBalanceRaw, 6);
+    logger.info(`[balanceChecker] Found Polymarket L2 USDC balance: ${usdcBalance} USDC (raw: ${usdcBalanceRaw})`);
     
     // Check if balance is sufficient
     const requiredAmountNum = parseFloat(requiredAmount);

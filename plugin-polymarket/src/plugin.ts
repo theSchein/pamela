@@ -37,8 +37,11 @@ import { getWalletBalanceAction } from './actions/getWalletBalance';
 import { depositUSDCAction } from './actions/depositUSDC';
 import { getDepositAddressAction } from './actions/getDepositAddress';
 import { approveUSDCAction } from './actions/approveUSDC';
+import { setupTradingAction } from './actions/setupTrading';
+import { sellOrderAction } from './actions/sellOrder';
 import { cancelOrderAction } from './actions/cancelOrder';
 import { getMarketPriceAction } from './actions/getMarketPrice';
+import { directPlaceOrderAction } from './actions/directPlaceOrder';
 import { polymarketSchema } from './schema';
 import { MarketSyncService } from './services/MarketSyncService';
 import { MarketDetailService } from './services/MarketDetailService';
@@ -207,43 +210,40 @@ const plugin: Plugin = {
   },
   services: [PolymarketService, MarketSyncService, MarketDetailService],
   actions: [
-    // === CORE ACTIONS - SIMPLIFIED PLUGIN ===
+    // === STREAMLINED TRADING ACTIONS ===
     
-    // Market Discovery (2 actions) - temporarily disabled due to database dependency
-    // getPopularMarketsAction,        // Fast database lookup - requires database
-    getSamplingMarkets,            // Reward-enabled markets - may work without database
-    
-    // Market Details (3 actions) - temporarily disabled due to database dependency
-    // getEnhancedMarketInfoAction,   // Comprehensive market details - requires database  
-    // getMarketDetailBySearchAction, // Search functionality - requires database
-    // getMarketByNameAction,         // Market lookup by name/description - requires database
-    
-    // Market Data (2 actions)
-    getOrderBookSummaryAction,     // Complete order book with pricing info
-    getMarketPriceAction,          // Current market price and trading recommendations
-    
-    // Trading (9 actions)
-    placeOrderAction,              // Order placement
+    // Setup & Management
+    setupTradingAction,            // Complete trading setup (approvals + credentials)
+    approveUSDCAction,             // Legacy USDC approval (kept for compatibility)
     getWalletBalanceAction,        // Balance checking
-    approveUSDCAction,             // USDC approval for trading
+    
+    // Core Trading
+    placeOrderAction,              // Buy orders (enhanced with market lookup)
+    sellOrderAction,               // Sell orders (new streamlined selling)
+    directPlaceOrderAction,        // Direct API orders (bypasses LLM)
     cancelOrderAction,             // Cancel orders
-    depositUSDCAction,             // USDC deposits to Polymarket
-    getDepositAddressAction,       // Get deposit address info
-    getOrderDetailsAction,         // Order status  
+    
+    // Market Discovery & Data
+    getSamplingMarkets,            // Active markets with rewards
+    getOrderBookSummaryAction,     // Order book data
+    getMarketPriceAction,          // Current prices and recommendations
+    getPriceHistory,               // Historical price data
+    
+    // Order Management
+    getOrderDetailsAction,         // Order status
     getActiveOrdersAction,         // Open orders
     getTradeHistoryAction,         // Trade history
     
-    // Market data functionality
-    getPriceHistory,               // Historical price data
-    
-    // Account management (keep essential ones)
+    // Account Management
     createApiKeyAction,
     revokeApiKeyAction, 
     getAllApiKeysAction,
     checkOrderScoringAction,
     getAccountAccessStatusAction,
     
-    // WebSocket and real-time (advanced features)
+    // Advanced Features
+    depositUSDCAction,             // USDC deposits
+    getDepositAddressAction,       // Deposit address info
     handleAuthenticationAction,
     setupWebsocketAction,
     handleRealtimeUpdatesAction,
