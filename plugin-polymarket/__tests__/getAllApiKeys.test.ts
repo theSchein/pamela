@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getAllApiKeysAction } from '../actions/getAllApiKeys';
+import { getAllApiKeysAction } from '../src/actions/getAllApiKeys';
 import type { IAgentRuntime, Memory, State } from '@elizaos/core';
 
 // Mock the crypto module

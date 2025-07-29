@@ -119,3 +119,62 @@ export function setupLoggerSpies() {
   // allow tests to restore originals
   return () => vi.restoreAllMocks();
 }
+
+/**
+ * Creates a real runtime for live testing (not mocked)
+ * 
+ * @param envOverrides - Environment variable overrides for testing
+ * @returns A real runtime instance for live testing
+ */
+export async function createTestRuntime(envOverrides: Record<string, string> = {}): Promise<IAgentRuntime> {
+  // This is a simplified implementation for live testing
+  // In a real implementation, this would initialize the full ElizaOS runtime
+  const testRuntime = {
+    character,
+    plugins: [plugin],
+    databaseAdapter: null,
+    tokenProvider: null,
+    modelProvider: null,
+    cacheManager: null,
+    composeState: async () => ({}),
+    updateRecentMessageState: async () => ({}),
+    evaluate: async () => [],
+    getProviderResults: async () => [],
+    getSetting: (key: string) => envOverrides[key] || process.env[key] || null,
+    setSetting: async (key: string, value: string) => {
+      envOverrides[key] = value;
+    },
+    actions: [],
+    providers: [],
+    services: new Map(),
+    registerPlugin: async () => {},
+    initialize: async () => {},
+    useModel: async () => 'Test response',
+    getService: () => null,
+  } as unknown as IAgentRuntime;
+
+  return testRuntime;
+}
+
+/**
+ * Creates a test memory object for live testing
+ * 
+ * @param options - Memory configuration options
+ * @returns A memory object for testing
+ */
+export function createTestMemory(options: {
+  content: { text: string };
+  userId: string;
+  roomId: string;
+}): Memory {
+  return {
+    id: crypto.randomUUID() as `${string}-${string}-${string}-${string}-${string}`,
+    userId: options.userId as `${string}-${string}-${string}-${string}-${string}`,
+    agentId: crypto.randomUUID() as `${string}-${string}-${string}-${string}-${string}`,
+    roomId: options.roomId as `${string}-${string}-${string}-${string}-${string}`,
+    content: options.content,
+    createdAt: Date.now(),
+    embedding: new Float32Array(0),
+    unique: true,
+  };
+}

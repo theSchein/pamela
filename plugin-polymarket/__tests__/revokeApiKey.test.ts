@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { revokeApiKeyAction } from '../actions/revokeApiKey';
+import { revokeApiKeyAction } from '../src/actions/revokeApiKey';
 import type { IAgentRuntime, Memory, State } from '@elizaos/core';
 
 // Mock the dependencies
-vi.mock('../utils/clobClient');
-vi.mock('../utils/llmHelpers');
+vi.mock('../src/utils/clobClient');
+vi.mock('../src/utils/llmHelpers');
 
 describe('revokeApiKeyAction', () => {
   let mockRuntime: IAgentRuntime;
@@ -56,13 +56,13 @@ describe('revokeApiKeyAction', () => {
   describe('handler', () => {
     beforeEach(async () => {
       // Mock the LLM helper
-      const { callLLMWithTimeout } = (await vi.importMock('../utils/llmHelpers')) as any;
+      const { callLLMWithTimeout } = (await vi.importMock('../src/utils/llmHelpers')) as any;
       callLLMWithTimeout.mockResolvedValue = vi
         .fn()
         .mockResolvedValue('12345678-1234-5678-9abc-123456789012');
 
       // Mock the CLOB client
-      const { initializeClobClient } = (await vi.importMock('../utils/clobClient')) as any;
+      const { initializeClobClient } = (await vi.importMock('../src/utils/clobClient')) as any;
       const mockClobClient = {
         deleteApiKey: vi.fn().mockResolvedValue({ success: true }),
       };
@@ -71,8 +71,8 @@ describe('revokeApiKeyAction', () => {
 
     it('should successfully revoke a valid API key', async () => {
       // Set up mocks for this specific test
-      const { callLLMWithTimeout } = (await vi.importMock('../utils/llmHelpers')) as any;
-      const { initializeClobClient } = (await vi.importMock('../utils/clobClient')) as any;
+      const { callLLMWithTimeout } = (await vi.importMock('../src/utils/llmHelpers')) as any;
+      const { initializeClobClient } = (await vi.importMock('../src/utils/clobClient')) as any;
 
       (callLLMWithTimeout as any).mockResolvedValue('12345678-1234-5678-9abc-123456789012');
       const mockClobClient = { deleteApiKey: vi.fn().mockResolvedValue({ success: true }) };
@@ -96,7 +96,7 @@ describe('revokeApiKeyAction', () => {
     });
 
     it('should handle invalid API key ID format', async () => {
-      const { callLLMWithTimeout } = (await vi.importMock('../utils/llmHelpers')) as any;
+      const { callLLMWithTimeout } = (await vi.importMock('../src/utils/llmHelpers')) as any;
       (callLLMWithTimeout as any).mockResolvedValue('NONE');
 
       await revokeApiKeyAction.handler(mockRuntime, mockMessage, mockState, {}, mockCallback);
@@ -112,8 +112,8 @@ describe('revokeApiKeyAction', () => {
     });
 
     it('should handle API key not found error', async () => {
-      const { callLLMWithTimeout } = (await vi.importMock('../utils/llmHelpers')) as any;
-      const { initializeClobClient } = (await vi.importMock('../utils/clobClient')) as any;
+      const { callLLMWithTimeout } = (await vi.importMock('../src/utils/llmHelpers')) as any;
+      const { initializeClobClient } = (await vi.importMock('../src/utils/clobClient')) as any;
 
       (callLLMWithTimeout as any).mockResolvedValue('12345678-1234-5678-9abc-123456789012');
       const mockClobClient = {
@@ -134,7 +134,7 @@ describe('revokeApiKeyAction', () => {
     });
 
     it('should handle network connectivity issues', async () => {
-      const { initializeClobClient } = (await vi.importMock('../utils/clobClient')) as any;
+      const { initializeClobClient } = (await vi.importMock('../src/utils/clobClient')) as any;
       (initializeClobClient as any).mockRejectedValue(new Error('Network error'));
 
       await revokeApiKeyAction.handler(mockRuntime, mockMessage, mockState, {}, mockCallback);
@@ -150,8 +150,8 @@ describe('revokeApiKeyAction', () => {
     });
 
     it('should extract API key ID from various message formats', async () => {
-      const { callLLMWithTimeout } = (await vi.importMock('../utils/llmHelpers')) as any;
-      const { initializeClobClient } = (await vi.importMock('../utils/clobClient')) as any;
+      const { callLLMWithTimeout } = (await vi.importMock('../src/utils/llmHelpers')) as any;
+      const { initializeClobClient } = (await vi.importMock('../src/utils/clobClient')) as any;
 
       // Test different message formats
       const testCases = [

@@ -124,20 +124,28 @@ export const retrieveAllMarketsAction: Action = {
 
       const allMarkets: Market[] = response.data;
       
-      // Filter for current markets (2025+) to avoid showing old closed markets
+      // Filter for active markets with good liquidity/volume for trading
       const currentDate = new Date();
       const markets = allMarkets.filter((market) => {
+        // Basic active/open check
         const isActiveAndOpen = market.active === true && market.closed === false;
         
-        // Also check if market end date is in the future (or at least current year)
-        let isFutureOrCurrent = true;
+        // Check if market end date is in the future
+        let isFutureMarket = true;
         if (market.end_date_iso) {
           const endDate = new Date(market.end_date_iso);
-          // Only include markets ending in 2025 or later
-          isFutureOrCurrent = endDate.getFullYear() >= 2025;
+          isFutureMarket = endDate > currentDate;
         }
         
-        return isActiveAndOpen && isFutureOrCurrent;
+        // Check for reasonable liquidity/volume (indicates active trading)
+        const hasLiquidity = market.liquidityNum && market.liquidityNum > 100; // At least $100 liquidity
+        const hasVolume = market.volumeNum && market.volumeNum > 50; // At least $50 volume
+        const hasTradingActivity = hasLiquidity || hasVolume;
+        
+        // Ensure market has tokens for trading
+        const hasTokens = market.tokens && market.tokens.length >= 2;
+        
+        return isActiveAndOpen && isFutureMarket && hasTradingActivity && hasTokens;
       });
       
       const marketCount = markets.length;

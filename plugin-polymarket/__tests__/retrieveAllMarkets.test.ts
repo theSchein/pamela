@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { retrieveAllMarketsAction } from '../actions/retrieveAllMarkets';
+import { retrieveAllMarketsAction } from '../src/actions/retrieveAllMarkets';
 import type { IAgentRuntime, Memory, State } from '@elizaos/core';
 
 // Mock the dependencies
-vi.mock('../utils/llmHelpers', () => ({
+vi.mock('../src/utils/llmHelpers', () => ({
   callLLMWithTimeout: vi.fn(),
 }));
 
-vi.mock('../utils/clobClient', () => ({
+vi.mock('../src/utils/clobClient', () => ({
   initializeClobClient: vi.fn(),
 }));
 
@@ -96,8 +96,8 @@ describe('retrieveAllMarketsAction', () => {
 
       vi.mocked(mockRuntime.getSetting).mockReturnValue('https://clob.polymarket.com');
 
-      const { callLLMWithTimeout } = await import('../utils/llmHelpers');
-      const { initializeClobClient } = await import('../utils/clobClient');
+      const { callLLMWithTimeout } = await import('../src/utils/llmHelpers');
+      const { initializeClobClient } = await import('../src/utils/clobClient');
 
       vi.mocked(callLLMWithTimeout).mockResolvedValue({});
       vi.mocked(initializeClobClient).mockResolvedValue(mockClobClient);
@@ -133,8 +133,8 @@ describe('retrieveAllMarketsAction', () => {
 
       vi.mocked(mockRuntime.getSetting).mockReturnValue('https://clob.polymarket.com');
 
-      const { callLLMWithTimeout } = await import('../utils/llmHelpers');
-      const { initializeClobClient } = await import('../utils/clobClient');
+      const { callLLMWithTimeout } = await import('../src/utils/llmHelpers');
+      const { initializeClobClient } = await import('../src/utils/clobClient');
 
       vi.mocked(callLLMWithTimeout).mockResolvedValue({});
       vi.mocked(initializeClobClient).mockResolvedValue(mockClobClient);
@@ -161,8 +161,8 @@ describe('retrieveAllMarketsAction', () => {
 
       vi.mocked(mockRuntime.getSetting).mockReturnValue('https://clob.polymarket.com');
 
-      const { callLLMWithTimeout } = await import('../utils/llmHelpers');
-      const { initializeClobClient } = await import('../utils/clobClient');
+      const { callLLMWithTimeout } = await import('../src/utils/llmHelpers');
+      const { initializeClobClient } = await import('../src/utils/clobClient');
 
       vi.mocked(callLLMWithTimeout).mockResolvedValue({});
       vi.mocked(initializeClobClient).mockResolvedValue(mockClobClient);

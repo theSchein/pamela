@@ -36,6 +36,9 @@ import { handleRealtimeUpdatesAction } from './actions/handleRealtimeUpdates';
 import { getWalletBalanceAction } from './actions/getWalletBalance';
 import { depositUSDCAction } from './actions/depositUSDC';
 import { getDepositAddressAction } from './actions/getDepositAddress';
+import { approveUSDCAction } from './actions/approveUSDC';
+import { cancelOrderAction } from './actions/cancelOrder';
+import { getMarketPriceAction } from './actions/getMarketPrice';
 import { polymarketSchema } from './schema';
 import { MarketSyncService } from './services/MarketSyncService';
 import { MarketDetailService } from './services/MarketDetailService';
@@ -215,12 +218,15 @@ const plugin: Plugin = {
     // getMarketDetailBySearchAction, // Search functionality - requires database
     // getMarketByNameAction,         // Market lookup by name/description - requires database
     
-    // Market Data (1 action)
+    // Market Data (2 actions)
     getOrderBookSummaryAction,     // Complete order book with pricing info
+    getMarketPriceAction,          // Current market price and trading recommendations
     
-    // Trading (7 actions)
+    // Trading (9 actions)
     placeOrderAction,              // Order placement
     getWalletBalanceAction,        // Balance checking
+    approveUSDCAction,             // USDC approval for trading
+    cancelOrderAction,             // Cancel orders
     depositUSDCAction,             // USDC deposits to Polymarket
     getDepositAddressAction,       // Get deposit address info
     getOrderDetailsAction,         // Order status  

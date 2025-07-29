@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import type { IAgentRuntime, Memory, State } from '@elizaos/core';
-import { createTestRuntime, createTestMemory } from '../test-utils';
+import { createTestRuntime, createTestMemory } from './test-utils';
 
 // Import all trading actions for live testing
 import { placeOrderAction } from '../src/actions/placeOrder';

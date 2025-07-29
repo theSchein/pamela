@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import type { IAgentRuntime, Memory, State } from '@elizaos/core';
-import { createTestRuntime, createTestMemory } from '../test-utils';
+import { createTestRuntime, createTestMemory } from './test-utils';
 
 // Import existing actions that will be extended
 import { placeOrderAction } from '../src/actions/placeOrder';

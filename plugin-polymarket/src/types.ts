@@ -71,6 +71,10 @@ export interface Market {
   icon: string;
   /** Address of associated fixed product market maker on Polygon network */
   fpmm: string;
+  /** Market liquidity as a number (from Gamma API) */
+  liquidityNum?: number;
+  /** Market volume as a number (from Gamma API) */
+  volumeNum?: number;
 }
 
 /**
