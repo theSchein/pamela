@@ -2,8 +2,11 @@ import { type IAgentRuntime, logger } from '@elizaos/core';
 import { ethers } from 'ethers';
 import { initializeClobClient } from './clobClient';
 
-// USDC contract address on Polygon
-const USDC_CONTRACT_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
+// USDC contract addresses on Polygon - check both for compatibility
+const USDC_NATIVE_ADDRESS = '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359'; // Native USDC (2024 standard)
+const USDC_BRIDGED_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'; // USDC.e (bridged, being phased out)
+
+// Polymarket supports both, but native USDC is preferred
 
 // ERC20 ABI for balance checking
 const ERC20_ABI = [
@@ -152,19 +155,30 @@ export async function checkUSDCBalance(
 
     logger.info(`[balanceChecker] Checking balance for wallet: ${walletAddress}`);
 
-    // Create USDC contract instance
-    const usdcContract = new ethers.Contract(USDC_CONTRACT_ADDRESS, ERC20_ABI, provider);
+    // Check both USDC contracts (native + bridged) and sum balances
+    const usdcNativeContract = new ethers.Contract(USDC_NATIVE_ADDRESS, ERC20_ABI, provider);
+    const usdcBridgedContract = new ethers.Contract(USDC_BRIDGED_ADDRESS, ERC20_ABI, provider);
 
-    // Get USDC balance with retry logic
-    let balanceRaw: bigint | undefined;
-    let decimals: number | undefined;
+    // Get USDC balance from both contracts with retry logic
+    let totalBalanceRaw: bigint = 0n;
+    let decimals: number = 6; // USDC always has 6 decimals
     const maxRetries = 3;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         logger.info(`[balanceChecker] Balance check attempt ${attempt}/${maxRetries}`);
-        balanceRaw = await usdcContract.balanceOf(walletAddress);
-        decimals = await usdcContract.decimals();
+        
+        // Check native USDC balance
+        const nativeBalance = await usdcNativeContract.balanceOf(walletAddress);
+        logger.info(`[balanceChecker] Native USDC balance: ${ethers.formatUnits(nativeBalance, 6)}`);
+        
+        // Check bridged USDC.e balance  
+        const bridgedBalance = await usdcBridgedContract.balanceOf(walletAddress);
+        logger.info(`[balanceChecker] Bridged USDC.e balance: ${ethers.formatUnits(bridgedBalance, 6)}`);
+        
+        // Sum both balances
+        totalBalanceRaw = nativeBalance + bridgedBalance;
+        
         break;
       } catch (error) {
         logger.warn(`[balanceChecker] Attempt ${attempt} failed:`, error);
@@ -176,21 +190,21 @@ export async function checkUSDCBalance(
       }
     }
 
-    if (balanceRaw === undefined || decimals === undefined) {
+    if (totalBalanceRaw === undefined || decimals === undefined) {
       throw new Error('Failed to retrieve balance information');
     }
     
     // Convert to human readable format
-    const balanceFormatted = ethers.formatUnits(balanceRaw, decimals);
+    const balanceFormatted = ethers.formatUnits(totalBalanceRaw, decimals);
     
     // Check if balance is sufficient
     const requiredAmountBN = ethers.parseUnits(requiredAmount, decimals);
-    const hasEnoughBalance = balanceRaw >= requiredAmountBN;
+    const hasEnoughBalance = totalBalanceRaw >= requiredAmountBN;
 
     const balanceInfo: BalanceInfo = {
       address: walletAddress,
       usdcBalance: balanceFormatted,
-      usdcBalanceRaw: balanceRaw.toString(),
+      usdcBalanceRaw: totalBalanceRaw.toString(),
       hasEnoughBalance,
       requiredAmount,
     };

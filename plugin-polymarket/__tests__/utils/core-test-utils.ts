@@ -83,17 +83,31 @@ export const runCoreActionTests = (actions: Action[]) => {
 };
 
 /**
- * Creates a mock runtime for testing
+ * Creates a mock runtime for testing - loads real environment variables for live testing
  */
 export const createMockRuntime = (): IAgentRuntime => {
+  // Load real environment variables for live testing
+  const getSetting = (key: string) => {
+    return process.env[key] || null;
+  };
+
   return {
     character: {
       name: 'Test Character',
       system: 'You are a helpful assistant for testing.',
     },
-    getSetting: (key: string) => null,
+    getSetting,
     // Include real model functionality
     models: {},
+    // Add mock useModel method
+    useModel: vi.fn().mockResolvedValue({
+      text: 'Mock LLM response',
+      // Add mock parsed data that actions expect
+      token_id: 'test-token-id',
+      market_id: 'test-market-id',
+      amount: '10',
+      outcome: 'YES'
+    }),
     // Add real database functionality
     db: {
       get: async () => null,

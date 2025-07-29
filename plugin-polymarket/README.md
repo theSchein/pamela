@@ -21,8 +21,11 @@ npm install
 
 # Build the plugin
 npm run build
+# Build the plugin
+npm run build
 ```
 
+```
 ## Configuration
 
 ### Required Environment Variables

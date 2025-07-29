@@ -14,28 +14,12 @@ import {
   logger,
 } from '@elizaos/core';
 import { z } from 'zod';
-// REDUNDANT - commenting out overlapping market retrieval actions
-// import { retrieveAllMarketsAction } from './actions/retrieveAllMarkets';
-// import { getSimplifiedMarketsAction } from './actions/getSimplifiedMarkets';
-// import { getClobMarkets } from './actions/getClobMarkets';
-// import { getOpenMarkets } from './actions/getOpenMarkets';
 
-// REDUNDANT - commenting out basic market details (superseded by enhanced)
-// import { getMarketDetailsAction } from './actions/getMarketDetails';
-
-// KEEP - essential order book data
+// CORE TRADING ACTIONS
 import { getOrderBookSummaryAction } from './actions/getOrderBookSummary';
 
-// REDUNDANT - commenting out duplicate order book and derived pricing
-// import { getOrderBookDepthAction } from './actions/getOrderBookDepth';
-// import { getBestPriceAction } from './actions/getBestPrice';
-// import { getMidpointPriceAction } from './actions/getMidpointPrice';
-// import { getSpreadAction } from './actions/getSpread';
-
-// KEEP - specialized market sampling
+// MARKET DATA ACTIONS  
 import { getSamplingMarkets } from './actions/getSamplingMarkets';
-
-// KEEP - price history is unique functionality
 import { getPriceHistory } from './actions/getPriceHistory';
 import { placeOrderAction } from './actions/placeOrder';
 import { createApiKeyAction } from './actions/createApiKey';
@@ -49,14 +33,9 @@ import { getTradeHistoryAction } from './actions/getTradeHistory';
 import { handleAuthenticationAction } from './actions/handleAuthentication';
 import { setupWebsocketAction } from './actions/setupWebsocket';
 import { handleRealtimeUpdatesAction } from './actions/handleRealtimeUpdates';
-import { getMarketDetailBySearchAction } from './actions/getMarketDetailBySearch';
-import { getEnhancedMarketInfoAction } from './actions/getEnhancedMarketInfo';
-import { getPopularMarketsAction } from './actions/getPopularMarkets';
 import { getWalletBalanceAction } from './actions/getWalletBalance';
-import { getMarketByNameAction } from './actions/getMarketByName';
 import { depositUSDCAction } from './actions/depositUSDC';
 import { getDepositAddressAction } from './actions/getDepositAddress';
-// import { showPredictionMarketAction } from './actions/showPredictionMarket'; // REDUNDANT
 import { polymarketSchema } from './schema';
 import { MarketSyncService } from './services/MarketSyncService';
 import { MarketDetailService } from './services/MarketDetailService';
@@ -227,14 +206,14 @@ const plugin: Plugin = {
   actions: [
     // === CORE ACTIONS - SIMPLIFIED PLUGIN ===
     
-    // Market Discovery (2 actions)
-    getPopularMarketsAction,        // Fast database lookup
-    getSamplingMarkets,            // Reward-enabled markets
+    // Market Discovery (2 actions) - temporarily disabled due to database dependency
+    // getPopularMarketsAction,        // Fast database lookup - requires database
+    getSamplingMarkets,            // Reward-enabled markets - may work without database
     
-    // Market Details (3 actions)  
-    getEnhancedMarketInfoAction,   // Comprehensive market details
-    getMarketDetailBySearchAction, // Search functionality
-    getMarketByNameAction,         // Market lookup by name/description
+    // Market Details (3 actions) - temporarily disabled due to database dependency
+    // getEnhancedMarketInfoAction,   // Comprehensive market details - requires database  
+    // getMarketDetailBySearchAction, // Search functionality - requires database
+    // getMarketByNameAction,         // Market lookup by name/description - requires database
     
     // Market Data (1 action)
     getOrderBookSummaryAction,     // Complete order book with pricing info
@@ -248,24 +227,8 @@ const plugin: Plugin = {
     getActiveOrdersAction,         // Open orders
     getTradeHistoryAction,         // Trade history
     
-    // === COMMENTED OUT - REDUNDANT ACTIONS ===
-    
-    // REDUNDANT: Market retrieval overlap
-    // showPredictionMarketAction,     // REDUNDANT: superseded by enhanced market info
-    // retrieveAllMarketsAction,       // REDUNDANT: overlaps with popular markets
-    // getSimplifiedMarketsAction,     // REDUNDANT: optimization can be parameter-based
-    // getClobMarkets,                 // REDUNDANT: nearly identical to retrieveAllMarkets
-    // getOpenMarkets,                 // REDUNDANT: just filtered retrieveAllMarkets
-    // getMarketDetailsAction,         // REDUNDANT: superseded by enhanced version
-    
-    // REDUNDANT: Order book and pricing overlap  
-    // getOrderBookDepthAction,        // REDUNDANT: minimal difference from summary
-    // getBestPriceAction,             // REDUNDANT: derivable from order book
-    // getMidpointPriceAction,         // REDUNDANT: derivable from order book  
-    // getSpreadAction,                // REDUNDANT: derivable from order book
-    
-    // Additional functionality (price history)
-    getPriceHistory,               // Unique historical data functionality
+    // Market data functionality
+    getPriceHistory,               // Historical price data
     
     // Account management (keep essential ones)
     createApiKeyAction,
