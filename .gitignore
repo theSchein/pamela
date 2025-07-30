@@ -19,11 +19,17 @@ build/
 .elizadb/
 .elizadb-test/
 
-# Logs
+# Logs (comprehensive)
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+*.log
+server.log
+agent.log
+debug.log
+error.log
+access.log
 
 # Runtime data
 pids
@@ -110,6 +116,13 @@ public
 *.tmp
 *.temp
 
-# this fucking file
-*.log
-server.log
+# Test artifacts and temporary scripts
+test-results.json
+quick-test*.js
+test-buy*.js
+start-with-node.js
+test-*.json
+
+# Build artifacts that shouldn't be committed
+dist/
+*.js.map
