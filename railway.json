@@ -11,7 +11,6 @@
     "drainingSeconds": 0,
     "sleepApplication": false,
     "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 10,
-    "startCommand": "bun run start"
+    "restartPolicyMaxRetries": 10
   }
 }
