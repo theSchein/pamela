@@ -78,10 +78,10 @@
     "vite": "^6.0.1"
   },
   "scripts": {
-    "start": "bun run dist/server.js",
+    "start": "elizaos start",
     "dev": "elizaos dev",
     "dev:frontend": "vite",
-    "build": "tsc --noEmit && vite build && tsup",
+    "build": "tsc --noEmit && vite build && tsup && mkdir -p dist/client && cp -r dist/frontend/* dist/client/ && rm -rf dist/frontend",
     "lint": "prettier --write ./src",
     "type-check": "tsc --noEmit",
     "type-check:watch": "tsc --noEmit --watch",
