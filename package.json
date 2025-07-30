@@ -74,6 +74,7 @@
   "scripts": {
     "start": "elizaos start",
     "dev": "elizaos dev",
+    "dev:frontend": "vite",
     "build": "tsc --noEmit && vite build && tsup",
     "lint": "prettier --write ./src",
     "type-check": "tsc --noEmit",

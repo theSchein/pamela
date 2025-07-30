@@ -16,7 +16,7 @@ export class BasicAgentTestSuite implements TestSuite {
       fn: async (runtime: any) => {
         try {
           console.log("🎯 Testing basic agent greeting response");
-          
+
           // Create a unique room for this test
           const roomId = `test-room-greeting-${Date.now()}`;
           const userId = "test-user";
@@ -53,15 +53,14 @@ export class BasicAgentTestSuite implements TestSuite {
           // Verify we have at least 2 messages (user + agent)
           if (messages.length < 2) {
             throw new Error(
-              `Expected at least 2 messages, got ${messages.length}`
+              `Expected at least 2 messages, got ${messages.length}`,
             );
           }
 
           // Find the agent's response
           const agentResponse = messages.find(
             (m: any) =>
-              m.userId === runtime.agentId &&
-              m.id !== greetingMessage.id,
+              m.userId === runtime.agentId && m.id !== greetingMessage.id,
           );
 
           if (!agentResponse) {
@@ -71,16 +70,18 @@ export class BasicAgentTestSuite implements TestSuite {
           console.log("🤖 Agent response:", agentResponse.content.text);
 
           // Verify the response is reasonable (has some content)
-          if (!agentResponse.content.text || agentResponse.content.text.length < 5) {
+          if (
+            !agentResponse.content.text ||
+            agentResponse.content.text.length < 5
+          ) {
             throw new Error("Agent response was too short or empty");
           }
 
           console.log("✅ Basic agent greeting test PASSED");
-          
         } catch (error) {
           console.error("❌ Basic agent greeting test FAILED:", error);
           throw new Error(
-            `Basic greeting test failed: ${(error as Error).message}`
+            `Basic greeting test failed: ${(error as Error).message}`,
           );
         }
       },
@@ -91,7 +92,7 @@ export class BasicAgentTestSuite implements TestSuite {
       fn: async (runtime: any) => {
         try {
           console.log("🎯 Testing agent character is Pamela");
-          
+
           // Verify character is loaded
           if (!runtime.character) {
             throw new Error("Character not loaded in runtime");
@@ -100,30 +101,34 @@ export class BasicAgentTestSuite implements TestSuite {
           // Verify the character has the expected name
           if (runtime.character.name !== "Pamela") {
             throw new Error(
-              `Expected character name 'Pamela', got '${runtime.character.name}'`
+              `Expected character name 'Pamela', got '${runtime.character.name}'`,
             );
           }
 
           // Verify character has prediction market focus
-          const system = runtime.character.system?.toLowerCase() || '';
-          const bio = runtime.character.bio?.join(' ').toLowerCase() || '';
-          
-          const tradingKeywords = ['polymarket', 'prediction', 'trading', 'market'];
-          const hasTradeKeywords = tradingKeywords.some(keyword => 
-            system.includes(keyword) || bio.includes(keyword)
+          const system = runtime.character.system?.toLowerCase() || "";
+          const bio = runtime.character.bio?.join(" ").toLowerCase() || "";
+
+          const tradingKeywords = [
+            "polymarket",
+            "prediction",
+            "trading",
+            "market",
+          ];
+          const hasTradeKeywords = tradingKeywords.some(
+            (keyword) => system.includes(keyword) || bio.includes(keyword),
           );
 
           if (!hasTradeKeywords) {
-            throw new Error("Character doesn't appear to be configured for trading");
+            throw new Error(
+              "Character doesn't appear to be configured for trading",
+            );
           }
 
           console.log("✅ Pamela character properly loaded with trading focus");
-          
         } catch (error) {
           console.error("❌ Character test FAILED:", error);
-          throw new Error(
-            `Character test failed: ${(error as Error).message}`
-          );
+          throw new Error(`Character test failed: ${(error as Error).message}`);
         }
       },
     },
@@ -133,7 +138,7 @@ export class BasicAgentTestSuite implements TestSuite {
       fn: async (runtime: any) => {
         try {
           console.log("🎯 Testing Polymarket plugin availability");
-          
+
           // Check if runtime has plugins/actions available
           if (!runtime.actions || !Array.isArray(runtime.actions)) {
             throw new Error("Runtime actions not available");
@@ -141,17 +146,17 @@ export class BasicAgentTestSuite implements TestSuite {
 
           // Look for some key Polymarket actions
           const polymarketActions = [
-            'DIRECT_PLACE_ORDER',
-            'GET_PORTFOLIO_POSITIONS',
-            'GET_SAMPLING_MARKETS',
-            'SETUP_TRADING'
+            "DIRECT_PLACE_ORDER",
+            "GET_PORTFOLIO_POSITIONS",
+            "GET_SAMPLING_MARKETS",
+            "SETUP_TRADING",
           ];
 
           const availableActions = runtime.actions.map((a: any) => a.name);
           console.log(`📋 Available actions: ${availableActions.length} total`);
-          
-          const foundActions = polymarketActions.filter(action => 
-            availableActions.includes(action)
+
+          const foundActions = polymarketActions.filter((action) =>
+            availableActions.includes(action),
           );
 
           if (foundActions.length === 0) {
@@ -159,13 +164,12 @@ export class BasicAgentTestSuite implements TestSuite {
             throw new Error("No Polymarket actions found in runtime");
           }
 
-          console.log(`✅ Found ${foundActions.length} Polymarket actions: ${foundActions.join(', ')}`);
-          
+          console.log(
+            `✅ Found ${foundActions.length} Polymarket actions: ${foundActions.join(", ")}`,
+          );
         } catch (error) {
           console.error("❌ Plugin test FAILED:", error);
-          throw new Error(
-            `Plugin test failed: ${(error as Error).message}`
-          );
+          throw new Error(`Plugin test failed: ${(error as Error).message}`);
         }
       },
     },

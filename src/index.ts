@@ -6,7 +6,7 @@ import {
 } from "@elizaos/core";
 import bootstrapPlugin from "@elizaos/plugin-bootstrap";
 import starterPlugin from "./plugin.ts";
-import predictionMarketPlugin from "./prediction-market-plugin.ts";
+import polymarketPlugin from "../plugin-polymarket/src/plugin.ts";
 import { character } from "./character.ts";
 
 // Additional plugins can be imported here as needed
@@ -28,11 +28,11 @@ export const projectAgent: ProjectAgent = {
     starterPlugin,
 
     // Core prediction market trading
-    predictionMarketPlugin,
+    polymarketPlugin,
 
     // Future plugins will be added here:
     // - Web search for market research
-    // - News monitoring for market intelligence  
+    // - News monitoring for market intelligence
     // - Social media integration
     // - Browser automation for data collection
   ],

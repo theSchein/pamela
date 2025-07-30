@@ -28,7 +28,7 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
          */
         try {
           console.log("🎯 Testing Step 1: Show prediction markets");
-          
+
           // Create a unique room for this test
           const roomId = `test-room-markets-${Date.now()}`;
           const userId = "test-user-trader";
@@ -46,7 +46,9 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
             createdAt: Date.now(),
           };
 
-          console.log("📤 Sending request: 'Show me some active prediction markets'");
+          console.log(
+            "📤 Sending request: 'Show me some active prediction markets'",
+          );
 
           // Process the message through the runtime
           await runtime.processMessage(marketRequest);
@@ -60,12 +62,14 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
             limit: 10,
           });
 
-          console.log(`📨 Retrieved ${messages.length} messages from conversation`);
+          console.log(
+            `📨 Retrieved ${messages.length} messages from conversation`,
+          );
 
           // Verify we have at least 2 messages (user + agent)
           if (messages.length < 2) {
             throw new Error(
-              `Expected at least 2 messages, got ${messages.length}`
+              `Expected at least 2 messages, got ${messages.length}`,
             );
           }
 
@@ -81,13 +85,24 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
             throw new Error("Agent did not respond to market request");
           }
 
-          console.log("🤖 Agent response:", agentResponse.content.text.substring(0, 200) + "...");
+          console.log(
+            "🤖 Agent response:",
+            agentResponse.content.text.substring(0, 200) + "...",
+          );
 
           // Verify the response contains market information
           const responseText = agentResponse.content.text.toLowerCase();
           const marketKeywords = [
-            "market", "prediction", "polymarket", "trade", "trading",
-            "yes", "no", "price", "$", "shares"
+            "market",
+            "prediction",
+            "polymarket",
+            "trade",
+            "trading",
+            "yes",
+            "no",
+            "price",
+            "$",
+            "shares",
           ];
 
           const containsMarketInfo = marketKeywords.some((keyword) =>
@@ -97,23 +112,27 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
           if (!containsMarketInfo) {
             throw new Error(
               `Agent response did not contain market information. ` +
-                `Response was: "${agentResponse.content.text}"`
+                `Response was: "${agentResponse.content.text}"`,
             );
           }
 
           // Check if the agent used any Polymarket actions
           if (agentResponse.content.data) {
-            console.log("📊 Agent action data:", JSON.stringify(agentResponse.content.data, null, 2));
+            console.log(
+              "📊 Agent action data:",
+              JSON.stringify(agentResponse.content.data, null, 2),
+            );
           }
 
-          console.log("✅ Step 1 PASSED: Agent successfully showed prediction markets");
-          
+          console.log(
+            "✅ Step 1 PASSED: Agent successfully showed prediction markets",
+          );
+
           // Test completed successfully - no need to return anything
-          
         } catch (error) {
           console.error("❌ Step 1 FAILED:", error);
           throw new Error(
-            `Step 1 (show markets) failed: ${(error as Error).message}`
+            `Step 1 (show markets) failed: ${(error as Error).message}`,
           );
         }
       },
@@ -128,7 +147,7 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
          */
         try {
           console.log("🎯 Testing Step 2: Agent makes buy decision");
-          
+
           // Create a new room for this test
           const roomId = `test-room-buy-${Date.now()}`;
           const userId = "test-user-trader";
@@ -146,7 +165,9 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
             createdAt: Date.now(),
           };
 
-          console.log("📤 Sending request: 'Pick a market and buy $5 worth of shares'");
+          console.log(
+            "📤 Sending request: 'Pick a market and buy $5 worth of shares'",
+          );
 
           // Process the message through the runtime
           await runtime.processMessage(buyRequest);
@@ -160,7 +181,9 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
             limit: 10,
           });
 
-          console.log(`📨 Retrieved ${messages.length} messages from conversation`);
+          console.log(
+            `📨 Retrieved ${messages.length} messages from conversation`,
+          );
 
           // Find the agent's response
           const agentResponse = messages.find(
@@ -174,13 +197,25 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
             throw new Error("Agent did not respond to buy request");
           }
 
-          console.log("🤖 Agent response:", agentResponse.content.text.substring(0, 300) + "...");
+          console.log(
+            "🤖 Agent response:",
+            agentResponse.content.text.substring(0, 300) + "...",
+          );
 
           // Verify the response indicates trading activity
           const responseText = agentResponse.content.text.toLowerCase();
           const tradingKeywords = [
-            "buy", "buying", "order", "placed", "shares", "position",
-            "yes", "no", "market", "analysis", "$"
+            "buy",
+            "buying",
+            "order",
+            "placed",
+            "shares",
+            "position",
+            "yes",
+            "no",
+            "market",
+            "analysis",
+            "$",
           ];
 
           const containsTradingInfo = tradingKeywords.some((keyword) =>
@@ -190,21 +225,23 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
           if (!containsTradingInfo) {
             throw new Error(
               `Agent response did not contain trading information. ` +
-                `Response was: "${agentResponse.content.text}"`
+                `Response was: "${agentResponse.content.text}"`,
             );
           }
 
           // Check if any trading actions were executed
           if (agentResponse.content.data) {
-            console.log("💰 Trading action data:", JSON.stringify(agentResponse.content.data, null, 2));
+            console.log(
+              "💰 Trading action data:",
+              JSON.stringify(agentResponse.content.data, null, 2),
+            );
           }
 
           console.log("✅ Step 2 PASSED: Agent made autonomous buy decision");
-          
         } catch (error) {
           console.error("❌ Step 2 FAILED:", error);
           throw new Error(
-            `Step 2 (buy decision) failed: ${(error as Error).message}`
+            `Step 2 (buy decision) failed: ${(error as Error).message}`,
           );
         }
       },
@@ -218,7 +255,7 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
          */
         try {
           console.log("🎯 Testing Step 3: Show portfolio");
-          
+
           // Create a new room for this test
           const roomId = `test-room-portfolio-${Date.now()}`;
           const userId = "test-user-trader";
@@ -250,7 +287,9 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
             limit: 10,
           });
 
-          console.log(`📨 Retrieved ${messages.length} messages from conversation`);
+          console.log(
+            `📨 Retrieved ${messages.length} messages from conversation`,
+          );
 
           // Find the agent's response
           const agentResponse = messages.find(
@@ -264,13 +303,23 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
             throw new Error("Agent did not respond to portfolio request");
           }
 
-          console.log("🤖 Agent response:", agentResponse.content.text.substring(0, 300) + "...");
+          console.log(
+            "🤖 Agent response:",
+            agentResponse.content.text.substring(0, 300) + "...",
+          );
 
           // Verify the response contains portfolio information
           const responseText = agentResponse.content.text.toLowerCase();
           const portfolioKeywords = [
-            "portfolio", "position", "shares", "balance", "usdc",
-            "market", "value", "total", "$"
+            "portfolio",
+            "position",
+            "shares",
+            "balance",
+            "usdc",
+            "market",
+            "value",
+            "total",
+            "$",
           ];
 
           const containsPortfolioInfo = portfolioKeywords.some((keyword) =>
@@ -280,21 +329,23 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
           if (!containsPortfolioInfo) {
             throw new Error(
               `Agent response did not contain portfolio information. ` +
-                `Response was: "${agentResponse.content.text}"`
+                `Response was: "${agentResponse.content.text}"`,
             );
           }
 
           // Check portfolio data
           if (agentResponse.content.data) {
-            console.log("📊 Portfolio data:", JSON.stringify(agentResponse.content.data, null, 2));
+            console.log(
+              "📊 Portfolio data:",
+              JSON.stringify(agentResponse.content.data, null, 2),
+            );
           }
 
           console.log("✅ Step 3 PASSED: Agent successfully showed portfolio");
-          
         } catch (error) {
           console.error("❌ Step 3 FAILED:", error);
           throw new Error(
-            `Step 3 (show portfolio) failed: ${(error as Error).message}`
+            `Step 3 (show portfolio) failed: ${(error as Error).message}`,
           );
         }
       },
@@ -308,7 +359,7 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
          */
         try {
           console.log("🎯 Testing Step 4: Sell position");
-          
+
           // Create a new room for this test
           const roomId = `test-room-sell-${Date.now()}`;
           const userId = "test-user-trader";
@@ -340,7 +391,9 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
             limit: 10,
           });
 
-          console.log(`📨 Retrieved ${messages.length} messages from conversation`);
+          console.log(
+            `📨 Retrieved ${messages.length} messages from conversation`,
+          );
 
           // Find the agent's response
           const agentResponse = messages.find(
@@ -354,13 +407,24 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
             throw new Error("Agent did not respond to sell request");
           }
 
-          console.log("🤖 Agent response:", agentResponse.content.text.substring(0, 300) + "...");
+          console.log(
+            "🤖 Agent response:",
+            agentResponse.content.text.substring(0, 300) + "...",
+          );
 
           // Verify the response indicates selling activity
           const responseText = agentResponse.content.text.toLowerCase();
           const sellingKeywords = [
-            "sell", "selling", "sold", "order", "position", "shares",
-            "proceeds", "executed", "market", "$"
+            "sell",
+            "selling",
+            "sold",
+            "order",
+            "position",
+            "shares",
+            "proceeds",
+            "executed",
+            "market",
+            "$",
           ];
 
           const containsSellingInfo = sellingKeywords.some((keyword) =>
@@ -370,21 +434,25 @@ export class PolymarketAgentTradingTestSuite implements TestSuite {
           if (!containsSellingInfo) {
             throw new Error(
               `Agent response did not contain selling information. ` +
-                `Response was: "${agentResponse.content.text}"`
+                `Response was: "${agentResponse.content.text}"`,
             );
           }
 
           // Check selling action data
           if (agentResponse.content.data) {
-            console.log("💸 Selling action data:", JSON.stringify(agentResponse.content.data, null, 2));
+            console.log(
+              "💸 Selling action data:",
+              JSON.stringify(agentResponse.content.data, null, 2),
+            );
           }
 
-          console.log("✅ Step 4 PASSED: Agent successfully executed sell order");
-          
+          console.log(
+            "✅ Step 4 PASSED: Agent successfully executed sell order",
+          );
         } catch (error) {
           console.error("❌ Step 4 FAILED:", error);
           throw new Error(
-            `Step 4 (sell position) failed: ${(error as Error).message}`
+            `Step 4 (sell position) failed: ${(error as Error).message}`,
           );
         }
       },
