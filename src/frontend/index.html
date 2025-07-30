@@ -19,10 +19,10 @@
     <meta property="og:type" content="website" />
 
     <script>
-      // This will be injected by the server in production
+      // Dynamic config - will use Railway URL in production
       window.ELIZA_CONFIG = {
-        agentId: "test-agent-id",
-        apiBase: "http://localhost:3000",
+        agentId: "",
+        apiBase: window.location.origin,
       };
     </script>
   </head>
