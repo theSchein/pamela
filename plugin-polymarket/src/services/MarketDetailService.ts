@@ -198,18 +198,9 @@ export class MarketDetailService extends Service {
             ),
             // Search criteria
             or(
-              like(
-                sql`LOWER(${polymarketMarketsTable.question})`,
-                searchPattern,
-              ),
-              like(
-                sql`LOWER(${polymarketMarketsTable.category})`,
-                searchPattern,
-              ),
-              like(
-                sql`LOWER(${polymarketMarketsTable.marketSlug})`,
-                searchPattern,
-              ),
+              sql`LOWER(${polymarketMarketsTable.question}) LIKE ${searchPattern}`,
+              sql`LOWER(${polymarketMarketsTable.category}) LIKE ${searchPattern}`,
+              sql`LOWER(${polymarketMarketsTable.marketSlug}) LIKE ${searchPattern}`,
             ),
           ),
         )
