@@ -78,7 +78,7 @@
     "vite": "^6.0.1"
   },
   "scripts": {
-    "start": "bun run dist/src/server.js",
+    "start": "bun run dist/server.js",
     "dev": "elizaos dev",
     "dev:frontend": "vite",
     "build": "tsc --noEmit && vite build && tsup",
