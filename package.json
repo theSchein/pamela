@@ -78,7 +78,7 @@
     "vite": "^6.0.1"
   },
   "scripts": {
-    "start": "elizaos start --port $PORT",
+    "start": "elizaos start --port ${PORT:-3000}",
     "dev": "elizaos dev",
     "dev:frontend": "vite",
     "build": "tsc --noEmit && vite build && tsup && mkdir -p dist/client && cp -r dist/frontend/* dist/client/ && rm -rf dist/frontend",
