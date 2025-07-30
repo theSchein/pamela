@@ -59,7 +59,7 @@ export const directPlaceOrderAction: Action = {
       side: (options?.side as 'BUY' | 'SELL') || extractSide(message.content?.text || ''),
       price: (typeof options?.price === 'number' ? options.price : extractPrice(message.content?.text || '')) || 0,
       size: (typeof options?.size === 'number' ? options.size : extractSize(message.content?.text || '')) || 0,
-      orderType: (options?.orderType as 'GTC' | 'FOK') || 'GTC',
+      orderType: (options?.orderType as 'GTC' | 'FOK') || 'FOK',  // Default to FOK (market order)
     };
 
     logger.info('[directPlaceOrderAction] Extracted parameters:', orderParams);

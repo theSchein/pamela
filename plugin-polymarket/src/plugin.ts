@@ -42,6 +42,7 @@ import { sellOrderAction } from './actions/sellOrder';
 import { cancelOrderAction } from './actions/cancelOrder';
 import { getMarketPriceAction } from './actions/getMarketPrice';
 import { directPlaceOrderAction } from './actions/directPlaceOrder';
+import { directSellOrderAction } from './actions/directSellOrder';
 import { getPortfolioPositionsAction } from './actions/getPortfolioPositions';
 import { polymarketSchema } from './schema';
 import { MarketSyncService } from './services/MarketSyncService';
@@ -222,7 +223,8 @@ const plugin: Plugin = {
     // Core Trading
     placeOrderAction,              // Buy orders (enhanced with market lookup)
     sellOrderAction,               // Sell orders (new streamlined selling)
-    directPlaceOrderAction,        // Direct API orders (bypasses LLM)
+    directPlaceOrderAction,        // Direct API buy orders (bypasses LLM)
+    directSellOrderAction,         // Direct API sell orders (bypasses LLM)
     cancelOrderAction,             // Cancel orders
     
     // Market Discovery & Data
