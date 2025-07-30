@@ -1,0 +1,266 @@
+# Test Coverage Analysis - Polymarket Plugin
+# Generated: 2025-07-30
+# Current Coverage: ~28% line coverage
+
+## MISSING TEST COVERAGE ANALYSIS
+
+### STATUS OVERVIEW
+✅ WORKING: Core trading functionality (direct orders, portfolio, approvals)
+🔴 MISSING: Many actions, services, and error handling paths
+🟡 PARTIAL: Some actions have basic coverage but need error/edge cases
+
+### 1. UNTESTED ACTIONS (0% coverage)
+These core actions have NO test coverage:
+
+- cancelOrder.ts (0% coverage)
+  - Order cancellation workflow
+  - Active order management
+  - Cancellation error handling
+
+- createApiKey.ts (0% coverage)  
+  - API key generation
+  - Credential derivation
+  - Key management workflows
+
+- depositUSDC.ts (0% coverage)
+  - USDC deposit functionality
+  - Deposit address management
+  - Transaction monitoring
+
+- revokeApiKey.ts (0% coverage)
+  - API key revocation
+  - Security management
+  - Key cleanup processes
+
+- sellOrder.ts (0% coverage)
+  - LLM-based sell orders
+  - Sell parameter extraction
+  - Sell order validation
+
+- handleAuthentication.ts (0% coverage)
+  - Authentication workflows
+  - Credential validation
+  - Auth error handling
+
+- handleRealtimeUpdates.ts (0% coverage)
+  - WebSocket data processing
+  - Real-time market updates
+  - Event handling
+
+- setupWebsocket.ts (0% coverage)
+  - WebSocket connection setup
+  - Connection management
+  - Reconnection logic
+
+- getMarketPrice.ts (0% coverage)
+  - Price discovery
+  - Market price calculations
+  - Price recommendation logic
+
+- getMarketDetails.ts (0% coverage)
+  - Market information retrieval
+  - Market metadata processing
+  - Detail formatting
+
+- retrieveAllMarkets.ts (0% coverage)
+  - Market listing functionality
+  - Market filtering
+  - Pagination handling
+
+### 2. PARTIALLY TESTED ACTIONS (need more coverage)
+These actions have basic coverage but need comprehensive testing:
+
+- directSellOrder.ts (9.63% coverage)
+  - Need: Error handling, edge cases, validation failures
+  - Missing: Invalid parameters, insufficient positions, API errors
+
+- placeOrder.ts (10.86% coverage)
+  - Need: LLM parameter extraction, validation errors
+  - Missing: Order rejection, network failures, balance checks
+
+- directPlaceOrder.ts (11.95% coverage)
+  - Need: Error scenarios, edge cases
+  - Missing: Invalid tokens, order failures, balance issues
+
+- getPortfolioPositions.ts (16.88% coverage)
+  - Need: Empty portfolio, error handling
+  - Missing: API failures, data parsing errors
+
+- approveUSDC.ts (45.08% coverage - highest partial coverage)
+  - Need: Error paths, transaction failures
+  - Missing: Network errors, approval failures, gas issues
+
+### 3. UNTESTED SERVICES & UTILITIES (0-10% coverage)
+Critical infrastructure with minimal/no coverage:
+
+- MarketSyncService.ts (0.52% coverage)
+  - Market data synchronization
+  - Background update processes
+  - Data consistency management
+
+- MarketDetailService.ts (2.03% coverage)
+  - Market detail processing
+  - Data enrichment
+  - Service lifecycle management
+
+- databaseInit.ts (2.22% coverage)
+  - Database initialization
+  - Schema setup
+  - Migration handling
+
+- llmHelpers.ts (3.33% coverage)
+  - LLM integration utilities
+  - Parameter extraction
+  - Timeout handling
+
+- marketLookup.ts (2.91% coverage)
+  - Market search functionality
+  - Lookup optimization
+  - Caching strategies
+
+- balanceChecker.ts (5.56% coverage)
+  - Balance validation
+  - Sufficient funds checking
+  - Multi-token balance handling
+
+- depositManager.ts (9.83% coverage)
+  - Deposit workflow management
+  - Transaction tracking
+  - Deposit verification
+
+### 4. MISSING ERROR PATH TESTING
+Critical error scenarios not covered:
+
+- Network failures (API timeouts, connection errors)
+- API errors (400/500 responses, rate limiting)
+- Invalid parameters (malformed data, wrong types)
+- Insufficient balance scenarios
+- Authentication failures (expired tokens, invalid keys)
+- Order rejection handling (market closed, invalid prices)
+- Blockchain errors (gas failures, transaction reverts)
+- Data parsing errors (malformed responses)
+
+### 5. MISSING EDGE CASE TESTING
+Important boundary conditions not tested:
+
+- Empty market responses
+- Zero balances and positions
+- Maximum order sizes and limits
+- Price boundary conditions (0, negative, extremely high)
+- Token ID validation (invalid formats, non-existent tokens)
+- Wallet connection failures
+- Concurrent operation handling
+- Rate limiting scenarios
+
+## TO ACHIEVE 90%+ COVERAGE
+
+### HIGH PRIORITY (Core Trading) - Target: 60% total coverage
+1. **Error handling in trading actions**
+   - API failures, network timeouts
+   - Insufficient funds scenarios
+   - Invalid parameter handling
+
+2. **Sell order functionality**
+   - Complete testing of sellOrder.ts
+   - Enhanced directSellOrder.ts coverage
+   - Sell parameter validation
+
+3. **Order management**
+   - Order cancellation workflows
+   - Active order monitoring
+   - Order status tracking
+
+4. **Market data retrieval**
+   - Market listing and filtering
+   - Market detail processing
+   - Price discovery testing
+
+### MEDIUM PRIORITY (Management Features) - Target: 75% total coverage
+1. **API key management**
+   - Key creation and derivation
+   - Key revocation and cleanup
+   - Security validation
+
+2. **WebSocket functionality**
+   - Connection setup and management
+   - Real-time data processing
+   - Event handling and reconnection
+
+3. **USDC deposit flows**
+   - Deposit address generation
+   - Transaction monitoring
+   - Deposit confirmation
+
+### LOW PRIORITY (Infrastructure) - Target: 90% total coverage
+1. **Service layer testing**
+   - Database services
+   - Sync services
+   - Background processes
+
+2. **Helper utilities**
+   - LLM integration helpers
+   - Balance checking utilities
+   - Market lookup functions
+
+3. **Configuration validation**
+   - Schema validation
+   - Plugin initialization
+   - Environment setup
+
+## ESTIMATED IMPLEMENTATION EFFORT
+
+### Test Files Needed:
+- **6-8 action test files** for untested actions
+- **3-4 error scenario test files** for comprehensive error handling
+- **2-3 utility/service test files** for infrastructure coverage
+- **2-3 integration test files** for end-to-end workflows
+
+**Total: ~12-15 additional test files**
+
+### Development Time Estimate:
+- High Priority: 2-3 days (core trading coverage)
+- Medium Priority: 1-2 days (management features)
+- Low Priority: 1-2 days (infrastructure/utilities)
+
+**Total: 4-7 days for comprehensive coverage**
+
+### Coverage Targets:
+- Current: ~28% line coverage
+- High Priority Complete: ~60% coverage
+- Medium Priority Complete: ~75% coverage  
+- Full Implementation: ~90-95% coverage
+
+## RECOMMENDED NEXT STEPS
+
+1. **Immediate (High ROI):**
+   - Add error handling tests to existing actions
+   - Test sell order functionality
+   - Add order cancellation tests
+
+2. **Short-term (Complete Core):**
+   - Test market data retrieval actions
+   - Add API key management tests
+   - Test WebSocket functionality
+
+3. **Long-term (Full Coverage):**
+   - Service layer comprehensive testing
+   - Utility function coverage
+   - Edge case and boundary testing
+
+## NOTES
+
+- Current live integration approach is excellent for production confidence
+- Focus on error paths will provide highest coverage gains
+- Many utilities can be tested with unit tests (faster execution)
+- Consider mock testing for some service layer components to avoid API limits
+- Prioritize based on business-critical functionality first
+
+## FILES TO REFERENCE WHEN IMPLEMENTING
+
+Existing working test patterns:
+- plugin-polymarket/__tests__/direct-trading.test.ts (live API integration)
+- plugin-polymarket/__tests__/portfolio-positions.test.ts (workflow testing)
+- plugin-polymarket/__tests__/test-approvals-and-trading.test.ts (error scenarios)
+- plugin-polymarket/__tests__/test-utils.ts (test infrastructure)
+
+Coverage can be checked with: `bun test --coverage`
