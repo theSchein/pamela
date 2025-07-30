@@ -73,7 +73,7 @@
     "vite": "^6.0.1"
   },
   "scripts": {
-    "start": "elizaos start",
+    "start": "node dist/src/server.js",
     "dev": "elizaos dev",
     "dev:frontend": "vite",
     "build": "tsc --noEmit && vite build && tsup",
