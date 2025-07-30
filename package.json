@@ -3,6 +3,10 @@
   "description": "Autonomous prediction market trading agent built on ElizaOS",
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "main": "dist/src/index.js",
   "module": "dist/src/index.js",
   "types": "dist/index.d.ts",
