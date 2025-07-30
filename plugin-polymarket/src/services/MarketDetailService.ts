@@ -4,15 +4,15 @@
  * and provides enhanced market data to users through conversational interface
  */
 
-import { type IAgentRuntime, logger, Service } from '@elizaos/core';
-import { eq, and, sql, like, or, gte } from 'drizzle-orm';
-import { initializeClobClient, type ClobClient } from '../utils/clobClient';
-import { 
+import { type IAgentRuntime, logger, Service } from "@elizaos/core";
+import { eq, and, sql, like, or, gte } from "drizzle-orm";
+import { initializeClobClient, type ClobClient } from "../utils/clobClient";
+import {
   polymarketMarketsTable,
   polymarketTokensTable,
   type PolymarketMarket,
-} from '../schema';
-import type { Market } from '../types';
+} from "../schema";
+import type { Market } from "../types";
 
 /**
  * Interface for market detail cache entry
@@ -28,9 +28,10 @@ interface MarketDetailCache {
  * Service responsible for fetching detailed market information
  */
 export class MarketDetailService extends Service {
-  static serviceType = 'polymarket-market-detail';
-  capabilityDescription = 'Fetches detailed market information from Polymarket API with smart caching';
-  
+  static serviceType = "polymarket-market-detail";
+  capabilityDescription =
+    "Fetches detailed market information from Polymarket API with smart caching";
+
   private clobClient: ClobClient | null = null;
   private marketCache: Map<string, MarketDetailCache> = new Map();
   private readonly CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes cache
@@ -44,19 +45,19 @@ export class MarketDetailService extends Service {
    * Start the market detail service
    */
   static async start(runtime: IAgentRuntime): Promise<MarketDetailService> {
-    logger.info('*** Starting Polymarket Market Detail Service ***');
-    
+    logger.info("*** Starting Polymarket Market Detail Service ***");
+
     const service = new MarketDetailService(runtime);
-    
+
     try {
       // Initialize CLOB client
       service.clobClient = await initializeClobClient(runtime);
-      logger.info('Market detail service: CLOB client initialized');
-      
-      logger.info('Market detail service started successfully');
+      logger.info("Market detail service: CLOB client initialized");
+
+      logger.info("Market detail service started successfully");
       return service;
     } catch (error) {
-      logger.error('Failed to start market detail service:', error);
+      logger.error("Failed to start market detail service:", error);
       throw error;
     }
   }
@@ -65,9 +66,11 @@ export class MarketDetailService extends Service {
    * Stop the market detail service
    */
   static async stop(runtime: IAgentRuntime): Promise<void> {
-    logger.info('*** Stopping Polymarket Market Detail Service ***');
-    
-    const service = runtime.getService(MarketDetailService.serviceType) as MarketDetailService;
+    logger.info("*** Stopping Polymarket Market Detail Service ***");
+
+    const service = runtime.getService(
+      MarketDetailService.serviceType,
+    ) as MarketDetailService;
     if (service) {
       await service.stop();
     }
@@ -79,13 +82,16 @@ export class MarketDetailService extends Service {
   async stop(): Promise<void> {
     // Clear cache
     this.marketCache.clear();
-    logger.info('Market detail service stopped');
+    logger.info("Market detail service stopped");
   }
 
   /**
    * Get detailed information for a specific market by condition_id
    */
-  async getMarketDetail(conditionId: string, useCache: boolean = true): Promise<Market | null> {
+  async getMarketDetail(
+    conditionId: string,
+    useCache: boolean = true,
+  ): Promise<Market | null> {
     try {
       // Check cache first if enabled
       if (useCache) {
@@ -98,12 +104,14 @@ export class MarketDetailService extends Service {
 
       // Fetch from API
       if (!this.clobClient) {
-        throw new Error('CLOB client not initialized');
+        throw new Error("CLOB client not initialized");
       }
 
-      logger.info(`Fetching market detail from API for condition_id: ${conditionId}`);
+      logger.info(
+        `Fetching market detail from API for condition_id: ${conditionId}`,
+      );
       const marketDetail = await this.clobClient.getMarket(conditionId);
-      
+
       if (!marketDetail) {
         logger.warn(`No market found for condition_id: ${conditionId}`);
         return null;
@@ -116,7 +124,6 @@ export class MarketDetailService extends Service {
 
       logger.info(`Successfully fetched market detail for: ${conditionId}`);
       return marketDetail;
-
     } catch (error) {
       logger.error(`Failed to get market detail for ${conditionId}:`, error);
       throw error;
@@ -126,29 +133,34 @@ export class MarketDetailService extends Service {
   /**
    * Search for markets in local database by question text
    */
-  async searchMarkets(searchTerm: string, limit: number = 10): Promise<PolymarketMarket[]> {
+  async searchMarkets(
+    searchTerm: string,
+    limit: number = 10,
+  ): Promise<PolymarketMarket[]> {
     const db = (this.runtime as any).db;
     if (!db) {
-      logger.warn('Database not available, returning empty results');
+      logger.warn("Database not available, returning empty results");
       return [];
     }
 
     try {
       // Ensure we have a valid search term and it's not too long
       if (!searchTerm || searchTerm.trim().length === 0) {
-        logger.warn('Empty search term provided');
+        logger.warn("Empty search term provided");
         return [];
       }
 
       const cleanSearchTerm = searchTerm.trim().toLowerCase();
       if (cleanSearchTerm.length > 100) {
-        logger.warn(`Search term too long (${cleanSearchTerm.length} chars), truncating`);
+        logger.warn(
+          `Search term too long (${cleanSearchTerm.length} chars), truncating`,
+        );
         const truncatedTerm = cleanSearchTerm.substring(0, 50);
         return this.searchMarkets(truncatedTerm, limit);
       }
 
       const searchPattern = `%${cleanSearchTerm}%`;
-      
+
       // First try to check if table exists by doing a simple count
       try {
         const testQuery = await db
@@ -156,18 +168,22 @@ export class MarketDetailService extends Service {
           .from(polymarketMarketsTable)
           .where(eq(polymarketMarketsTable.active, true))
           .limit(1);
-        
-        logger.info(`Database connection test passed, found ${testQuery.length} active markets in sample`);
+
+        logger.info(
+          `Database connection test passed, found ${testQuery.length} active markets in sample`,
+        );
       } catch (testError) {
-        logger.error('Database table access failed:', testError);
+        logger.error("Database table access failed:", testError);
         return [];
       }
-      
+
       // Only show markets that are active and haven't ended yet
       const currentDate = new Date();
       // Use 1 hour buffer to exclude recently ended markets
-      const minimumFutureDate = new Date(currentDate.getTime() + 60 * 60 * 1000);
-      
+      const minimumFutureDate = new Date(
+        currentDate.getTime() + 60 * 60 * 1000,
+      );
+
       const markets = await db
         .select()
         .from(polymarketMarketsTable)
@@ -178,22 +194,32 @@ export class MarketDetailService extends Service {
             // Only include markets that end more than 1 hour from now
             or(
               sql`${polymarketMarketsTable.endDateIso} IS NULL`,
-              sql`${polymarketMarketsTable.endDateIso} > ${minimumFutureDate}`
+              sql`${polymarketMarketsTable.endDateIso} > ${minimumFutureDate}`,
             ),
             // Search criteria
             or(
-              like(sql`LOWER(${polymarketMarketsTable.question})`, searchPattern),
-              like(sql`LOWER(${polymarketMarketsTable.category})`, searchPattern),
-              like(sql`LOWER(${polymarketMarketsTable.marketSlug})`, searchPattern)
-            )
-          )
+              like(
+                sql`LOWER(${polymarketMarketsTable.question})`,
+                searchPattern,
+              ),
+              like(
+                sql`LOWER(${polymarketMarketsTable.category})`,
+                searchPattern,
+              ),
+              like(
+                sql`LOWER(${polymarketMarketsTable.marketSlug})`,
+                searchPattern,
+              ),
+            ),
+          ),
         )
         .limit(limit)
         .orderBy(sql`${polymarketMarketsTable.endDateIso} DESC`);
 
-      logger.info(`Found ${markets.length} markets matching search term: "${searchTerm}"`);
+      logger.info(
+        `Found ${markets.length} markets matching search term: "${searchTerm}"`,
+      );
       return markets;
-
     } catch (error) {
       logger.error(`Failed to search markets for term "${searchTerm}":`, error);
       // Instead of throwing, return empty array for graceful degradation
@@ -204,18 +230,23 @@ export class MarketDetailService extends Service {
   /**
    * Get popular/trending markets (by category or recent activity)
    */
-  async getPopularMarkets(category?: string, limit: number = 5): Promise<PolymarketMarket[]> {
+  async getPopularMarkets(
+    category?: string,
+    limit: number = 5,
+  ): Promise<PolymarketMarket[]> {
     const db = (this.runtime as any).db;
     if (!db) {
-      throw new Error('Database not available');
+      throw new Error("Database not available");
     }
 
     try {
       // Only show markets that are active and haven't ended yet
       const currentDate = new Date();
       // Use 1 hour buffer to exclude recently ended markets
-      const minimumFutureDate = new Date(currentDate.getTime() + 60 * 60 * 1000);
-      
+      const minimumFutureDate = new Date(
+        currentDate.getTime() + 60 * 60 * 1000,
+      );
+
       const query = db
         .select()
         .from(polymarketMarketsTable)
@@ -226,19 +257,20 @@ export class MarketDetailService extends Service {
             // Only include markets that end more than 1 hour from now
             or(
               sql`${polymarketMarketsTable.endDateIso} IS NULL`,
-              sql`${polymarketMarketsTable.endDateIso} > ${minimumFutureDate}`
+              sql`${polymarketMarketsTable.endDateIso} > ${minimumFutureDate}`,
             ),
-            category ? eq(polymarketMarketsTable.category, category) : sql`1=1`
-          )
+            category ? eq(polymarketMarketsTable.category, category) : sql`1=1`,
+          ),
         )
         .limit(limit)
         .orderBy(sql`${polymarketMarketsTable.endDateIso} DESC`);
 
       const markets = await query;
-      
-      logger.info(`Found ${markets.length} popular markets${category ? ` in category: ${category}` : ''}`);
-      return markets;
 
+      logger.info(
+        `Found ${markets.length} popular markets${category ? ` in category: ${category}` : ""}`,
+      );
+      return markets;
     } catch (error) {
       logger.error(`Failed to get popular markets:`, error);
       throw error;
@@ -251,7 +283,7 @@ export class MarketDetailService extends Service {
   async getMarketCategories(): Promise<string[]> {
     const db = (this.runtime as any).db;
     if (!db) {
-      throw new Error('Database not available');
+      throw new Error("Database not available");
     }
 
     try {
@@ -261,8 +293,8 @@ export class MarketDetailService extends Service {
         .where(
           and(
             eq(polymarketMarketsTable.active, true),
-            sql`${polymarketMarketsTable.category} IS NOT NULL`
-          )
+            sql`${polymarketMarketsTable.category} IS NOT NULL`,
+          ),
         )
         .orderBy(polymarketMarketsTable.category);
 
@@ -272,9 +304,8 @@ export class MarketDetailService extends Service {
 
       logger.info(`Found ${categories.length} market categories`);
       return categories;
-
     } catch (error) {
-      logger.error('Failed to get market categories:', error);
+      logger.error("Failed to get market categories:", error);
       throw error;
     }
   }
@@ -288,33 +319,39 @@ export class MarketDetailService extends Service {
     tokens: any[];
   }> {
     const db = (this.runtime as any).db;
-    
+
     try {
       // Get local market data
-      const localData = db ? await db
-        .select()
-        .from(polymarketMarketsTable)
-        .where(eq(polymarketMarketsTable.conditionId, conditionId))
-        .limit(1)
-        .then((rows: any[]) => rows[0] || null) : null;
+      const localData = db
+        ? await db
+            .select()
+            .from(polymarketMarketsTable)
+            .where(eq(polymarketMarketsTable.conditionId, conditionId))
+            .limit(1)
+            .then((rows: any[]) => rows[0] || null)
+        : null;
 
       // Get live API data
       const liveData = await this.getMarketDetail(conditionId);
 
       // Get tokens
-      const tokens = db ? await db
-        .select()
-        .from(polymarketTokensTable)
-        .where(eq(polymarketTokensTable.conditionId, conditionId)) : [];
+      const tokens = db
+        ? await db
+            .select()
+            .from(polymarketTokensTable)
+            .where(eq(polymarketTokensTable.conditionId, conditionId))
+        : [];
 
       return {
         localData,
         liveData,
-        tokens
+        tokens,
       };
-
     } catch (error) {
-      logger.error(`Failed to get enhanced market info for ${conditionId}:`, error);
+      logger.error(
+        `Failed to get enhanced market info for ${conditionId}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -322,29 +359,37 @@ export class MarketDetailService extends Service {
   /**
    * Format market information for user-friendly display
    */
-  formatMarketInfo(localData: PolymarketMarket | null, liveData: Market | null): string {
+  formatMarketInfo(
+    localData: PolymarketMarket | null,
+    liveData: Market | null,
+  ): string {
     if (!localData && !liveData) {
       return "Market not found.";
     }
 
     // Handle both Market and PolymarketMarket types
-    const question = liveData?.question || localData?.question || "Unknown question";
-    const category = liveData?.category || localData?.category || "Uncategorized";
-    const active = liveData?.active !== undefined ? liveData.active : localData?.active;
-    
+    const question =
+      liveData?.question || localData?.question || "Unknown question";
+    const category =
+      liveData?.category || localData?.category || "Uncategorized";
+    const active =
+      liveData?.active !== undefined ? liveData.active : localData?.active;
+
     // Handle different date property names
     const endDateIso = liveData?.end_date_iso || localData?.endDateIso;
-    const endDate = endDateIso ? new Date(endDateIso).toLocaleDateString() : "No end date";
-    
+    const endDate = endDateIso
+      ? new Date(endDateIso).toLocaleDateString()
+      : "No end date";
+
     let info = `**${question}**\n`;
     info += `📊 Category: ${category}\n`;
     info += `🔴 Status: ${active ? "Active" : "Inactive"}\n`;
     info += `📅 End Date: ${endDate}\n`;
-    
+
     if (liveData) {
       info += `✨ *Live data from API*\n`;
     }
-    
+
     return info;
   }
 
@@ -367,10 +412,12 @@ export class MarketDetailService extends Service {
       conditionId,
       marketDetail,
       fetchedAt: now,
-      expiresAt
+      expiresAt,
     });
 
-    logger.debug(`Cached market detail for ${conditionId}, expires at ${expiresAt.toISOString()}`);
+    logger.debug(
+      `Cached market detail for ${conditionId}, expires at ${expiresAt.toISOString()}`,
+    );
   }
 
   /**
@@ -378,7 +425,7 @@ export class MarketDetailService extends Service {
    */
   private getFromCache(conditionId: string): MarketDetailCache | null {
     const cached = this.marketCache.get(conditionId);
-    
+
     if (!cached) {
       return null;
     }
@@ -398,7 +445,7 @@ export class MarketDetailService extends Service {
   getCacheStats(): { size: number; maxSize: number; hitRate?: number } {
     return {
       size: this.marketCache.size,
-      maxSize: this.MAX_CACHE_SIZE
+      maxSize: this.MAX_CACHE_SIZE,
     };
   }
 }

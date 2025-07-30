@@ -1,25 +1,31 @@
-import { Content, ActionResult } from '@elizaos/core';
+import { Content, ActionResult } from "@elizaos/core";
 
 /**
  * Converts a Content object to an ActionResult object
  * This is a compatibility helper for the polymarket plugin
  */
-export function contentToActionResult(content: Content, success: boolean = true): ActionResult {
+export function contentToActionResult(
+  content: Content,
+  success: boolean = true,
+): ActionResult {
   return {
-    text: content.text || '',
+    text: content.text || "",
     success,
     data: content,
     values: {
       success,
-      ...(content.values || {})
-    }
+      ...(content.values || {}),
+    },
   };
 }
 
 /**
  * Creates an error ActionResult
  */
-export function createErrorResult(error: string | Error, data?: any): ActionResult {
+export function createErrorResult(
+  error: string | Error,
+  data?: any,
+): ActionResult {
   const errorMessage = error instanceof Error ? error.message : error;
   return {
     text: `Error: ${errorMessage}`,
@@ -28,7 +34,7 @@ export function createErrorResult(error: string | Error, data?: any): ActionResu
     data: data || {},
     values: {
       success: false,
-      error: errorMessage
-    }
+      error: errorMessage,
+    },
   };
 }

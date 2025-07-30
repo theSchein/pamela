@@ -9,44 +9,54 @@ import {
   logger,
   ModelType,
   composePromptFromState,
-} from '@elizaos/core';
-import { callLLMWithTimeout } from '../utils/llmHelpers';
-import { initializeClobClient } from '../utils/clobClient';
-import { retrieveAllMarketsTemplate } from '../templates';
-import type { MarketFilters, Market } from '../types';
-import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
+} from "@elizaos/core";
+import { callLLMWithTimeout } from "../utils/llmHelpers";
+import { initializeClobClient } from "../utils/clobClient";
+import { retrieveAllMarketsTemplate } from "../templates";
+import type { MarketFilters, Market } from "../types";
+import {
+  contentToActionResult,
+  createErrorResult,
+} from "../utils/actionHelpers";
 
 /**
  * Retrieve all available markets action for Polymarket
  * Fetches the complete list of prediction markets from the CLOB
  */
 export const retrieveAllMarketsAction: Action = {
-  name: 'POLYMARKET_GET_ALL_MARKETS',
+  name: "POLYMARKET_GET_ALL_MARKETS",
   similes: [
-    'LIST_MARKETS',
-    'SHOW_MARKETS',
-    'GET_MARKETS',
-    'FETCH_MARKETS',
-    'ALL_MARKETS',
-    'AVAILABLE_MARKETS',
+    "LIST_MARKETS",
+    "SHOW_MARKETS",
+    "GET_MARKETS",
+    "FETCH_MARKETS",
+    "ALL_MARKETS",
+    "AVAILABLE_MARKETS",
   ],
-  description: 'Retrieve all available prediction markets from Polymarket',
+  description: "Retrieve all available prediction markets from Polymarket",
 
-  validate: async (runtime: IAgentRuntime, message: Memory, state?: State): Promise<boolean> => {
-    const clobApiUrl = runtime.getSetting('CLOB_API_URL');
+  validate: async (
+    runtime: IAgentRuntime,
+    message: Memory,
+    state?: State,
+  ): Promise<boolean> => {
+    const clobApiUrl = runtime.getSetting("CLOB_API_URL");
 
     if (!clobApiUrl) {
-      logger.warn('[retrieveAllMarketsAction] CLOB_API_URL is required but not provided');
+      logger.warn(
+        "[retrieveAllMarketsAction] CLOB_API_URL is required but not provided",
+      );
       return false;
     }
 
     // Only validate if message specifically asks for "all markets" or "complete list"
-    const messageText = message.content?.text?.toLowerCase() || '';
-    const isAllMarketsRequest = messageText.includes('all markets') || 
-                               messageText.includes('complete list') ||
-                               messageText.includes('every market') ||
-                               messageText.includes('full list');
-    
+    const messageText = message.content?.text?.toLowerCase() || "";
+    const isAllMarketsRequest =
+      messageText.includes("all markets") ||
+      messageText.includes("complete list") ||
+      messageText.includes("every market") ||
+      messageText.includes("full list");
+
     return isAllMarketsRequest;
   },
 
@@ -55,18 +65,20 @@ export const retrieveAllMarketsAction: Action = {
     message: Memory,
     state?: State,
     options?: { [key: string]: unknown },
-    callback?: HandlerCallback
+    callback?: HandlerCallback,
   ): Promise<ActionResult> => {
-    logger.info('[retrieveAllMarketsAction] Handler called!');
+    logger.info("[retrieveAllMarketsAction] Handler called!");
 
-    const clobApiUrl = runtime.getSetting('CLOB_API_URL');
+    const clobApiUrl = runtime.getSetting("CLOB_API_URL");
 
     if (!clobApiUrl) {
-      const errorMessage = 'CLOB_API_URL is required in configuration.';
-      logger.error(`[retrieveAllMarketsAction] Configuration error: ${errorMessage}`);
+      const errorMessage = "CLOB_API_URL is required in configuration.";
+      logger.error(
+        `[retrieveAllMarketsAction] Configuration error: ${errorMessage}`,
+      );
       const errorContent: Content = {
         text: errorMessage,
-        actions: ['POLYMARKET_GET_ALL_MARKETS'],
+        actions: ["POLYMARKET_GET_ALL_MARKETS"],
         data: { error: errorMessage },
       };
 
@@ -80,16 +92,13 @@ export const retrieveAllMarketsAction: Action = {
 
     // Extract optional filter parameters using LLM
     try {
-      const llmResult = await callLLMWithTimeout<MarketFilters & { error?: string }>(
-        runtime,
-        state,
-        retrieveAllMarketsTemplate,
-        'retrieveAllMarketsAction'
-      );
+      const llmResult = await callLLMWithTimeout<
+        MarketFilters & { error?: string }
+      >(runtime, state, retrieveAllMarketsTemplate, "retrieveAllMarketsAction");
 
       if (llmResult?.error) {
         logger.info(
-          '[retrieveAllMarketsAction] No specific filters requested, fetching all markets'
+          "[retrieveAllMarketsAction] No specific filters requested, fetching all markets",
         );
         filterParams = {};
       } else {
@@ -101,8 +110,8 @@ export const retrieveAllMarketsAction: Action = {
       }
     } catch (error) {
       logger.debug(
-        '[retrieveAllMarketsAction] LLM parameter extraction failed, using defaults:',
-        error
+        "[retrieveAllMarketsAction] LLM parameter extraction failed, using defaults:",
+        error,
       );
       filterParams = {};
     }
@@ -112,60 +121,68 @@ export const retrieveAllMarketsAction: Action = {
       const clobClient = await initializeClobClient(runtime);
 
       // Fetch markets with proper filtering for current markets
-      const response = await (clobClient as any).getMarkets(filterParams?.next_cursor || '', {
-        active: true, // Only active markets
-        closed: false, // Only non-closed markets
-        limit: filterParams?.limit || 50, // Default limit
-      });
+      const response = await (clobClient as any).getMarkets(
+        filterParams?.next_cursor || "",
+        {
+          active: true, // Only active markets
+          closed: false, // Only non-closed markets
+          limit: filterParams?.limit || 50, // Default limit
+        },
+      );
 
       if (!response || !response.data) {
-        return createErrorResult('Invalid response from CLOB API');
+        return createErrorResult("Invalid response from CLOB API");
       }
 
       const allMarkets: Market[] = response.data;
-      
+
       // Filter for active markets with good liquidity/volume for trading
       const currentDate = new Date();
       const markets = allMarkets.filter((market) => {
         // Basic active/open check
-        const isActiveAndOpen = market.active === true && market.closed === false;
-        
+        const isActiveAndOpen =
+          market.active === true && market.closed === false;
+
         // Check if market end date is in the future
         let isFutureMarket = true;
         if (market.end_date_iso) {
           const endDate = new Date(market.end_date_iso);
           isFutureMarket = endDate > currentDate;
         }
-        
+
         // Check for reasonable liquidity/volume (indicates active trading)
         const hasLiquidity = market.liquidityNum && market.liquidityNum > 100; // At least $100 liquidity
         const hasVolume = market.volumeNum && market.volumeNum > 50; // At least $50 volume
         const hasTradingActivity = hasLiquidity || hasVolume;
-        
+
         // Ensure market has tokens for trading
         const hasTokens = market.tokens && market.tokens.length >= 2;
-        
-        return isActiveAndOpen && isFutureMarket && hasTradingActivity && hasTokens;
+
+        return (
+          isActiveAndOpen && isFutureMarket && hasTradingActivity && hasTokens
+        );
       });
-      
+
       const marketCount = markets.length;
-      logger.info(`[retrieveAllMarkets] Filtered from ${allMarkets.length} to ${marketCount} current markets`);
+      logger.info(
+        `[retrieveAllMarkets] Filtered from ${allMarkets.length} to ${marketCount} current markets`,
+      );
 
       // Format response text
       let responseText = `📊 **Retrieved ${marketCount} Polymarket prediction markets**\n\n`;
 
       if (marketCount === 0) {
-        responseText += 'No markets found matching your criteria.';
+        responseText += "No markets found matching your criteria.";
       } else {
         // Show first few markets as preview
         const previewMarkets = markets.slice(0, 5);
-        responseText += '**Sample Markets:**\n';
+        responseText += "**Sample Markets:**\n";
 
         previewMarkets.forEach((market: Market, index: number) => {
           responseText += `${index + 1}. **${market.question}**\n`;
-          responseText += `   • Category: ${market.category || 'N/A'}\n`;
-          responseText += `   • Active: ${market.active ? '✅' : '❌'}\n`;
-          responseText += `   • End Date: ${market.end_date_iso ? new Date(market.end_date_iso).toLocaleDateString() : 'N/A'}\n\n`;
+          responseText += `   • Category: ${market.category || "N/A"}\n`;
+          responseText += `   • Active: ${market.active ? "✅" : "❌"}\n`;
+          responseText += `   • End Date: ${market.end_date_iso ? new Date(market.end_date_iso).toLocaleDateString() : "N/A"}\n\n`;
         });
 
         if (marketCount > 5) {
@@ -176,14 +193,14 @@ export const retrieveAllMarketsAction: Action = {
         responseText += `• Total Markets: ${marketCount}\n`;
         responseText += `• Data includes: question, category, tokens, rewards, and trading details\n`;
 
-        if (response.next_cursor && response.next_cursor !== 'LTE=') {
+        if (response.next_cursor && response.next_cursor !== "LTE=") {
           responseText += `• More results available (paginated)\n`;
         }
       }
 
       const responseContent: Content = {
         text: responseText,
-        actions: ['POLYMARKET_GET_ALL_MARKETS'],
+        actions: ["POLYMARKET_GET_ALL_MARKETS"],
         data: {
           markets,
           count: marketCount,
@@ -200,10 +217,12 @@ export const retrieveAllMarketsAction: Action = {
 
       return contentToActionResult(responseContent);
     } catch (error) {
-      logger.error('[retrieveAllMarketsAction] Error fetching markets:', error);
+      logger.error("[retrieveAllMarketsAction] Error fetching markets:", error);
 
       const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error occurred while fetching markets';
+        error instanceof Error
+          ? error.message
+          : "Unknown error occurred while fetching markets";
       const errorContent: Content = {
         text: `❌ **Error retrieving markets**: ${errorMessage}
 
@@ -211,7 +230,7 @@ Please check:
 • CLOB_API_URL is correctly configured
 • Network connectivity is available
 • Polymarket CLOB service is operational`,
-        actions: ['POLYMARKET_GET_ALL_MARKETS'],
+        actions: ["POLYMARKET_GET_ALL_MARKETS"],
         data: {
           error: errorMessage,
           timestamp: new Date().toISOString(),
@@ -228,46 +247,46 @@ Please check:
   examples: [
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Show me all available prediction markets via Polymarket',
+          text: "Show me all available prediction markets via Polymarket",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll retrieve all available Polymarket prediction markets for you.",
-          action: 'POLYMARKET_GET_ALL_MARKETS',
+          action: "POLYMARKET_GET_ALL_MARKETS",
         },
       },
     ],
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'What markets can I trade on Polymarket?',
+          text: "What markets can I trade on Polymarket?",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
-          text: 'Let me fetch the current list of available markets from Polymarket.',
-          action: 'POLYMARKET_GET_ALL_MARKETS',
+          text: "Let me fetch the current list of available markets from Polymarket.",
+          action: "POLYMARKET_GET_ALL_MARKETS",
         },
       },
     ],
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'List all active prediction markets via Polymarket',
+          text: "List all active prediction markets via Polymarket",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll get all the active prediction markets currently available via Polymarket.",
-          action: 'POLYMARKET_GET_ALL_MARKETS',
+          action: "POLYMARKET_GET_ALL_MARKETS",
         },
       },
     ],

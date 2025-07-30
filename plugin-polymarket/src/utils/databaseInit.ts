@@ -3,8 +3,8 @@
  * Handles table creation and schema setup
  */
 
-import { logger } from '@elizaos/core';
-import { sql } from 'drizzle-orm';
+import { logger } from "@elizaos/core";
+import { sql } from "drizzle-orm";
 
 /**
  * Initialize database tables for Polymarket plugin
@@ -12,7 +12,7 @@ import { sql } from 'drizzle-orm';
  */
 export async function initializePolymarketTables(db: any): Promise<boolean> {
   try {
-    logger.info('Initializing Polymarket database tables...');
+    logger.info("Initializing Polymarket database tables...");
 
     // Create polymarket_markets table
     await db.execute(sql`
@@ -41,13 +41,27 @@ export async function initializePolymarketTables(db: any): Promise<boolean> {
     `);
 
     // Create indexes
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_markets_condition_id_idx ON polymarket_markets(condition_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_markets_active_idx ON polymarket_markets(active)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_markets_closed_idx ON polymarket_markets(closed)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_markets_category_idx ON polymarket_markets(category)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_markets_end_date_idx ON polymarket_markets(end_date_iso)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_markets_last_synced_idx ON polymarket_markets(last_synced_at)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_markets_active_closed_idx ON polymarket_markets(active, closed)`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_markets_condition_id_idx ON polymarket_markets(condition_id)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_markets_active_idx ON polymarket_markets(active)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_markets_closed_idx ON polymarket_markets(closed)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_markets_category_idx ON polymarket_markets(category)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_markets_end_date_idx ON polymarket_markets(end_date_iso)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_markets_last_synced_idx ON polymarket_markets(last_synced_at)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_markets_active_closed_idx ON polymarket_markets(active, closed)`,
+    );
 
     // Create polymarket_tokens table
     await db.execute(sql`
@@ -63,10 +77,18 @@ export async function initializePolymarketTables(db: any): Promise<boolean> {
     `);
 
     // Create token indexes
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_tokens_token_id_idx ON polymarket_tokens(token_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_tokens_condition_id_idx ON polymarket_tokens(condition_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_tokens_outcome_idx ON polymarket_tokens(outcome)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_tokens_condition_outcome_idx ON polymarket_tokens(condition_id, outcome)`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_tokens_token_id_idx ON polymarket_tokens(token_id)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_tokens_condition_id_idx ON polymarket_tokens(condition_id)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_tokens_outcome_idx ON polymarket_tokens(outcome)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_tokens_condition_outcome_idx ON polymarket_tokens(condition_id, outcome)`,
+    );
 
     // Create polymarket_rewards table
     await db.execute(sql`
@@ -86,7 +108,9 @@ export async function initializePolymarketTables(db: any): Promise<boolean> {
     `);
 
     // Create reward indexes
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_rewards_epoch_idx ON polymarket_rewards(reward_epoch)`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_rewards_epoch_idx ON polymarket_rewards(reward_epoch)`,
+    );
 
     // Create polymarket_prices table
     await db.execute(sql`
@@ -105,10 +129,18 @@ export async function initializePolymarketTables(db: any): Promise<boolean> {
     `);
 
     // Create price indexes
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_prices_token_id_idx ON polymarket_prices(token_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_prices_condition_id_idx ON polymarket_prices(condition_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_prices_updated_at_idx ON polymarket_prices(updated_at)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_prices_token_updated_idx ON polymarket_prices(token_id, updated_at)`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_prices_token_id_idx ON polymarket_prices(token_id)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_prices_condition_id_idx ON polymarket_prices(condition_id)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_prices_updated_at_idx ON polymarket_prices(updated_at)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_prices_token_updated_idx ON polymarket_prices(token_id, updated_at)`,
+    );
 
     // Create polymarket_sync_status table
     await db.execute(sql`
@@ -126,16 +158,23 @@ export async function initializePolymarketTables(db: any): Promise<boolean> {
     `);
 
     // Create sync status indexes
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_sync_status_type_idx ON polymarket_sync_status(sync_type)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_sync_status_last_sync_idx ON polymarket_sync_status(last_sync_at)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_sync_status_status_idx ON polymarket_sync_status(sync_status)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS polymarket_sync_status_type_last_sync_idx ON polymarket_sync_status(sync_type, last_sync_at)`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_sync_status_type_idx ON polymarket_sync_status(sync_type)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_sync_status_last_sync_idx ON polymarket_sync_status(last_sync_at)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_sync_status_status_idx ON polymarket_sync_status(sync_status)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS polymarket_sync_status_type_last_sync_idx ON polymarket_sync_status(sync_type, last_sync_at)`,
+    );
 
-    logger.info('Polymarket database tables initialized successfully');
+    logger.info("Polymarket database tables initialized successfully");
     return true;
-
   } catch (error) {
-    logger.error('Failed to initialize Polymarket database tables:', error);
+    logger.error("Failed to initialize Polymarket database tables:", error);
     return false;
   }
 }

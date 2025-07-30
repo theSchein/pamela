@@ -1,8 +1,17 @@
-import { IAgentRuntime, Memory, State, HandlerCallback, logger } from '@elizaos/core';
-import { initializeClobClient } from '../utils/clobClient';
-import { callLLMWithTimeout } from '../utils/llmHelpers';
-import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
-import { ethers } from 'ethers';
+import {
+  IAgentRuntime,
+  Memory,
+  State,
+  HandlerCallback,
+  logger,
+} from "@elizaos/core";
+import { initializeClobClient } from "../utils/clobClient";
+import { callLLMWithTimeout } from "../utils/llmHelpers";
+import {
+  contentToActionResult,
+  createErrorResult,
+} from "../utils/actionHelpers";
+import { ethers } from "ethers";
 
 export interface RevokeApiKeyParams {
   apiKeyId: string;
@@ -20,60 +29,64 @@ export interface RevokeApiKeyResponse {
  * Deletes/revokes an existing API key to disable L2 authentication
  */
 export const revokeApiKeyAction = {
-  name: 'POLYMARKET_DELETE_API_KEY',
+  name: "POLYMARKET_DELETE_API_KEY",
   similes: [
-    'REVOKE_API_KEY',
-    'DELETE_POLYMARKET_API_KEY',
-    'REMOVE_API_CREDENTIALS',
-    'REVOKE_CLOB_CREDENTIALS',
-    'DELETE_API_ACCESS',
-    'DISABLE_API_KEY',
+    "REVOKE_API_KEY",
+    "DELETE_POLYMARKET_API_KEY",
+    "REMOVE_API_CREDENTIALS",
+    "REVOKE_CLOB_CREDENTIALS",
+    "DELETE_API_ACCESS",
+    "DISABLE_API_KEY",
   ],
-  description: 'Revoke/delete an existing API key for Polymarket CLOB authentication',
+  description:
+    "Revoke/delete an existing API key for Polymarket CLOB authentication",
   examples: [
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Revoke API key 12345678-1234-5678-9abc-123456789012 via Polymarket',
+          text: "Revoke API key 12345678-1234-5678-9abc-123456789012 via Polymarket",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll revoke the specified API key via Polymarket. This will disable L2 authentication for that key.",
-          action: 'POLYMARKET_DELETE_API_KEY',
+          action: "POLYMARKET_DELETE_API_KEY",
         },
       },
     ],
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Delete my CLOB API credentials via Polymarket',
+          text: "Delete my CLOB API credentials via Polymarket",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
-          text: 'Revoking your API key credentials via Polymarket...',
-          action: 'POLYMARKET_DELETE_API_KEY',
+          text: "Revoking your API key credentials via Polymarket...",
+          action: "POLYMARKET_DELETE_API_KEY",
         },
       },
     ],
   ],
 
-  validate: async (runtime: IAgentRuntime, message: Memory): Promise<boolean> => {
-    logger.info('[revokeApiKeyAction] Validating action');
+  validate: async (
+    runtime: IAgentRuntime,
+    message: Memory,
+  ): Promise<boolean> => {
+    logger.info("[revokeApiKeyAction] Validating action");
 
     // Check if private key is available for authentication
     const privateKey =
-      runtime.getSetting('WALLET_PRIVATE_KEY') ||
-      runtime.getSetting('PRIVATE_KEY') ||
-      runtime.getSetting('POLYMARKET_PRIVATE_KEY');
+      runtime.getSetting("WALLET_PRIVATE_KEY") ||
+      runtime.getSetting("PRIVATE_KEY") ||
+      runtime.getSetting("POLYMARKET_PRIVATE_KEY");
 
     if (!privateKey) {
-      logger.error('[revokeApiKeyAction] No private key found in environment');
+      logger.error("[revokeApiKeyAction] No private key found in environment");
       return false;
     }
 
@@ -85,9 +98,9 @@ export const revokeApiKeyAction = {
     message: Memory,
     state: State,
     options: any,
-    callback: HandlerCallback
+    callback: HandlerCallback,
   ): Promise<void> => {
-    logger.info('[revokeApiKeyAction] Handler called!');
+    logger.info("[revokeApiKeyAction] Handler called!");
 
     try {
       // Extract API key ID from user message using LLM
@@ -103,21 +116,24 @@ Examples:
 - "Remove key abc12345-def6-7890-ghij-klmnopqrstuv" → "abc12345-def6-7890-ghij-klmnopqrstuv"
 `;
 
-      logger.info('[revokeApiKeyAction] Starting LLM parameter extraction...');
+      logger.info("[revokeApiKeyAction] Starting LLM parameter extraction...");
 
       const extractedApiKeyId = await callLLMWithTimeout(
         runtime,
         state,
         extractionPrompt,
-        'revokeApiKeyAction',
-        5000
+        "revokeApiKeyAction",
+        5000,
       );
 
-      logger.debug(`[revokeApiKeyAction] Parsed LLM parameters:`, extractedApiKeyId);
+      logger.debug(
+        `[revokeApiKeyAction] Parsed LLM parameters:`,
+        extractedApiKeyId,
+      );
 
       // Handle both string and object responses from LLM
       let apiKeyIdString: string;
-      if (typeof extractedApiKeyId === 'object' && extractedApiKeyId !== null) {
+      if (typeof extractedApiKeyId === "object" && extractedApiKeyId !== null) {
         // If it's an object like {"api_key_id": "NONE"} or {"result": "NONE"}, extract the result
         apiKeyIdString =
           (extractedApiKeyId as any).api_key_id ||
@@ -125,10 +141,14 @@ Examples:
           (extractedApiKeyId as any).apiKeyId ||
           String(extractedApiKeyId);
       } else {
-        apiKeyIdString = String(extractedApiKeyId || '');
+        apiKeyIdString = String(extractedApiKeyId || "");
       }
 
-      if (!apiKeyIdString || apiKeyIdString.trim() === 'NONE' || apiKeyIdString.trim() === '') {
+      if (
+        !apiKeyIdString ||
+        apiKeyIdString.trim() === "NONE" ||
+        apiKeyIdString.trim() === ""
+      ) {
         const errorMessage = `❌ **API Key Revocation Failed**
 
 **Error**: No valid API key ID provided
@@ -143,10 +163,10 @@ Examples:
         if (callback) {
           callback({
             text: errorMessage,
-            action: 'POLYMARKET_DELETE_API_KEY',
+            action: "POLYMARKET_DELETE_API_KEY",
             data: {
               success: false,
-              error: 'No valid API key ID provided',
+              error: "No valid API key ID provided",
             },
           });
         }
@@ -157,29 +177,30 @@ Examples:
       logger.info(`[revokeApiKeyAction] Extracted API key ID: ${apiKeyId}`);
 
       // Get API credentials for L2 authentication
-      const apiKey = runtime.getSetting('CLOB_API_KEY');
-      const apiSecret = runtime.getSetting('CLOB_API_SECRET');
-      const apiPassphrase = runtime.getSetting('CLOB_API_PASSPHRASE');
+      const apiKey = runtime.getSetting("CLOB_API_KEY");
+      const apiSecret = runtime.getSetting("CLOB_API_SECRET");
+      const apiPassphrase = runtime.getSetting("CLOB_API_PASSPHRASE");
 
       if (!apiKey || !apiSecret || !apiPassphrase) {
         const errorResult = createErrorResult(
-          'API credentials not found. You need to create API keys first using the CREATE_API_KEY action'
+          "API credentials not found. You need to create API keys first using the CREATE_API_KEY action",
         );
         if (callback) await callback({ text: errorResult.text });
         return;
       }
 
-      const clobApiUrl = runtime.getSetting('CLOB_API_URL') || 'https://clob.polymarket.com';
+      const clobApiUrl =
+        runtime.getSetting("CLOB_API_URL") || "https://clob.polymarket.com";
 
       // Get private key from environment
       const privateKey =
-        runtime.getSetting('WALLET_PRIVATE_KEY') ||
-        runtime.getSetting('PRIVATE_KEY') ||
-        runtime.getSetting('POLYMARKET_PRIVATE_KEY');
+        runtime.getSetting("WALLET_PRIVATE_KEY") ||
+        runtime.getSetting("PRIVATE_KEY") ||
+        runtime.getSetting("POLYMARKET_PRIVATE_KEY");
 
       if (!privateKey) {
         const errorResult = createErrorResult(
-          'No private key found. Please set WALLET_PRIVATE_KEY, PRIVATE_KEY, or POLYMARKET_PRIVATE_KEY in your environment'
+          "No private key found. Please set WALLET_PRIVATE_KEY, PRIVATE_KEY, or POLYMARKET_PRIVATE_KEY in your environment",
         );
         if (callback) await callback({ text: errorResult.text });
         return;
@@ -189,26 +210,27 @@ Examples:
       const wallet = new ethers.Wallet(privateKey);
       const address = wallet.address;
 
-      logger.info('[revokeApiKeyAction] Revoking API key...');
+      logger.info("[revokeApiKeyAction] Revoking API key...");
 
       // Prepare L2 authentication headers
       const timestamp = Math.floor(Date.now() / 1000).toString();
-      const method = 'DELETE';
-      const requestPath = '/auth/api-key';
+      const method = "DELETE";
+      const requestPath = "/auth/api-key";
 
       // Create HMAC signature for L2 authentication
-      const crypto = require('crypto');
-      const message_to_sign = timestamp + method + requestPath + JSON.stringify({ key: apiKeyId });
+      const crypto = require("crypto");
+      const message_to_sign =
+        timestamp + method + requestPath + JSON.stringify({ key: apiKeyId });
       const signature = crypto
-        .createHmac('sha256', apiSecret)
+        .createHmac("sha256", apiSecret)
         .update(message_to_sign)
-        .digest('base64');
+        .digest("base64");
 
       // Make HTTP request to delete API key
       const deleteResponse = await fetch(`${clobApiUrl}${requestPath}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           POLY_ADDRESS: address,
           POLY_SIGNATURE: signature,
           POLY_TIMESTAMP: timestamp,
@@ -221,7 +243,7 @@ Examples:
       if (!deleteResponse.ok) {
         const errorText = await deleteResponse.text();
         const errorResult = createErrorResult(
-          `Failed to revoke API key: ${deleteResponse.status} ${deleteResponse.statusText}. ${errorText}`
+          `Failed to revoke API key: ${deleteResponse.status} ${deleteResponse.statusText}. ${errorText}`,
         );
         if (callback) await callback({ text: errorResult.text });
         return;
@@ -229,14 +251,14 @@ Examples:
 
       const deleteResult = await deleteResponse.json();
 
-      logger.info('[revokeApiKeyAction] API key revoked successfully');
+      logger.info("[revokeApiKeyAction] API key revoked successfully");
 
       // Format the response
       const responseData: RevokeApiKeyResponse = {
         success: true,
         apiKeyId: apiKeyId,
         revokedAt: new Date().toISOString(),
-        message: 'API key revoked successfully',
+        message: "API key revoked successfully",
       };
 
       // Create success message
@@ -259,7 +281,7 @@ If you need API access, use the CREATE_API_KEY action to generate new credential
       if (callback) {
         callback({
           text: successMessage,
-          action: 'POLYMARKET_DELETE_API_KEY',
+          action: "POLYMARKET_DELETE_API_KEY",
           data: {
             success: true,
             revocation: responseData,
@@ -267,13 +289,15 @@ If you need API access, use the CREATE_API_KEY action to generate new credential
         });
       }
 
-      logger.info('[revokeApiKeyAction] API key revocation completed successfully');
+      logger.info(
+        "[revokeApiKeyAction] API key revocation completed successfully",
+      );
     } catch (error) {
-      logger.error('[revokeApiKeyAction] Error revoking API key:', error);
+      logger.error("[revokeApiKeyAction] Error revoking API key:", error);
 
       const errorMessage = `❌ **API Key Revocation Failed**
 
-**Error**: ${error instanceof Error ? error.message : 'Unknown error occurred'}
+**Error**: ${error instanceof Error ? error.message : "Unknown error occurred"}
 
 **Possible Causes:**
 • API key ID not found or already revoked
@@ -290,10 +314,10 @@ If you need API access, use the CREATE_API_KEY action to generate new credential
       if (callback) {
         callback({
           text: errorMessage,
-          action: 'POLYMARKET_DELETE_API_KEY',
+          action: "POLYMARKET_DELETE_API_KEY",
           data: {
             success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: error instanceof Error ? error.message : "Unknown error",
           },
         });
       }

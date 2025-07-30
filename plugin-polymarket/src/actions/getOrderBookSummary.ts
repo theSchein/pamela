@@ -9,16 +9,19 @@ import {
   logger,
   ModelType,
   composePromptFromState,
-} from '@elizaos/core';
-import { callLLMWithTimeout } from '../utils/llmHelpers';
-import { initializeClobClient } from '../utils/clobClient';
-import { getOrderBookTemplate } from '../templates';
-import type { OrderBook } from '../types';
-import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
+} from "@elizaos/core";
+import { callLLMWithTimeout } from "../utils/llmHelpers";
+import { initializeClobClient } from "../utils/clobClient";
+import { getOrderBookTemplate } from "../templates";
+import type { OrderBook } from "../types";
+import {
+  contentToActionResult,
+  createErrorResult,
+} from "../utils/actionHelpers";
 
 enum Side {
-  BUY = 'buy',
-  SELL = 'sell',
+  BUY = "buy",
+  SELL = "sell",
 }
 
 /**
@@ -26,26 +29,33 @@ enum Side {
  * Fetches bid/ask data for a specific token
  */
 export const getOrderBookSummaryAction: Action = {
-  name: 'POLYMARKET_GET_ORDER_BOOK',
+  name: "POLYMARKET_GET_ORDER_BOOK",
   similes: [
-    'ORDER_BOOK',
-    'BOOK_SUMMARY',
-    'GET_BOOK',
-    'SHOW_BOOK',
-    'FETCH_BOOK',
-    'ORDER_BOOK_SUMMARY',
-    'BOOK_DATA',
-    'BID_ASK',
-    'MARKET_DEPTH',
-    'ORDERBOOK',
+    "ORDER_BOOK",
+    "BOOK_SUMMARY",
+    "GET_BOOK",
+    "SHOW_BOOK",
+    "FETCH_BOOK",
+    "ORDER_BOOK_SUMMARY",
+    "BOOK_DATA",
+    "BID_ASK",
+    "MARKET_DEPTH",
+    "ORDERBOOK",
   ],
-  description: 'Retrieve order book summary (bids and asks) for a specific Polymarket token',
+  description:
+    "Retrieve order book summary (bids and asks) for a specific Polymarket token",
 
-  validate: async (runtime: IAgentRuntime, message: Memory, state?: State): Promise<boolean> => {
-    const clobApiUrl = runtime.getSetting('CLOB_API_URL');
+  validate: async (
+    runtime: IAgentRuntime,
+    message: Memory,
+    state?: State,
+  ): Promise<boolean> => {
+    const clobApiUrl = runtime.getSetting("CLOB_API_URL");
 
     if (!clobApiUrl) {
-      logger.warn('[getOrderBookSummaryAction] CLOB_API_URL is required but not provided');
+      logger.warn(
+        "[getOrderBookSummaryAction] CLOB_API_URL is required but not provided",
+      );
       return false;
     }
 
@@ -57,18 +67,20 @@ export const getOrderBookSummaryAction: Action = {
     message: Memory,
     state?: State,
     options?: { [key: string]: unknown },
-    callback?: HandlerCallback
+    callback?: HandlerCallback,
   ): Promise<ActionResult> => {
-    logger.info('[getOrderBookSummaryAction] Handler called!');
+    logger.info("[getOrderBookSummaryAction] Handler called!");
 
-    const clobApiUrl = runtime.getSetting('CLOB_API_URL');
+    const clobApiUrl = runtime.getSetting("CLOB_API_URL");
 
     if (!clobApiUrl) {
-      const errorMessage = 'CLOB_API_URL is required in configuration.';
-      logger.error(`[getOrderBookSummaryAction] Configuration error: ${errorMessage}`);
+      const errorMessage = "CLOB_API_URL is required in configuration.";
+      logger.error(
+        `[getOrderBookSummaryAction] Configuration error: ${errorMessage}`,
+      );
       const errorContent: Content = {
         text: errorMessage,
-        actions: ['POLYMARKET_GET_ORDER_BOOK'],
+        actions: ["POLYMARKET_GET_ORDER_BOOK"],
         data: { error: errorMessage },
       };
 
@@ -78,7 +90,7 @@ export const getOrderBookSummaryAction: Action = {
       return createErrorResult(errorMessage);
     }
 
-    let tokenId = '';
+    let tokenId = "";
 
     // Extract token ID using LLM
     try {
@@ -86,14 +98,19 @@ export const getOrderBookSummaryAction: Action = {
         tokenId?: string;
         query?: string;
         error?: string;
-      }>(runtime, state, getOrderBookTemplate, 'getOrderBookSummaryAction');
+      }>(runtime, state, getOrderBookTemplate, "getOrderBookSummaryAction");
 
-      logger.info('[getOrderBookSummaryAction] LLM result:', JSON.stringify(llmResult));
+      logger.info(
+        "[getOrderBookSummaryAction] LLM result:",
+        JSON.stringify(llmResult),
+      );
 
       if (llmResult?.error) {
         const errorMessage =
-          'Token identifier not found. Please specify a token ID for the order book.';
-        logger.error(`[getOrderBookSummaryAction] Parameter extraction error: ${errorMessage}`);
+          "Token identifier not found. Please specify a token ID for the order book.";
+        logger.error(
+          `[getOrderBookSummaryAction] Parameter extraction error: ${errorMessage}`,
+        );
         const errorContent: Content = {
           text: `❌ **Error**: ${errorMessage}
 
@@ -101,7 +118,7 @@ Please provide a token ID in your request. For example:
 • "Show order book for token 123456"
 • "Get order book summary for 789012"
 • "ORDER_BOOK 345678"`,
-          actions: ['POLYMARKET_GET_ORDER_BOOK'],
+          actions: ["POLYMARKET_GET_ORDER_BOOK"],
           data: { error: errorMessage },
         };
 
@@ -111,15 +128,15 @@ Please provide a token ID in your request. For example:
         return createErrorResult(errorMessage);
       }
 
-      tokenId = llmResult?.tokenId || '';
+      tokenId = llmResult?.tokenId || "";
 
-      if (!tokenId || tokenId.trim() === '') {
+      if (!tokenId || tokenId.trim() === "") {
         // Try to extract from query as fallback
-        const fallbackId = llmResult?.query || '';
+        const fallbackId = llmResult?.query || "";
         if (fallbackId && fallbackId.match(/^\d+$/)) {
           tokenId = fallbackId;
         } else {
-          return createErrorResult('No valid token ID found');
+          return createErrorResult("No valid token ID found");
         }
       }
     } catch (error) {
@@ -127,26 +144,33 @@ Please provide a token ID in your request. For example:
       if (
         error instanceof Error &&
         error.message ===
-          'Token identifier not found. Please specify a token ID for the order book.'
+          "Token identifier not found. Please specify a token ID for the order book."
       ) {
         return createErrorResult(error);
       }
 
-      logger.warn('[getOrderBookSummaryAction] LLM extraction failed, trying regex fallback');
+      logger.warn(
+        "[getOrderBookSummaryAction] LLM extraction failed, trying regex fallback",
+      );
 
       // Regex fallback - try to extract token ID directly from the message
-      const messageText = message.content.text || '';
+      const messageText = message.content.text || "";
       const tokenIdMatch = messageText.match(
-        /(?:token|TOKEN)\s*(\d+)|ORDER_BOOK\s*(\d+)|(\d{6,})/i
+        /(?:token|TOKEN)\s*(\d+)|ORDER_BOOK\s*(\d+)|(\d{6,})/i,
       );
 
       if (tokenIdMatch) {
         tokenId = tokenIdMatch[1] || tokenIdMatch[2] || tokenIdMatch[3];
-        logger.info(`[getOrderBookSummaryAction] Regex fallback extracted token ID: ${tokenId}`);
+        logger.info(
+          `[getOrderBookSummaryAction] Regex fallback extracted token ID: ${tokenId}`,
+        );
       } else {
         const errorMessage =
-          'Unable to extract token ID from your message. Please provide a valid token ID.';
-        logger.error('[getOrderBookSummaryAction] LLM parameter extraction failed:', error);
+          "Unable to extract token ID from your message. Please provide a valid token ID.";
+        logger.error(
+          "[getOrderBookSummaryAction] LLM parameter extraction failed:",
+          error,
+        );
 
         const errorContent: Content = {
           text: `❌ **Error**: ${errorMessage}
@@ -155,7 +179,7 @@ Please provide a token ID in your request. For example:
 • "Show order book for token 123456"
 • "Get order book summary for 789012"
 • "ORDER_BOOK 345678"`,
-          actions: ['POLYMARKET_GET_ORDER_BOOK'],
+          actions: ["POLYMARKET_GET_ORDER_BOOK"],
           data: { error: errorMessage },
         };
 
@@ -172,12 +196,19 @@ Please provide a token ID in your request. For example:
 
       // Fetch order book data for both sides
       const [buyBook, sellBook] = await Promise.all([
-        clobClient.getOrderBooks([{ token_id: tokenId, side: 'buy' as any }]),
-        clobClient.getOrderBooks([{ token_id: tokenId, side: 'sell' as any }]),
+        clobClient.getOrderBooks([{ token_id: tokenId, side: "buy" as any }]),
+        clobClient.getOrderBooks([{ token_id: tokenId, side: "sell" as any }]),
       ]);
 
-      if (!buyBook || buyBook.length === 0 || !sellBook || sellBook.length === 0) {
-        return createErrorResult(`Order book not found for token ID: ${tokenId}`);
+      if (
+        !buyBook ||
+        buyBook.length === 0 ||
+        !sellBook ||
+        sellBook.length === 0
+      ) {
+        return createErrorResult(
+          `Order book not found for token ID: ${tokenId}`,
+        );
       }
       const orderBook: OrderBook = {
         ...buyBook[0],
@@ -193,19 +224,23 @@ Please provide a token ID in your request. For example:
       const spread =
         bestBid && bestAsk
           ? (parseFloat(bestAsk.price) - parseFloat(bestBid.price)).toFixed(4)
-          : 'N/A';
+          : "N/A";
 
       // Calculate total bid/ask sizes
-      const totalBidSize = orderBook.bids?.reduce((sum, bid) => sum + parseFloat(bid.size), 0) || 0;
-      const totalAskSize = orderBook.asks?.reduce((sum, ask) => sum + parseFloat(ask.size), 0) || 0;
+      const totalBidSize =
+        orderBook.bids?.reduce((sum, bid) => sum + parseFloat(bid.size), 0) ||
+        0;
+      const totalAskSize =
+        orderBook.asks?.reduce((sum, ask) => sum + parseFloat(ask.size), 0) ||
+        0;
 
       // Format response text
       let responseText = `📖 **Order Book Summary**\n\n`;
 
       responseText += `**Token Information:**\n`;
       responseText += `• Token ID: \`${tokenId}\`\n`;
-      responseText += `• Market: ${orderBook.market || 'N/A'}\n`;
-      responseText += `• Asset ID: ${orderBook.asset_id || 'N/A'}\n\n`;
+      responseText += `• Market: ${orderBook.market || "N/A"}\n`;
+      responseText += `• Asset ID: ${orderBook.asset_id || "N/A"}\n\n`;
 
       responseText += `**Market Depth:**\n`;
       responseText += `• Bid Orders: ${bidCount}\n`;
@@ -226,7 +261,7 @@ Please provide a token ID in your request. For example:
         responseText += `• Best Ask: No asks available\n`;
       }
 
-      responseText += `• Spread: ${spread === 'N/A' ? 'N/A' : '$' + spread}\n\n`;
+      responseText += `• Spread: ${spread === "N/A" ? "N/A" : "$" + spread}\n\n`;
 
       // Show top 5 bids and asks
       if (bidCount > 0) {
@@ -246,7 +281,7 @@ Please provide a token ID in your request. For example:
 
       const responseContent: Content = {
         text: responseText,
-        actions: ['POLYMARKET_GET_ORDER_BOOK'],
+        actions: ["POLYMARKET_GET_ORDER_BOOK"],
         data: {
           orderBook,
           tokenId,
@@ -269,10 +304,15 @@ Please provide a token ID in your request. For example:
 
       return contentToActionResult(responseContent);
     } catch (error) {
-      logger.error('[getOrderBookSummaryAction] Error fetching order book:', error);
+      logger.error(
+        "[getOrderBookSummaryAction] Error fetching order book:",
+        error,
+      );
 
       const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error occurred while fetching order book';
+        error instanceof Error
+          ? error.message
+          : "Unknown error occurred while fetching order book";
       const errorContent: Content = {
         text: `❌ **Error retrieving order book**: ${errorMessage}
 
@@ -283,7 +323,7 @@ Please check:
 • Polymarket CLOB service is operational
 
 **Token ID**: \`${tokenId}\``,
-        actions: ['POLYMARKET_GET_ORDER_BOOK'],
+        actions: ["POLYMARKET_GET_ORDER_BOOK"],
         data: {
           error: errorMessage,
           tokenId,
@@ -301,46 +341,46 @@ Please check:
   examples: [
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Show me the order book for token 123456 via Polymarket',
+          text: "Show me the order book for token 123456 via Polymarket",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll retrieve the order book summary for that token from Polymarket.",
-          action: 'POLYMARKET_GET_ORDER_BOOK',
+          action: "POLYMARKET_GET_ORDER_BOOK",
         },
       },
     ],
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Can I get the market depth for 789012 via Polymarket?',
+          text: "Can I get the market depth for 789012 via Polymarket?",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
-          text: 'Fetching the market depth and order book data for you from Polymarket...',
-          action: 'POLYMARKET_GET_ORDER_BOOK',
+          text: "Fetching the market depth and order book data for you from Polymarket...",
+          action: "POLYMARKET_GET_ORDER_BOOK",
         },
       },
     ],
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'ORDER_BOOK 345678',
+          text: "ORDER_BOOK 345678",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
-          text: 'Getting order book data for token 345678 from Polymarket.',
-          action: 'POLYMARKET_GET_ORDER_BOOK',
+          text: "Getting order book data for token 345678 from Polymarket.",
+          action: "POLYMARKET_GET_ORDER_BOOK",
         },
       },
     ],

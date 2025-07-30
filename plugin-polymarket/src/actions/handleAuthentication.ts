@@ -7,11 +7,14 @@ import {
   type Memory,
   type State,
   logger,
-} from '@elizaos/core';
+} from "@elizaos/core";
 // import { ClobClient } from '@polymarket/clob-client'; // Not needed if initializeClobClient returns typed client
-import { initializeClobClient } from '../utils/clobClient';
-import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
-import type { ClobClient } from '@polymarket/clob-client'; // For type assertion
+import { initializeClobClient } from "../utils/clobClient";
+import {
+  contentToActionResult,
+  createErrorResult,
+} from "../utils/actionHelpers";
+import type { ClobClient } from "@polymarket/clob-client"; // For type assertion
 
 // Interface for the parameters accepted by the action
 interface HandleAuthenticationParams {
@@ -42,20 +45,24 @@ interface RawDerivedApiKeyResponse {
 }
 
 export const handleAuthenticationAction: Action = {
-  name: 'POLYMARKET_HANDLE_AUTHENTICATION',
+  name: "POLYMARKET_HANDLE_AUTHENTICATION",
   similes: [
-    'DERIVE_POLYMARKET_API_KEY',
-    'CREATE_CLOB_API_KEY',
-    'SETUP_POLYMARKET_AUTH',
-    'GET_API_ACCESS_KEYS',
+    "DERIVE_POLYMARKET_API_KEY",
+    "CREATE_CLOB_API_KEY",
+    "SETUP_POLYMARKET_AUTH",
+    "GET_API_ACCESS_KEYS",
   ],
   description:
-    'Derives a new Polymarket CLOB API key using a provided private key and sets it in runtime for use by other actions.',
+    "Derives a new Polymarket CLOB API key using a provided private key and sets it in runtime for use by other actions.",
 
-  validate: async (runtime: IAgentRuntime, message: Memory, state?: State): Promise<boolean> => {
+  validate: async (
+    runtime: IAgentRuntime,
+    message: Memory,
+    state?: State,
+  ): Promise<boolean> => {
     logger.info(`[handleAuthenticationAction] Validate called.`);
     logger.info(
-      '[handleAuthenticationAction] Basic validation passed (private key check in handler).'
+      "[handleAuthenticationAction] Basic validation passed (private key check in handler).",
     );
     return true;
   },
@@ -65,35 +72,35 @@ export const handleAuthenticationAction: Action = {
     message: Memory,
     state?: State,
     options?: { [key: string]: unknown },
-    callback?: HandlerCallback
+    callback?: HandlerCallback,
   ): Promise<ActionResult> => {
-    logger.info('[handleAuthenticationAction] Handler called.');
+    logger.info("[handleAuthenticationAction] Handler called.");
 
     const params = (message.content?.data as HandleAuthenticationParams) || {};
 
     const privateKeyFromInput = params.privateKeyInput;
     const privateKeyFromSettings =
-      runtime.getSetting('WALLET_PRIVATE_KEY') ||
-      runtime.getSetting('PRIVATE_KEY') ||
-      runtime.getSetting('POLYMARKET_PRIVATE_KEY');
+      runtime.getSetting("WALLET_PRIVATE_KEY") ||
+      runtime.getSetting("PRIVATE_KEY") ||
+      runtime.getSetting("POLYMARKET_PRIVATE_KEY");
 
     const privateKeyToUse = privateKeyFromInput || privateKeyFromSettings;
 
     if (!privateKeyToUse) {
       const errMsg =
-        'A private key is required to derive API keys. Provide privateKeyInput parameter or set WALLET_PRIVATE_KEY/POLYMARKET_PRIVATE_KEY in agent settings.';
+        "A private key is required to derive API keys. Provide privateKeyInput parameter or set WALLET_PRIVATE_KEY/POLYMARKET_PRIVATE_KEY in agent settings.";
       logger.error(`[handleAuthenticationAction] ${errMsg}`);
       if (callback) await callback({ text: `❌ Error: ${errMsg}` });
       return createErrorResult(errMsg);
     }
 
     try {
-      const runtimeForClientInit: Pick<IAgentRuntime, 'getSetting'> = {
+      const runtimeForClientInit: Pick<IAgentRuntime, "getSetting"> = {
         getSetting: (key: string): string | undefined => {
           if (
-            (key === 'WALLET_PRIVATE_KEY' ||
-              key === 'PRIVATE_KEY' ||
-              key === 'POLYMARKET_PRIVATE_KEY') &&
+            (key === "WALLET_PRIVATE_KEY" ||
+              key === "PRIVATE_KEY" ||
+              key === "POLYMARKET_PRIVATE_KEY") &&
             privateKeyFromInput
           ) {
             return privateKeyFromInput;
@@ -102,7 +109,7 @@ export const handleAuthenticationAction: Action = {
         },
       };
       const clientSignerInstance = (await initializeClobClient(
-        runtimeForClientInit as IAgentRuntime
+        runtimeForClientInit as IAgentRuntime,
       )) as ClobClient;
 
       logger.info(`[handleAuthenticationAction] Deriving API key...`);
@@ -113,16 +120,16 @@ export const handleAuthenticationAction: Action = {
       // Add robust check for the response structure, using "key" and "secret"
       if (
         !derivedApiCredsFromClient ||
-        typeof derivedApiCredsFromClient.key !== 'string' ||
-        typeof derivedApiCredsFromClient.secret !== 'string' ||
-        typeof derivedApiCredsFromClient.passphrase !== 'string'
+        typeof derivedApiCredsFromClient.key !== "string" ||
+        typeof derivedApiCredsFromClient.secret !== "string" ||
+        typeof derivedApiCredsFromClient.passphrase !== "string"
       ) {
         logger.error(
-          '[handleAuthenticationAction] Invalid or incomplete response from deriveApiKey. Response: ',
-          JSON.stringify(derivedApiCredsFromClient)
+          "[handleAuthenticationAction] Invalid or incomplete response from deriveApiKey. Response: ",
+          JSON.stringify(derivedApiCredsFromClient),
         );
         const errMsg =
-          'Failed to derive valid API credentials from Polymarket. The response was unexpected.';
+          "Failed to derive valid API credentials from Polymarket. The response was unexpected.";
         if (callback) await callback({ text: `❌ Error: ${errMsg}` });
         return createErrorResult(errMsg);
       }
@@ -135,31 +142,34 @@ export const handleAuthenticationAction: Action = {
         // We can add a default label here if desired for internal tracking, but it won't be from Polymarket
         label:
           derivedApiCredsFromClient.label ||
-          'derived-key-' +
+          "derived-key-" +
             (derivedApiCredsFromClient.key
               ? derivedApiCredsFromClient.key.substring(0, 8)
-              : 'unknown'),
-        expiration_timestamp_ms: derivedApiCredsFromClient.expiration_timestamp_ms,
+              : "unknown"),
+        expiration_timestamp_ms:
+          derivedApiCredsFromClient.expiration_timestamp_ms,
         key_id: derivedApiCredsFromClient.key, // Use .key for key_id as well, assuming it's the API key ID
       };
 
       logger.info(
-        `[handleAuthenticationAction] Successfully derived API Key ID: ${storedCreds.key_id}`
+        `[handleAuthenticationAction] Successfully derived API Key ID: ${storedCreds.key_id}`,
       );
 
-      await runtime.setSetting('CLOB_API_KEY', storedCreds.key);
-      await runtime.setSetting('CLOB_API_SECRET', storedCreds.secret);
-      await runtime.setSetting('CLOB_API_PASSPHRASE', storedCreds.passphrase);
+      await runtime.setSetting("CLOB_API_KEY", storedCreds.key);
+      await runtime.setSetting("CLOB_API_SECRET", storedCreds.secret);
+      await runtime.setSetting("CLOB_API_PASSPHRASE", storedCreds.passphrase);
 
       logger.info(
-        '[handleAuthenticationAction] Derived API credentials have been stored in runtime settings.'
+        "[handleAuthenticationAction] Derived API credentials have been stored in runtime settings.",
       );
 
       let responseText = `🔑 **API Key Derived Successfully**\nAPI Key (ID): ${storedCreds.key_id}`;
       // Check key before substring for the default label comparison
       const defaultLabel =
-        'derived-key-' +
-        (derivedApiCredsFromClient.key ? derivedApiCredsFromClient.key.substring(0, 8) : 'unknown');
+        "derived-key-" +
+        (derivedApiCredsFromClient.key
+          ? derivedApiCredsFromClient.key.substring(0, 8)
+          : "unknown");
       if (storedCreds.label && storedCreds.label !== defaultLabel) {
         // Only show label if it was part of response and not the default
         responseText += `\nLabel: ${storedCreds.label}`;
@@ -171,14 +181,21 @@ export const handleAuthenticationAction: Action = {
 
       const responseContent: Content = {
         text: responseText,
-        data: { derivedCreds: storedCreds, timestamp: new Date().toISOString() },
+        data: {
+          derivedCreds: storedCreds,
+          timestamp: new Date().toISOString(),
+        },
       };
 
       if (callback) await callback(responseContent);
       return contentToActionResult(responseContent);
     } catch (error) {
-      logger.error('[handleAuthenticationAction] Error deriving API key:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred.';
+      logger.error(
+        "[handleAuthenticationAction] Error deriving API key:",
+        error,
+      );
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred.";
       const errorContent: Content = {
         text: `❌ **Error deriving API key**: ${errorMessage}`,
         data: { error: errorMessage, timestamp: new Date().toISOString() },
@@ -190,12 +207,15 @@ export const handleAuthenticationAction: Action = {
 
   examples: [
     [
-      { name: '{{user1}}', content: { text: 'Derive a new Polymarket API key for me.' } },
       {
-        name: '{{user2}}',
+        name: "{{user1}}",
+        content: { text: "Derive a new Polymarket API key for me." },
+      },
+      {
+        name: "{{user2}}",
         content: {
           text: "Okay, I will derive a new Polymarket API key. This requires your wallet's private key to be configured in settings.",
-          action: 'POLYMARKET_HANDLE_AUTHENTICATION',
+          action: "POLYMARKET_HANDLE_AUTHENTICATION",
         },
       },
     ],

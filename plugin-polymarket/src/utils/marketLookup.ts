@@ -1,6 +1,6 @@
-import { type IAgentRuntime, logger } from '@elizaos/core';
-import { eq, and, sql, like, desc } from 'drizzle-orm';
-import { polymarketMarketsTable, polymarketTokensTable } from '../schema';
+import { type IAgentRuntime, logger } from "@elizaos/core";
+import { eq, and, sql, like, desc } from "drizzle-orm";
+import { polymarketMarketsTable, polymarketTokensTable } from "../schema";
 
 /**
  * Market lookup result containing market and token information
@@ -30,21 +30,18 @@ export interface MarketLookupResult {
  */
 export async function findMarketByName(
   runtime: IAgentRuntime,
-  searchTerm: string
+  searchTerm: string,
 ): Promise<MarketLookupResult | null> {
   logger.info(`[marketLookup] Searching for market: "${searchTerm}"`);
 
   try {
     const db = (runtime as any).db;
     if (!db) {
-      throw new Error('Database not available');
+      throw new Error("Database not available");
     }
 
     // Clean search term - remove quotes, normalize case
-    const cleanTerm = searchTerm
-      .replace(/['"]/g, '')
-      .trim()
-      .toLowerCase();
+    const cleanTerm = searchTerm.replace(/['"]/g, "").trim().toLowerCase();
 
     logger.info(`[marketLookup] Clean search term: "${cleanTerm}"`);
 
@@ -60,8 +57,8 @@ export async function findMarketByName(
             LOWER(${polymarketMarketsTable.question}) LIKE ${`%${cleanTerm}%`} OR
             LOWER(${polymarketMarketsTable.marketSlug}) LIKE ${`%${cleanTerm}%`} OR
             LOWER(${polymarketMarketsTable.category}) LIKE ${`%${cleanTerm}%`}
-          )`
-        )
+          )`,
+        ),
       )
       .orderBy(desc(polymarketMarketsTable.lastSyncedAt))
       .limit(5);
@@ -93,8 +90,8 @@ export async function findMarketByName(
         question: market.question,
         condition_id: market.conditionId,
         slug: market.marketSlug,
-        category: market.category || '',
-        end_date_iso: market.endDateIso?.toISOString() || '',
+        category: market.category || "",
+        end_date_iso: market.endDateIso?.toISOString() || "",
         description: market.marketSlug, // Use slug as description fallback
       },
       tokens: tokens.map((token: any) => ({
@@ -107,7 +104,9 @@ export async function findMarketByName(
     logger.info(`[marketLookup] Market lookup successful:`, {
       question: result.market.question,
       tokenCount: result.tokens.length,
-      tokens: result.tokens.map(t => `${t.outcome}: ${t.token_id.slice(0, 8)}...`),
+      tokens: result.tokens.map(
+        (t) => `${t.outcome}: ${t.token_id.slice(0, 8)}...`,
+      ),
     });
 
     return result;
@@ -127,20 +126,17 @@ export async function findMarketByName(
 export async function getMarketSuggestions(
   runtime: IAgentRuntime,
   searchTerm: string,
-  limit: number = 5
+  limit: number = 5,
 ): Promise<MarketLookupResult[]> {
   logger.info(`[marketLookup] Getting suggestions for: "${searchTerm}"`);
 
   try {
     const db = (runtime as any).db;
     if (!db) {
-      throw new Error('Database not available');
+      throw new Error("Database not available");
     }
 
-    const cleanTerm = searchTerm
-      .replace(/['"]/g, '')
-      .trim()
-      .toLowerCase();
+    const cleanTerm = searchTerm.replace(/['"]/g, "").trim().toLowerCase();
 
     const markets = await db
       .select()
@@ -153,8 +149,8 @@ export async function getMarketSuggestions(
             LOWER(${polymarketMarketsTable.question}) LIKE ${`%${cleanTerm}%`} OR
             LOWER(${polymarketMarketsTable.marketSlug}) LIKE ${`%${cleanTerm}%`} OR
             LOWER(${polymarketMarketsTable.category}) LIKE ${`%${cleanTerm}%`}
-          )`
-        )
+          )`,
+        ),
       )
       .orderBy(desc(polymarketMarketsTable.lastSyncedAt))
       .limit(limit);
@@ -175,8 +171,8 @@ export async function getMarketSuggestions(
             question: market.question,
             condition_id: market.conditionId,
             slug: market.marketSlug,
-            category: market.category || '',
-            end_date_iso: market.endDateIso?.toISOString() || '',
+            category: market.category || "",
+            end_date_iso: market.endDateIso?.toISOString() || "",
             description: market.marketSlug,
           },
           tokens: tokens.map((token: any) => ({
@@ -203,13 +199,15 @@ export async function getMarketSuggestions(
  */
 export function formatMarketLookup(result: MarketLookupResult): string {
   const endDate = new Date(result.market.end_date_iso).toLocaleDateString();
-  
+
   const tokenInfo = result.tokens
-    .map(token => {
-      const price = token.price ? `$${parseFloat(token.price).toFixed(3)}` : 'N/A';
+    .map((token) => {
+      const price = token.price
+        ? `$${parseFloat(token.price).toFixed(3)}`
+        : "N/A";
       return `• **${token.outcome}**: ${price}`;
     })
-    .join('\n');
+    .join("\n");
 
   return `**${result.market.question}**
 
@@ -232,11 +230,14 @@ ${tokenInfo}
 export function extractMarketReference(message: string): string | null {
   // Remove common trading words and extract market name
   const cleanMessage = message
-    .replace(/\b(buy|sell|trade|order|place|get|details|about|on|in|for|the)\b/gi, ' ')
-    .replace(/\b(token|market|shares?|position)\b/gi, ' ')
-    .replace(/\$[\d.]+/g, ' ') // Remove prices
-    .replace(/\d+/g, ' ') // Remove numbers
-    .replace(/\s+/g, ' ')
+    .replace(
+      /\b(buy|sell|trade|order|place|get|details|about|on|in|for|the)\b/gi,
+      " ",
+    )
+    .replace(/\b(token|market|shares?|position)\b/gi, " ")
+    .replace(/\$[\d.]+/g, " ") // Remove prices
+    .replace(/\d+/g, " ") // Remove numbers
+    .replace(/\s+/g, " ")
     .trim();
 
   // Look for quoted text or title case phrases

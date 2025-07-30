@@ -9,16 +9,24 @@ import {
   logger,
   ModelType,
   composePromptFromState,
-} from '@elizaos/core';
-import { callLLMWithTimeout } from '../utils/llmHelpers';
-import { initializeClobClient } from '../utils/clobClient';
-import { orderTemplate } from '../templates';
-import { OrderSide, OrderType } from '../types';
-import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
-import { checkUSDCBalance, checkPolymarketBalance, formatBalanceInfo, getMaxPositionSize } from '../utils/balanceChecker';
-import { findMarketByName } from '../utils/marketLookup';
-import { ClobClient, Side } from '@polymarket/clob-client';
-import { ethers } from 'ethers';
+} from "@elizaos/core";
+import { callLLMWithTimeout } from "../utils/llmHelpers";
+import { initializeClobClient } from "../utils/clobClient";
+import { orderTemplate } from "../templates";
+import { OrderSide, OrderType } from "../types";
+import {
+  contentToActionResult,
+  createErrorResult,
+} from "../utils/actionHelpers";
+import {
+  checkUSDCBalance,
+  checkPolymarketBalance,
+  formatBalanceInfo,
+  getMaxPositionSize,
+} from "../utils/balanceChecker";
+import { findMarketByName } from "../utils/marketLookup";
+import { ClobClient, Side } from "@polymarket/clob-client";
+import { ethers } from "ethers";
 
 interface PlaceOrderParams {
   tokenId: string;
@@ -36,41 +44,49 @@ interface PlaceOrderParams {
  * Creates and places both limit and market orders
  */
 export const placeOrderAction: Action = {
-  name: 'PLACE_ORDER',
+  name: "PLACE_ORDER",
   similes: [
-    'CREATE_ORDER',
-    'PLACE_ORDER',
-    'BUY_TOKEN',
-    'SELL_TOKEN',
-    'LIMIT_ORDER',
-    'MARKET_ORDER',
-    'TRADE',
-    'ORDER',
-    'BUY',
-    'SELL',
-    'PURCHASE',
-    'PLACE_BUY',
-    'PLACE_SELL',
-    'CREATE_BUY_ORDER',
-    'CREATE_SELL_ORDER',
-    'SUBMIT_ORDER',
-    'EXECUTE_ORDER',
-    'MAKE_ORDER',
-    'PLACE_TRADE',
+    "CREATE_ORDER",
+    "PLACE_ORDER",
+    "BUY_TOKEN",
+    "SELL_TOKEN",
+    "LIMIT_ORDER",
+    "MARKET_ORDER",
+    "TRADE",
+    "ORDER",
+    "BUY",
+    "SELL",
+    "PURCHASE",
+    "PLACE_BUY",
+    "PLACE_SELL",
+    "CREATE_BUY_ORDER",
+    "CREATE_SELL_ORDER",
+    "SUBMIT_ORDER",
+    "EXECUTE_ORDER",
+    "MAKE_ORDER",
+    "PLACE_TRADE",
   ],
-  description: 'Create and place limit or market orders on Polymarket',
+  description: "Create and place limit or market orders on Polymarket",
 
-  validate: async (runtime: IAgentRuntime, message: Memory, state?: State): Promise<boolean> => {
-    logger.info(`[placeOrderAction] Validate called for message: "${message.content?.text}"`);
+  validate: async (
+    runtime: IAgentRuntime,
+    message: Memory,
+    state?: State,
+  ): Promise<boolean> => {
+    logger.info(
+      `[placeOrderAction] Validate called for message: "${message.content?.text}"`,
+    );
 
-    const clobApiUrl = runtime.getSetting('CLOB_API_URL');
+    const clobApiUrl = runtime.getSetting("CLOB_API_URL");
 
     if (!clobApiUrl) {
-      logger.warn('[placeOrderAction] CLOB_API_URL is required but not provided');
+      logger.warn(
+        "[placeOrderAction] CLOB_API_URL is required but not provided",
+      );
       return false;
     }
 
-    logger.info('[placeOrderAction] Validation passed');
+    logger.info("[placeOrderAction] Validation passed");
     return true;
   },
 
@@ -79,18 +95,18 @@ export const placeOrderAction: Action = {
     message: Memory,
     state?: State,
     options?: { [key: string]: unknown },
-    callback?: HandlerCallback
+    callback?: HandlerCallback,
   ): Promise<ActionResult> => {
-    logger.info('[placeOrderAction] Handler called!');
+    logger.info("[placeOrderAction] Handler called!");
 
-    const clobApiUrl = runtime.getSetting('CLOB_API_URL');
+    const clobApiUrl = runtime.getSetting("CLOB_API_URL");
 
     if (!clobApiUrl) {
-      const errorMessage = 'CLOB_API_URL is required in configuration.';
+      const errorMessage = "CLOB_API_URL is required in configuration.";
       logger.error(`[placeOrderAction] Configuration error: ${errorMessage}`);
       const errorContent: Content = {
         text: errorMessage,
-        actions: ['PLACE_ORDER'],
+        actions: ["PLACE_ORDER"],
         data: { error: errorMessage },
       };
 
@@ -104,50 +120,56 @@ export const placeOrderAction: Action = {
     let side: string;
     let price: number;
     let size: number;
-    let orderType: string = 'GTC'; // Default to Good Till Cancelled
-    let feeRateBps: string = '0'; // Default fee
+    let orderType: string = "GTC"; // Default to Good Till Cancelled
+    let feeRateBps: string = "0"; // Default fee
 
     try {
       // Use LLM to extract parameters
-      const llmResult = await callLLMWithTimeout<PlaceOrderParams & { error?: string }>(
-        runtime,
-        state,
-        orderTemplate,
-        'placeOrderAction'
-      );
+      const llmResult = await callLLMWithTimeout<
+        PlaceOrderParams & { error?: string }
+      >(runtime, state, orderTemplate, "placeOrderAction");
 
-      logger.info('[placeOrderAction] LLM result:', JSON.stringify(llmResult));
+      logger.info("[placeOrderAction] LLM result:", JSON.stringify(llmResult));
 
       if (llmResult?.error) {
-        return createErrorResult('Required order parameters not found');
+        return createErrorResult("Required order parameters not found");
       }
 
-      tokenId = llmResult?.tokenId || '';
-      side = llmResult?.side?.toUpperCase() || '';
+      tokenId = llmResult?.tokenId || "";
+      side = llmResult?.side?.toUpperCase() || "";
       price = llmResult?.price || 0;
       size = llmResult?.size || 1; // Default to 1 share if not specified
-      orderType = llmResult?.orderType?.toLowerCase() || (price > 0 ? 'limit' : 'market');
-      feeRateBps = llmResult?.feeRateBps || '0';
+      orderType =
+        llmResult?.orderType?.toLowerCase() || (price > 0 ? "limit" : "market");
+      feeRateBps = llmResult?.feeRateBps || "0";
 
       // Convert order types to CLOB client format
-      if (orderType === 'limit') {
-        orderType = 'GTC'; // Good Till Cancelled
-      } else if (orderType === 'market') {
-        orderType = 'FOK'; // Fill Or Kill (market order)
+      if (orderType === "limit") {
+        orderType = "GTC"; // Good Till Cancelled
+      } else if (orderType === "market") {
+        orderType = "FOK"; // Fill Or Kill (market order)
         // For market orders, we need to get the current market price
         if (price <= 0) {
           // We'll set a reasonable price for market orders - this will be updated later
-          price = side === 'BUY' ? 0.999 : 0.001; // Aggressive pricing for market orders
+          price = side === "BUY" ? 0.999 : 0.001; // Aggressive pricing for market orders
         }
       }
 
       // Handle market name lookup - try to resolve to token ID
-      if ((tokenId === 'MARKET_NAME_LOOKUP' || !tokenId || tokenId.length < 10) && llmResult?.marketName) {
-        logger.info(`[placeOrderAction] Market name lookup requested: ${llmResult.marketName}`);
-        
+      if (
+        (tokenId === "MARKET_NAME_LOOKUP" || !tokenId || tokenId.length < 10) &&
+        llmResult?.marketName
+      ) {
+        logger.info(
+          `[placeOrderAction] Market name lookup requested: ${llmResult.marketName}`,
+        );
+
         try {
-          const marketResult = await findMarketByName(runtime, llmResult.marketName);
-          
+          const marketResult = await findMarketByName(
+            runtime,
+            llmResult.marketName,
+          );
+
           if (!marketResult) {
             const errorContent: Content = {
               text: `❌ **Market not found: "${llmResult.marketName}"**
@@ -163,8 +185,11 @@ I couldn't find an active market matching that name.
 - "Show me open markets"
 - "Buy YES in 'Macron out in 2025?'" 
 - "Trade on the Chiefs vs Raiders market"`,
-              actions: ['POLYMARKET_GET_OPEN_MARKETS'],
-              data: { error: 'Market not found', marketName: llmResult.marketName },
+              actions: ["POLYMARKET_GET_OPEN_MARKETS"],
+              data: {
+                error: "Market not found",
+                marketName: llmResult.marketName,
+              },
             };
 
             if (callback) {
@@ -174,11 +199,18 @@ I couldn't find an active market matching that name.
           }
 
           // Determine which token to use based on outcome (YES/NO)
-          const outcome = llmResult.outcome?.toUpperCase() || side.toUpperCase() === 'BUY' ? 'YES' : 'NO';
-          const targetToken = marketResult.tokens.find(t => t.outcome.toUpperCase() === outcome);
-          
+          const outcome =
+            llmResult.outcome?.toUpperCase() || side.toUpperCase() === "BUY"
+              ? "YES"
+              : "NO";
+          const targetToken = marketResult.tokens.find(
+            (t) => t.outcome.toUpperCase() === outcome,
+          );
+
           if (!targetToken) {
-            const availableOutcomes = marketResult.tokens.map(t => t.outcome).join(', ');
+            const availableOutcomes = marketResult.tokens
+              .map((t) => t.outcome)
+              .join(", ");
             const errorContent: Content = {
               text: `❌ **Outcome not found in market**
 
@@ -190,11 +222,11 @@ Requested outcome: ${outcome}
 - "Buy YES in [market name]"
 - "Buy NO in [market name]"
 - Or use the exact outcome names listed above`,
-              actions: ['POLYMARKET_PLACE_ORDER'],
-              data: { 
-                error: 'Outcome not found',
+              actions: ["POLYMARKET_PLACE_ORDER"],
+              data: {
+                error: "Outcome not found",
                 market: marketResult.market,
-                availableOutcomes: marketResult.tokens.map(t => t.outcome),
+                availableOutcomes: marketResult.tokens.map((t) => t.outcome),
                 requestedOutcome: outcome,
               },
             };
@@ -207,7 +239,9 @@ Requested outcome: ${outcome}
 
           // Success! Update tokenId with resolved token
           tokenId = targetToken.token_id;
-          logger.info(`[placeOrderAction] Resolved "${llmResult.marketName}" -> ${outcome} -> ${tokenId.slice(0, 12)}...`);
+          logger.info(
+            `[placeOrderAction] Resolved "${llmResult.marketName}" -> ${outcome} -> ${tokenId.slice(0, 12)}...`,
+          );
 
           // Show market resolution to user
           if (callback) {
@@ -219,18 +253,17 @@ Requested outcome: ${outcome}
 **Token ID**: ${tokenId.slice(0, 12)}...
 
 Proceeding with order verification...`,
-              actions: ['POLYMARKET_PLACE_ORDER'],
-              data: { 
+              actions: ["POLYMARKET_PLACE_ORDER"],
+              data: {
                 marketResolution: {
                   market: marketResult.market,
                   selectedToken: targetToken,
                   resolvedTokenId: tokenId,
-                }
+                },
               },
             };
             await callback(resolutionContent);
           }
-
         } catch (lookupError) {
           logger.error(`[placeOrderAction] Market lookup failed:`, lookupError);
           const errorContent: Content = {
@@ -247,43 +280,50 @@ This could be due to:
 - "Show me open markets" to browse available markets
 - Use more specific market names
 - Check spelling and try again`,
-            actions: ['POLYMARKET_GET_OPEN_MARKETS'],
-            data: { 
-              error: 'Market lookup failed',
+            actions: ["POLYMARKET_GET_OPEN_MARKETS"],
+            data: {
+              error: "Market lookup failed",
               marketName: llmResult.marketName,
-              lookupError: lookupError instanceof Error ? lookupError.message : 'Unknown error',
+              lookupError:
+                lookupError instanceof Error
+                  ? lookupError.message
+                  : "Unknown error",
             },
           };
 
           if (callback) {
             await callback(errorContent);
           }
-          return createErrorResult('Market lookup failed');
+          return createErrorResult("Market lookup failed");
         }
       }
 
       // Updated validation - price can be 0 for market orders
       if (!tokenId || !side || size <= 0) {
-        return createErrorResult('Invalid order parameters');
+        return createErrorResult("Invalid order parameters");
       }
-      
+
       // For market orders without explicit price, price will be set later
-      if (orderType === 'GTC' && price <= 0) {
-        return createErrorResult('Limit orders require a valid price');
+      if (orderType === "GTC" && price <= 0) {
+        return createErrorResult("Limit orders require a valid price");
       }
     } catch (error) {
-      logger.warn('[placeOrderAction] LLM extraction failed, trying regex fallback');
+      logger.warn(
+        "[placeOrderAction] LLM extraction failed, trying regex fallback",
+      );
 
       // Fallback to regex extraction
-      const text = message.content?.text || '';
+      const text = message.content?.text || "";
 
       // Extract token ID
-      const tokenMatch = text.match(/(?:token|market|id)\s+([a-zA-Z0-9]+)|([0-9]{5,})/i);
-      tokenId = tokenMatch?.[1] || tokenMatch?.[2] || '';
+      const tokenMatch = text.match(
+        /(?:token|market|id)\s+([a-zA-Z0-9]+)|([0-9]{5,})/i,
+      );
+      tokenId = tokenMatch?.[1] || tokenMatch?.[2] || "";
 
       // Extract side
       const sideMatch = text.match(/\b(buy|sell|long|short)\b/i);
-      side = sideMatch?.[1]?.toUpperCase() || 'BUY';
+      side = sideMatch?.[1]?.toUpperCase() || "BUY";
 
       // Extract price
       const priceMatch = text.match(/(?:price|at|for)\s*\$?([0-9]*\.?[0-9]+)/i);
@@ -291,7 +331,7 @@ This could be due to:
 
       // Extract size
       const sizeMatch = text.match(
-        /(?:size|amount|quantity)\s*([0-9]*\.?[0-9]+)|([0-9]*\.?[0-9]+)\s*(?:shares|tokens)/i
+        /(?:size|amount|quantity)\s*([0-9]*\.?[0-9]+)|([0-9]*\.?[0-9]+)\s*(?:shares|tokens)/i,
       );
       size = sizeMatch ? parseFloat(sizeMatch[1] || sizeMatch[2]) : 1; // Default to 1 share
 
@@ -299,19 +339,21 @@ This could be due to:
       const orderTypeMatch = text.match(/\b(GTC|FOK|GTD|FAK|limit|market)\b/i);
       if (orderTypeMatch) {
         const matched = orderTypeMatch[1].toUpperCase();
-        orderType = matched === 'LIMIT' ? 'GTC' : matched === 'MARKET' ? 'FOK' : matched;
+        orderType =
+          matched === "LIMIT" ? "GTC" : matched === "MARKET" ? "FOK" : matched;
       } else {
         // Default to market order if no price specified
-        orderType = price > 0 ? 'GTC' : 'FOK';
+        orderType = price > 0 ? "GTC" : "FOK";
       }
 
       // Set market order pricing if no price given
-      if (orderType === 'FOK' && price <= 0) {
-        price = side === 'BUY' ? 0.999 : 0.001; // Aggressive pricing for market orders
+      if (orderType === "FOK" && price <= 0) {
+        price = side === "BUY" ? 0.999 : 0.001; // Aggressive pricing for market orders
       }
 
-      if (!tokenId || size <= 0 || (orderType === 'GTC' && price <= 0)) {
-        const errorMessage = 'Please provide valid order parameters: token ID, price, and size.';
+      if (!tokenId || size <= 0 || (orderType === "GTC" && price <= 0)) {
+        const errorMessage =
+          "Please provide valid order parameters: token ID, price, and size.";
         logger.error(`[placeOrderAction] Parameter extraction failed`);
 
         const errorContent: Content = {
@@ -331,7 +373,7 @@ Please provide order details in your request. Examples:
 **Optional parameters:**
 - Order type (GTC/limit, FOK/market, GTD, FAK)
 - Fee rate (in basis points)`,
-          actions: ['PLACE_ORDER'],
+          actions: ["PLACE_ORDER"],
           data: { error: errorMessage },
         };
 
@@ -343,27 +385,32 @@ Please provide order details in your request. Examples:
     }
 
     // Validate parameters
-    if (!['BUY', 'SELL'].includes(side)) {
-      side = 'BUY'; // Default to buy
+    if (!["BUY", "SELL"].includes(side)) {
+      side = "BUY"; // Default to buy
     }
 
     if (price > 1.0) {
       price = price / 100; // Convert percentage to decimal if needed
     }
 
-    if (!['GTC', 'FOK', 'GTD', 'FAK'].includes(orderType)) {
-      orderType = 'GTC'; // Default to GTC
+    if (!["GTC", "FOK", "GTD", "FAK"].includes(orderType)) {
+      orderType = "GTC"; // Default to GTC
     }
 
     // Calculate total order value
     const totalValue = price * size;
 
     // Check Polymarket trading balance before placing order
-    logger.info(`[placeOrderAction] Checking Polymarket trading balance for order value: $${totalValue.toFixed(2)}`);
-    
+    logger.info(
+      `[placeOrderAction] Checking Polymarket trading balance for order value: $${totalValue.toFixed(2)}`,
+    );
+
     try {
-      const balanceInfo = await checkPolymarketBalance(runtime, totalValue.toString());
-      
+      const balanceInfo = await checkPolymarketBalance(
+        runtime,
+        totalValue.toString(),
+      );
+
       if (!balanceInfo.hasEnoughBalance) {
         const balanceDisplay = formatBalanceInfo(balanceInfo);
         const errorContent: Content = {
@@ -377,9 +424,9 @@ Please provide order details in your request. Examples:
 • **Total Value**: $${totalValue.toFixed(2)}
 
 Please add more USDC to your wallet and try again.`,
-          actions: ['POLYMARKET_PLACE_ORDER'],
+          actions: ["POLYMARKET_PLACE_ORDER"],
           data: {
-            error: 'Insufficient USDC balance',
+            error: "Insufficient USDC balance",
             balanceInfo,
             orderDetails: { tokenId, side, price, size, totalValue },
           },
@@ -388,7 +435,7 @@ Please add more USDC to your wallet and try again.`,
         if (callback) {
           await callback(errorContent);
         }
-        return createErrorResult('Insufficient USDC balance for order');
+        return createErrorResult("Insufficient USDC balance for order");
       }
 
       // Check position size limits
@@ -409,9 +456,9 @@ Please add more USDC to your wallet and try again.`,
 • **Size**: ${size} shares
 
 Please reduce your order size to stay within the configured limit.`,
-          actions: ['POLYMARKET_PLACE_ORDER'],
+          actions: ["POLYMARKET_PLACE_ORDER"],
           data: {
-            error: 'Order exceeds position limit',
+            error: "Order exceeds position limit",
             maxPositionSize,
             requestedAmount: totalValue,
             orderDetails: { tokenId, side, price, size },
@@ -421,13 +468,15 @@ Please reduce your order size to stay within the configured limit.`,
         if (callback) {
           await callback(errorContent);
         }
-        return createErrorResult('Order exceeds maximum position size limit');
+        return createErrorResult("Order exceeds maximum position size limit");
       }
 
       // Display successful balance check
-      logger.info(`[placeOrderAction] Balance check passed. Proceeding with order.`);
+      logger.info(
+        `[placeOrderAction] Balance check passed. Proceeding with order.`,
+      );
       const balanceDisplay = formatBalanceInfo(balanceInfo);
-      
+
       if (callback) {
         const balanceContent: Content = {
           text: `${balanceDisplay}
@@ -440,12 +489,14 @@ Please reduce your order size to stay within the configured limit.`,
 • **Total Value**: $${totalValue.toFixed(2)}
 
 Creating order...`,
-          actions: ['POLYMARKET_PLACE_ORDER'],
-          data: { balanceInfo, orderDetails: { tokenId, side, price, size, totalValue } },
+          actions: ["POLYMARKET_PLACE_ORDER"],
+          data: {
+            balanceInfo,
+            orderDetails: { tokenId, side, price, size, totalValue },
+          },
         };
         await callback(balanceContent);
       }
-
     } catch (balanceError) {
       logger.error(`[placeOrderAction] Balance check failed:`, balanceError);
       const errorContent: Content = {
@@ -464,10 +515,13 @@ Unable to verify wallet balance before placing order. This could be due to:
 • **Total Value**: $${totalValue.toFixed(2)}
 
 Please check your wallet configuration and try again.`,
-        actions: ['POLYMARKET_PLACE_ORDER'],
+        actions: ["POLYMARKET_PLACE_ORDER"],
         data: {
-          error: 'Balance check failed',
-          balanceError: balanceError instanceof Error ? balanceError.message : 'Unknown error',
+          error: "Balance check failed",
+          balanceError:
+            balanceError instanceof Error
+              ? balanceError.message
+              : "Unknown error",
           orderDetails: { tokenId, side, price, size, totalValue },
         },
       };
@@ -475,20 +529,28 @@ Please check your wallet configuration and try again.`,
       if (callback) {
         await callback(errorContent);
       }
-      return createErrorResult('Failed to verify wallet balance before order placement');
+      return createErrorResult(
+        "Failed to verify wallet balance before order placement",
+      );
     }
 
     try {
       // Check if we have API credentials, if not try to derive them
       logger.info(`[placeOrderAction] Checking for API credentials`);
-      
-      const hasApiKey = runtime.getSetting('CLOB_API_KEY');
-      const hasApiSecret = runtime.getSetting('CLOB_API_SECRET') || runtime.getSetting('CLOB_SECRET');
-      const hasApiPassphrase = runtime.getSetting('CLOB_API_PASSPHRASE') || runtime.getSetting('CLOB_PASS_PHRASE');
-      
+
+      const hasApiKey = runtime.getSetting("CLOB_API_KEY");
+      const hasApiSecret =
+        runtime.getSetting("CLOB_API_SECRET") ||
+        runtime.getSetting("CLOB_SECRET");
+      const hasApiPassphrase =
+        runtime.getSetting("CLOB_API_PASSPHRASE") ||
+        runtime.getSetting("CLOB_PASS_PHRASE");
+
       if (!hasApiKey || !hasApiSecret || !hasApiPassphrase) {
-        logger.info(`[placeOrderAction] API credentials missing, attempting to derive them`);
-        
+        logger.info(
+          `[placeOrderAction] API credentials missing, attempting to derive them`,
+        );
+
         if (callback) {
           const derivingContent: Content = {
             text: `🔑 **Deriving API Credentials**
@@ -498,7 +560,7 @@ Please check your wallet configuration and try again.`,
 • **Purpose**: Enable order posting to Polymarket
 
 Deriving credentials...`,
-            actions: ['POLYMARKET_PLACE_ORDER'],
+            actions: ["POLYMARKET_PLACE_ORDER"],
             data: { derivingCredentials: true },
           };
           await callback(derivingContent);
@@ -507,14 +569,19 @@ Deriving credentials...`,
         try {
           const client = await initializeClobClient(runtime);
           const derivedCreds = await client.createOrDeriveApiKey();
-          
+
           // Store the derived credentials in runtime
-          await runtime.setSetting('CLOB_API_KEY', derivedCreds.key);
-          await runtime.setSetting('CLOB_API_SECRET', derivedCreds.secret);
-          await runtime.setSetting('CLOB_API_PASSPHRASE', derivedCreds.passphrase);
-          
-          logger.info(`[placeOrderAction] Successfully derived and stored API credentials`);
-          
+          await runtime.setSetting("CLOB_API_KEY", derivedCreds.key);
+          await runtime.setSetting("CLOB_API_SECRET", derivedCreds.secret);
+          await runtime.setSetting(
+            "CLOB_API_PASSPHRASE",
+            derivedCreds.passphrase,
+          );
+
+          logger.info(
+            `[placeOrderAction] Successfully derived and stored API credentials`,
+          );
+
           if (callback) {
             const successContent: Content = {
               text: `✅ **API Credentials Derived Successfully**
@@ -525,17 +592,20 @@ Deriving credentials...`,
 • **Method**: Wallet-derived L2 credentials
 
 Reinitializing client with credentials...`,
-              actions: ['POLYMARKET_PLACE_ORDER'],
+              actions: ["POLYMARKET_PLACE_ORDER"],
               data: { credentialsReady: true, apiKey: derivedCreds.key },
             };
             await callback(successContent);
           }
         } catch (deriveError) {
-          logger.error(`[placeOrderAction] Failed to derive API credentials:`, deriveError);
+          logger.error(
+            `[placeOrderAction] Failed to derive API credentials:`,
+            deriveError,
+          );
           const errorContent: Content = {
             text: `❌ **Failed to Derive API Credentials**
 
-**Error**: ${deriveError instanceof Error ? deriveError.message : 'Unknown error'}
+**Error**: ${deriveError instanceof Error ? deriveError.message : "Unknown error"}
 
 This could be due to:
 • Network connectivity issues
@@ -543,17 +613,22 @@ This could be due to:
 • Polymarket API issues
 
 Please ensure your wallet is properly configured and try again.`,
-            actions: ['POLYMARKET_PLACE_ORDER'],
-            data: { 
-              error: 'Failed to derive API credentials',
-              deriveError: deriveError instanceof Error ? deriveError.message : 'Unknown error',
+            actions: ["POLYMARKET_PLACE_ORDER"],
+            data: {
+              error: "Failed to derive API credentials",
+              deriveError:
+                deriveError instanceof Error
+                  ? deriveError.message
+                  : "Unknown error",
             },
           };
-          
+
           if (callback) {
             await callback(errorContent);
           }
-          return createErrorResult('Failed to derive API credentials for order posting');
+          return createErrorResult(
+            "Failed to derive API credentials for order posting",
+          );
         }
       } else {
         logger.info(`[placeOrderAction] API credentials already available`);
@@ -566,7 +641,7 @@ Please ensure your wallet is properly configured and try again.`,
       const orderArgs = {
         tokenID: tokenId, // Official package expects tokenID (capital ID)
         price,
-        side: side === 'BUY' ? Side.BUY : Side.SELL,
+        side: side === "BUY" ? Side.BUY : Side.SELL,
         size,
         feeRateBps: parseFloat(feeRateBps), // Convert to number
       };
@@ -583,14 +658,14 @@ Please ensure your wallet is properly configured and try again.`,
 
         // Check for specific error types
         if (createError instanceof Error) {
-          if (createError.message.includes('minimum_tick_size')) {
+          if (createError.message.includes("minimum_tick_size")) {
             return createErrorResult(
-              `Invalid market data: The market may not exist or be inactive. Please verify the token ID is correct and the market is active.`
+              `Invalid market data: The market may not exist or be inactive. Please verify the token ID is correct and the market is active.`,
             );
           }
-          if (createError.message.includes('undefined is not an object')) {
+          if (createError.message.includes("undefined is not an object")) {
             return createErrorResult(
-              `Market data unavailable: The token ID may be invalid or the market may be closed.`
+              `Market data unavailable: The token ID may be invalid or the market may be closed.`,
             );
           }
         }
@@ -600,12 +675,15 @@ Please ensure your wallet is properly configured and try again.`,
       // Post the order with enhanced error handling
       let orderResponse: any;
       try {
-        orderResponse = await client.postOrder(signedOrder, orderType as OrderType);
+        orderResponse = await client.postOrder(
+          signedOrder,
+          orderType as OrderType,
+        );
         logger.info(`[placeOrderAction] Order posted successfully`);
       } catch (postError) {
         logger.error(`[placeOrderAction] Error posting order:`, postError);
         return createErrorResult(
-          `Failed to submit order: ${postError instanceof Error ? postError.message : 'Unknown error'}`
+          `Failed to submit order: ${postError instanceof Error ? postError.message : "Unknown error"}`,
         );
       }
 
@@ -616,7 +694,11 @@ Please ensure your wallet is properly configured and try again.`,
       if (orderResponse.success) {
         const sideText = side.toLowerCase();
         const orderTypeText =
-          orderType === 'GTC' ? 'limit' : orderType === 'FOK' ? 'market' : orderType.toLowerCase();
+          orderType === "GTC"
+            ? "limit"
+            : orderType === "FOK"
+              ? "market"
+              : orderType.toLowerCase();
         const totalValue = (price * size).toFixed(4);
 
         responseText = `✅ **Order Placed Successfully**
@@ -631,20 +713,20 @@ Please ensure your wallet is properly configured and try again.`,
 • **Fee Rate**: ${feeRateBps} bps
 
 **Order Response:**
-• **Order ID**: ${orderResponse.orderId || 'Pending'}
-• **Status**: ${orderResponse.status || 'submitted'}
+• **Order ID**: ${orderResponse.orderId || "Pending"}
+• **Status**: ${orderResponse.status || "submitted"}
 ${
   orderResponse.orderHashes && orderResponse.orderHashes.length > 0
-    ? `• **Transaction Hash(es)**: ${orderResponse.orderHashes.join(', ')}`
-    : ''
+    ? `• **Transaction Hash(es)**: ${orderResponse.orderHashes.join(", ")}`
+    : ""
 }
 
 ${
-  orderResponse.status === 'matched'
-    ? '🎉 Your order was immediately matched and executed!'
-    : orderResponse.status === 'delayed'
-      ? '⏳ Your order is subject to a matching delay due to market conditions.'
-      : '📋 Your order has been placed and is waiting to be matched.'
+  orderResponse.status === "matched"
+    ? "🎉 Your order was immediately matched and executed!"
+    : orderResponse.status === "delayed"
+      ? "⏳ Your order is subject to a matching delay due to market conditions."
+      : "📋 Your order has been placed and is waiting to be matched."
 }`;
 
         responseData = {
@@ -664,7 +746,7 @@ ${
       } else {
         responseText = `❌ **Order Placement Failed**
 
-**Error**: ${orderResponse.errorMsg || 'Unknown error occurred'}
+**Error**: ${orderResponse.errorMsg || "Unknown error occurred"}
 
 **Order Details Attempted:**
 • **Token ID**: ${tokenId}
@@ -696,7 +778,7 @@ Please check your parameters and try again. Common issues:
 
       const responseContent: Content = {
         text: responseText,
-        actions: ['POLYMARKET_PLACE_ORDER'],
+        actions: ["POLYMARKET_PLACE_ORDER"],
         data: responseData,
       };
 
@@ -707,7 +789,9 @@ Please check your parameters and try again. Common issues:
       return contentToActionResult(responseContent);
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error occurred while placing order';
+        error instanceof Error
+          ? error.message
+          : "Unknown error occurred while placing order";
       logger.error(`[placeOrderAction] Order placement error:`, error);
 
       const errorContent: Content = {
@@ -726,7 +810,7 @@ Please check your configuration and try again. Make sure:
 • Token ID is valid and active
 • Price and size are within acceptable ranges
 • Network connection is stable`,
-        actions: ['POLYMARKET_PLACE_ORDER'],
+        actions: ["POLYMARKET_PLACE_ORDER"],
         data: {
           error: errorMessage,
           orderDetails: { tokenId, side, price, size, orderType },
@@ -743,46 +827,46 @@ Please check your configuration and try again. Make sure:
   examples: [
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'I want to buy 100 shares of token 52114319501245915516055106046884209969926127482827954674443846427813813222426 at $0.50 as a limit order via Polymarket',
+          text: "I want to buy 100 shares of token 52114319501245915516055106046884209969926127482827954674443846427813813222426 at $0.50 as a limit order via Polymarket",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll place a limit buy order for you via Polymarket. Creating order for 100 shares at $0.50...",
-          action: 'POLYMARKET_PLACE_ORDER',
+          action: "POLYMARKET_PLACE_ORDER",
         },
       },
     ],
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Place a market sell order for 50 tokens of 71321045679252212594626385532706912750332728571942532289631379312455583992563 via Polymarket',
+          text: "Place a market sell order for 50 tokens of 71321045679252212594626385532706912750332728571942532289631379312455583992563 via Polymarket",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll place a market sell order for you via Polymarket. This will execute immediately at the best available price...",
-          action: 'POLYMARKET_PLACE_ORDER',
+          action: "POLYMARKET_PLACE_ORDER",
         },
       },
     ],
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Create a GTC order to buy 25 shares at 0.75 for market 123456789 via Polymarket',
+          text: "Create a GTC order to buy 25 shares at 0.75 for market 123456789 via Polymarket",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll create a Good-Till-Cancelled buy order for you at $0.75 per share via Polymarket...",
-          action: 'POLYMARKET_PLACE_ORDER',
+          action: "POLYMARKET_PLACE_ORDER",
         },
       },
     ],

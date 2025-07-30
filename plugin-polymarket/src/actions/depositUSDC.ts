@@ -9,11 +9,18 @@ import {
   logger,
   ModelType,
   composePromptFromState,
-} from '@elizaos/core';
-import { callLLMWithTimeout } from '../utils/llmHelpers';
-import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
-import { depositUSDC, getDepositAddress, formatDepositInfo } from '../utils/depositManager';
-import { checkUSDCBalance } from '../utils/balanceChecker';
+} from "@elizaos/core";
+import { callLLMWithTimeout } from "../utils/llmHelpers";
+import {
+  contentToActionResult,
+  createErrorResult,
+} from "../utils/actionHelpers";
+import {
+  depositUSDC,
+  getDepositAddress,
+  formatDepositInfo,
+} from "../utils/depositManager";
+import { checkUSDCBalance } from "../utils/balanceChecker";
 
 interface DepositParams {
   amount: number;
@@ -56,54 +63,67 @@ If the amount cannot be determined, respond with:
  * Transfers USDC from wallet to Polymarket proxy wallet
  */
 export const depositUSDCAction: Action = {
-  name: 'DEPOSIT_USDC',
+  name: "DEPOSIT_USDC",
   similes: [
-    'FUND_ACCOUNT',
-    'ADD_FUNDS',
-    'DEPOSIT_FUNDS', 
-    'TRANSFER_USDC',
-    'ADD_USDC',
-    'FUND_POLYMARKET',
-    'DEPOSIT_TO_POLYMARKET',
-    'ADD_MONEY',
-    'FUND_TRADING',
-    'DEPOSIT_MONEY',
-    'TRANSFER_FUNDS',
-    'ADD_BALANCE',
-    'FUND_WALLET',
-    'POLYMARKET_DEPOSIT',
+    "FUND_ACCOUNT",
+    "ADD_FUNDS",
+    "DEPOSIT_FUNDS",
+    "TRANSFER_USDC",
+    "ADD_USDC",
+    "FUND_POLYMARKET",
+    "DEPOSIT_TO_POLYMARKET",
+    "ADD_MONEY",
+    "FUND_TRADING",
+    "DEPOSIT_MONEY",
+    "TRANSFER_FUNDS",
+    "ADD_BALANCE",
+    "FUND_WALLET",
+    "POLYMARKET_DEPOSIT",
   ],
-  description: 'Deposit USDC from wallet to Polymarket account for trading',
+  description: "Deposit USDC from wallet to Polymarket account for trading",
 
-  validate: async (runtime: IAgentRuntime, message: Memory, state?: State): Promise<boolean> => {
-    logger.info(`[depositUSDCAction] Validate called for message: "${message.content?.text}"`);
+  validate: async (
+    runtime: IAgentRuntime,
+    message: Memory,
+    state?: State,
+  ): Promise<boolean> => {
+    logger.info(
+      `[depositUSDCAction] Validate called for message: "${message.content?.text}"`,
+    );
 
     // Check if wallet is configured
-    const privateKey = runtime.getSetting('WALLET_PRIVATE_KEY') ||
-                      runtime.getSetting('PRIVATE_KEY') ||
-                      runtime.getSetting('POLYMARKET_PRIVATE_KEY');
+    const privateKey =
+      runtime.getSetting("WALLET_PRIVATE_KEY") ||
+      runtime.getSetting("PRIVATE_KEY") ||
+      runtime.getSetting("POLYMARKET_PRIVATE_KEY");
 
     if (!privateKey) {
-      logger.warn('[depositUSDCAction] No wallet private key configured');
+      logger.warn("[depositUSDCAction] No wallet private key configured");
       return false;
     }
 
     // Check if message contains deposit-related terms
-    const text = message.content?.text?.toLowerCase() || '';
+    const text = message.content?.text?.toLowerCase() || "";
     const depositKeywords = [
-      'deposit', 'fund', 'add', 'transfer', 'money', 'usdc', 'balance'
+      "deposit",
+      "fund",
+      "add",
+      "transfer",
+      "money",
+      "usdc",
+      "balance",
     ];
 
-    const containsDepositKeyword = depositKeywords.some(keyword => 
-      text.includes(keyword)
+    const containsDepositKeyword = depositKeywords.some((keyword) =>
+      text.includes(keyword),
     );
 
     if (!containsDepositKeyword) {
-      logger.info('[depositUSDCAction] No deposit keywords found');
+      logger.info("[depositUSDCAction] No deposit keywords found");
       return false;
     }
 
-    logger.info('[depositUSDCAction] Validation passed');
+    logger.info("[depositUSDCAction] Validation passed");
     return true;
   },
 
@@ -112,9 +132,9 @@ export const depositUSDCAction: Action = {
     message: Memory,
     state?: State,
     options?: { [key: string]: unknown },
-    callback?: HandlerCallback
+    callback?: HandlerCallback,
   ): Promise<ActionResult> => {
-    logger.info('[depositUSDCAction] Handler called!');
+    logger.info("[depositUSDCAction] Handler called!");
 
     try {
       // Use LLM to extract deposit amount
@@ -122,10 +142,10 @@ export const depositUSDCAction: Action = {
         runtime,
         state,
         depositTemplate,
-        'depositUSDCAction'
+        "depositUSDCAction",
       );
 
-      logger.info('[depositUSDCAction] LLM result:', JSON.stringify(llmResult));
+      logger.info("[depositUSDCAction] LLM result:", JSON.stringify(llmResult));
 
       if (llmResult?.error) {
         const errorContent: Content = {
@@ -142,7 +162,7 @@ export const depositUSDCAction: Action = {
 3. You can check your trading balance anytime
 
 *Make sure you have enough USDC in your wallet before depositing.*`,
-          actions: ['POLYMARKET_DEPOSIT_USDC'],
+          actions: ["POLYMARKET_DEPOSIT_USDC"],
           data: { error: llmResult.error },
         };
 
@@ -155,16 +175,20 @@ export const depositUSDCAction: Action = {
       const amount = llmResult?.amount || 0;
 
       if (amount <= 0) {
-        return createErrorResult('Invalid deposit amount');
+        return createErrorResult("Invalid deposit amount");
       }
 
       // Check wallet USDC balance before attempting deposit
-      logger.info(`[depositUSDCAction] Checking wallet balance for deposit of $${amount}`);
-      
+      logger.info(
+        `[depositUSDCAction] Checking wallet balance for deposit of $${amount}`,
+      );
+
       const balanceInfo = await checkUSDCBalance(runtime, amount.toString());
-      
+
       if (!balanceInfo.hasEnoughBalance) {
-        const shortfall = (amount - parseFloat(balanceInfo.usdcBalance)).toFixed(2);
+        const shortfall = (
+          amount - parseFloat(balanceInfo.usdcBalance)
+        ).toFixed(2);
         const errorContent: Content = {
           text: `❌ **Insufficient USDC Balance**
 
@@ -177,9 +201,9 @@ export const depositUSDCAction: Action = {
 2. Try depositing a smaller amount: $${parseFloat(balanceInfo.usdcBalance).toFixed(2)} or less
 
 Your wallet needs USDC before you can deposit to Polymarket.`,
-          actions: ['POLYMARKET_DEPOSIT_USDC'],
-          data: { 
-            error: 'Insufficient balance',
+          actions: ["POLYMARKET_DEPOSIT_USDC"],
+          data: {
+            error: "Insufficient balance",
             requested: amount,
             available: parseFloat(balanceInfo.usdcBalance),
             shortfall: parseFloat(shortfall),
@@ -209,8 +233,8 @@ Your wallet needs USDC before you can deposit to Polymarket.`,
 3. Confirming transaction on Polygon network...
 
 *This may take a few moments. Please wait...*`,
-          actions: ['POLYMARKET_DEPOSIT_USDC'],
-          data: { 
+          actions: ["POLYMARKET_DEPOSIT_USDC"],
+          data: {
             depositAmount: amount,
             walletBalance: parseFloat(balanceInfo.usdcBalance),
           },
@@ -226,7 +250,7 @@ Your wallet needs USDC before you can deposit to Polymarket.`,
       const resultText = formatDepositInfo(depositResult);
       const responseContent: Content = {
         text: resultText,
-        actions: ['POLYMARKET_DEPOSIT_USDC'],
+        actions: ["POLYMARKET_DEPOSIT_USDC"],
         data: {
           success: depositResult.success,
           depositInfo: depositResult,
@@ -239,9 +263,9 @@ Your wallet needs USDC before you can deposit to Polymarket.`,
       }
 
       return contentToActionResult(responseContent);
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
       logger.error(`[depositUSDCAction] Deposit error:`, error);
 
       const errorContent: Content = {
@@ -260,7 +284,7 @@ Your wallet needs USDC before you can deposit to Polymarket.`,
 • Ensure you have MATIC for gas fees
 • Try again in a few moments
 • Contact support if issue persists`,
-        actions: ['POLYMARKET_DEPOSIT_USDC'],
+        actions: ["POLYMARKET_DEPOSIT_USDC"],
         data: {
           error: errorMessage,
           timestamp: new Date().toISOString(),
@@ -277,46 +301,46 @@ Your wallet needs USDC before you can deposit to Polymarket.`,
   examples: [
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Deposit $50 to my Polymarket account',
+          text: "Deposit $50 to my Polymarket account",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll deposit $50 USDC from your wallet to your Polymarket account. This will make the funds available for trading...",
-          action: 'POLYMARKET_DEPOSIT_USDC',
+          action: "POLYMARKET_DEPOSIT_USDC",
         },
       },
     ],
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Fund my account with 25 USDC for trading',
+          text: "Fund my account with 25 USDC for trading",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll transfer 25 USDC from your wallet to your Polymarket trading account...",
-          action: 'POLYMARKET_DEPOSIT_USDC',
+          action: "POLYMARKET_DEPOSIT_USDC",
         },
       },
     ],
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Add $100 to my trading balance',
+          text: "Add $100 to my trading balance",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll add $100 to your Polymarket trading balance by transferring USDC from your wallet...",
-          action: 'POLYMARKET_DEPOSIT_USDC',
+          action: "POLYMARKET_DEPOSIT_USDC",
         },
       },
     ],

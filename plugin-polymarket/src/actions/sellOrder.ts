@@ -7,14 +7,17 @@ import {
   type Memory,
   type State,
   logger,
-} from '@elizaos/core';
-import { callLLMWithTimeout } from '../utils/llmHelpers';
-import { initializeClobClient } from '../utils/clobClient';
-import { orderTemplate } from '../templates';
-import { OrderSide, OrderType } from '../types';
-import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
-import { findMarketByName } from '../utils/marketLookup';
-import { ClobClient, Side } from '@polymarket/clob-client';
+} from "@elizaos/core";
+import { callLLMWithTimeout } from "../utils/llmHelpers";
+import { initializeClobClient } from "../utils/clobClient";
+import { orderTemplate } from "../templates";
+import { OrderSide, OrderType } from "../types";
+import {
+  contentToActionResult,
+  createErrorResult,
+} from "../utils/actionHelpers";
+import { findMarketByName } from "../utils/marketLookup";
+import { ClobClient, Side } from "@polymarket/clob-client";
 
 interface SellOrderParams {
   tokenId: string;
@@ -31,31 +34,39 @@ interface SellOrderParams {
  * Simplified interface focused on selling existing positions
  */
 export const sellOrderAction: Action = {
-  name: 'SELL_ORDER',
+  name: "SELL_ORDER",
   similes: [
-    'SELL_ORDER',
-    'SELL_TOKEN',
-    'SELL_POSITION',
-    'CLOSE_POSITION',
-    'TAKE_PROFIT',
-    'EXIT_POSITION',
-    'SELL_SHARES',
-    'LIQUIDATE',
-    'CASH_OUT',
-    'REALIZE_GAINS',
+    "SELL_ORDER",
+    "SELL_TOKEN",
+    "SELL_POSITION",
+    "CLOSE_POSITION",
+    "TAKE_PROFIT",
+    "EXIT_POSITION",
+    "SELL_SHARES",
+    "LIQUIDATE",
+    "CASH_OUT",
+    "REALIZE_GAINS",
   ],
-  description: 'Sell existing Polymarket positions',
+  description: "Sell existing Polymarket positions",
 
-  validate: async (runtime: IAgentRuntime, message: Memory, state?: State): Promise<boolean> => {
-    logger.info(`[sellOrderAction] Validate called for message: "${message.content?.text}"`);
+  validate: async (
+    runtime: IAgentRuntime,
+    message: Memory,
+    state?: State,
+  ): Promise<boolean> => {
+    logger.info(
+      `[sellOrderAction] Validate called for message: "${message.content?.text}"`,
+    );
 
-    const clobApiUrl = runtime.getSetting('CLOB_API_URL');
+    const clobApiUrl = runtime.getSetting("CLOB_API_URL");
     if (!clobApiUrl) {
-      logger.warn('[sellOrderAction] CLOB_API_URL is required but not provided');
+      logger.warn(
+        "[sellOrderAction] CLOB_API_URL is required but not provided",
+      );
       return false;
     }
 
-    logger.info('[sellOrderAction] Validation passed');
+    logger.info("[sellOrderAction] Validation passed");
     return true;
   },
 
@@ -64,47 +75,50 @@ export const sellOrderAction: Action = {
     message: Memory,
     state?: State,
     options?: { [key: string]: unknown },
-    callback?: HandlerCallback
+    callback?: HandlerCallback,
   ): Promise<ActionResult> => {
-    logger.info('[sellOrderAction] Handler called!');
+    logger.info("[sellOrderAction] Handler called!");
 
-    const clobApiUrl = runtime.getSetting('CLOB_API_URL');
+    const clobApiUrl = runtime.getSetting("CLOB_API_URL");
     if (!clobApiUrl) {
-      return createErrorResult('CLOB_API_URL is required in configuration.');
+      return createErrorResult("CLOB_API_URL is required in configuration.");
     }
 
     let tokenId: string;
     let price: number;
     let size: number;
-    let orderType: string = 'GTC';
-    let feeRateBps: string = '0';
+    let orderType: string = "GTC";
+    let feeRateBps: string = "0";
 
     try {
       // Use LLM to extract sell parameters
-      const llmResult = await callLLMWithTimeout<SellOrderParams & { error?: string }>(
+      const llmResult = await callLLMWithTimeout<
+        SellOrderParams & { error?: string }
+      >(
         runtime,
         state,
         orderTemplate, // Reuse existing template but for selling
-        'sellOrderAction'
+        "sellOrderAction",
       );
 
-      logger.info('[sellOrderAction] LLM result:', JSON.stringify(llmResult));
+      logger.info("[sellOrderAction] LLM result:", JSON.stringify(llmResult));
 
       if (llmResult?.error) {
-        return createErrorResult('Required sell parameters not found');
+        return createErrorResult("Required sell parameters not found");
       }
 
-      tokenId = llmResult?.tokenId || '';
+      tokenId = llmResult?.tokenId || "";
       price = llmResult?.price || 0;
       size = llmResult?.size || 1;
-      orderType = llmResult?.orderType?.toLowerCase() || (price > 0 ? 'limit' : 'market');
-      feeRateBps = llmResult?.feeRateBps || '0';
+      orderType =
+        llmResult?.orderType?.toLowerCase() || (price > 0 ? "limit" : "market");
+      feeRateBps = llmResult?.feeRateBps || "0";
 
       // Convert order types
-      if (orderType === 'limit') {
-        orderType = 'GTC';
-      } else if (orderType === 'market') {
-        orderType = 'FOK';
+      if (orderType === "limit") {
+        orderType = "GTC";
+      } else if (orderType === "market") {
+        orderType = "FOK";
         // For market sells, use aggressive pricing
         if (price <= 0) {
           price = 0.001; // Very low price to ensure quick fill
@@ -112,12 +126,20 @@ export const sellOrderAction: Action = {
       }
 
       // Handle market name lookup for selling
-      if ((tokenId === 'MARKET_NAME_LOOKUP' || !tokenId || tokenId.length < 10) && llmResult?.marketName) {
-        logger.info(`[sellOrderAction] Market name lookup requested: ${llmResult.marketName}`);
-        
+      if (
+        (tokenId === "MARKET_NAME_LOOKUP" || !tokenId || tokenId.length < 10) &&
+        llmResult?.marketName
+      ) {
+        logger.info(
+          `[sellOrderAction] Market name lookup requested: ${llmResult.marketName}`,
+        );
+
         try {
-          const marketResult = await findMarketByName(runtime, llmResult.marketName);
-          
+          const marketResult = await findMarketByName(
+            runtime,
+            llmResult.marketName,
+          );
+
           if (!marketResult) {
             const errorContent: Content = {
               text: `❌ **Market not found: "${llmResult.marketName}"**
@@ -128,8 +150,11 @@ I couldn't find an active market matching that name for selling.
 1. "Show my positions" to see your holdings
 2. Be more specific with the market name
 3. Use the exact token ID for selling`,
-              actions: ['SELL_ORDER'],
-              data: { error: 'Market not found', marketName: llmResult.marketName },
+              actions: ["SELL_ORDER"],
+              data: {
+                error: "Market not found",
+                marketName: llmResult.marketName,
+              },
             };
 
             if (callback) {
@@ -139,11 +164,15 @@ I couldn't find an active market matching that name for selling.
           }
 
           // For selling, determine outcome from context or default to user's likely position
-          const outcome = llmResult.outcome?.toUpperCase() || 'YES'; // Default to YES for selling
-          const targetToken = marketResult.tokens.find(t => t.outcome.toUpperCase() === outcome);
-          
+          const outcome = llmResult.outcome?.toUpperCase() || "YES"; // Default to YES for selling
+          const targetToken = marketResult.tokens.find(
+            (t) => t.outcome.toUpperCase() === outcome,
+          );
+
           if (!targetToken) {
-            const availableOutcomes = marketResult.tokens.map(t => t.outcome).join(', ');
+            const availableOutcomes = marketResult.tokens
+              .map((t) => t.outcome)
+              .join(", ");
             const errorContent: Content = {
               text: `❌ **Outcome not found for selling**
 
@@ -154,11 +183,11 @@ Requested outcome: ${outcome}
 **Please specify which position to sell:**
 - "Sell my YES position in [market name]"
 - "Sell my NO position in [market name]"`,
-              actions: ['SELL_ORDER'],
-              data: { 
-                error: 'Outcome not found',
+              actions: ["SELL_ORDER"],
+              data: {
+                error: "Outcome not found",
                 market: marketResult.market,
-                availableOutcomes: marketResult.tokens.map(t => t.outcome),
+                availableOutcomes: marketResult.tokens.map((t) => t.outcome),
                 requestedOutcome: outcome,
               },
             };
@@ -170,7 +199,9 @@ Requested outcome: ${outcome}
           }
 
           tokenId = targetToken.token_id;
-          logger.info(`[sellOrderAction] Resolved "${llmResult.marketName}" -> ${outcome} -> ${tokenId.slice(0, 12)}...`);
+          logger.info(
+            `[sellOrderAction] Resolved "${llmResult.marketName}" -> ${outcome} -> ${tokenId.slice(0, 12)}...`,
+          );
 
           if (callback) {
             const resolutionContent: Content = {
@@ -181,63 +212,66 @@ Requested outcome: ${outcome}
 **Token ID**: ${tokenId.slice(0, 12)}...
 
 Preparing sell order...`,
-              actions: ['SELL_ORDER'],
-              data: { 
+              actions: ["SELL_ORDER"],
+              data: {
                 marketResolution: {
                   market: marketResult.market,
                   selectedToken: targetToken,
                   resolvedTokenId: tokenId,
-                }
+                },
               },
             };
             await callback(resolutionContent);
           }
-
         } catch (lookupError) {
           logger.error(`[sellOrderAction] Market lookup failed:`, lookupError);
-          return createErrorResult('Market lookup failed for selling');
+          return createErrorResult("Market lookup failed for selling");
         }
       }
 
       // Validate sell parameters
       if (!tokenId || size <= 0) {
-        return createErrorResult('Invalid sell parameters');
-      }
-      
-      if (orderType === 'GTC' && price <= 0) {
-        return createErrorResult('Limit sell orders require a valid price');
+        return createErrorResult("Invalid sell parameters");
       }
 
+      if (orderType === "GTC" && price <= 0) {
+        return createErrorResult("Limit sell orders require a valid price");
+      }
     } catch (error) {
-      logger.warn('[sellOrderAction] LLM extraction failed, trying regex fallback');
+      logger.warn(
+        "[sellOrderAction] LLM extraction failed, trying regex fallback",
+      );
 
       // Regex fallback for sell orders
-      const text = message.content?.text || '';
+      const text = message.content?.text || "";
 
-      const tokenMatch = text.match(/(?:token|market|id)\s+([a-zA-Z0-9]+)|([0-9]{5,})/i);
-      tokenId = tokenMatch?.[1] || tokenMatch?.[2] || '';
+      const tokenMatch = text.match(
+        /(?:token|market|id)\s+([a-zA-Z0-9]+)|([0-9]{5,})/i,
+      );
+      tokenId = tokenMatch?.[1] || tokenMatch?.[2] || "";
 
       const priceMatch = text.match(/(?:price|at|for)\s*\$?([0-9]*\.?[0-9]+)/i);
       price = priceMatch ? parseFloat(priceMatch[1]) : 0;
 
       const sizeMatch = text.match(
-        /(?:size|amount|quantity|sell)\s*([0-9]*\.?[0-9]+)|([0-9]*\.?[0-9]+)\s*(?:shares|tokens)/i
+        /(?:size|amount|quantity|sell)\s*([0-9]*\.?[0-9]+)|([0-9]*\.?[0-9]+)\s*(?:shares|tokens)/i,
       );
       size = sizeMatch ? parseFloat(sizeMatch[1] || sizeMatch[2]) : 1;
 
       const orderTypeMatch = text.match(/\b(GTC|FOK|GTD|FAK|limit|market)\b/i);
       if (orderTypeMatch) {
         const matched = orderTypeMatch[1].toUpperCase();
-        orderType = matched === 'LIMIT' ? 'GTC' : matched === 'MARKET' ? 'FOK' : matched;
+        orderType =
+          matched === "LIMIT" ? "GTC" : matched === "MARKET" ? "FOK" : matched;
       } else {
-        orderType = price > 0 ? 'GTC' : 'FOK';
+        orderType = price > 0 ? "GTC" : "FOK";
       }
 
-      if (orderType === 'FOK' && price <= 0) {
+      if (orderType === "FOK" && price <= 0) {
         price = 0.001; // Very aggressive sell price
       }
 
-      if (!tokenId || size <= 0 || (orderType === 'GTC' && price <= 0)) {
+      if (!tokenId || size <= 0 || (orderType === "GTC" && price <= 0)) {
         const errorContent: Content = {
           text: `❌ **Error**: Please provide valid sell parameters.
 
@@ -254,14 +288,14 @@ Preparing sell order...`,
 **Sell Types:**
 - Limit: "at $0.50" (specific price)
 - Market: "at market price" (immediate sale)`,
-          actions: ['SELL_ORDER'],
-          data: { error: 'Invalid sell parameters' },
+          actions: ["SELL_ORDER"],
+          data: { error: "Invalid sell parameters" },
         };
 
         if (callback) {
           await callback(errorContent);
         }
-        return createErrorResult('Please provide valid sell parameters');
+        return createErrorResult("Please provide valid sell parameters");
       }
     }
 
@@ -270,8 +304,8 @@ Preparing sell order...`,
       price = price / 100; // Convert percentage to decimal
     }
 
-    if (!['GTC', 'FOK', 'GTD', 'FAK'].includes(orderType)) {
-      orderType = 'GTC';
+    if (!["GTC", "FOK", "GTD", "FAK"].includes(orderType)) {
+      orderType = "GTC";
     }
 
     try {
@@ -287,7 +321,10 @@ Preparing sell order...`,
         feeRateBps: parseFloat(feeRateBps),
       };
 
-      logger.info(`[sellOrderAction] Creating sell order with args:`, orderArgs);
+      logger.info(
+        `[sellOrderAction] Creating sell order with args:`,
+        orderArgs,
+      );
 
       if (callback) {
         const orderContent: Content = {
@@ -295,13 +332,13 @@ Preparing sell order...`,
 
 **Order Details:**
 • **Token ID**: ${tokenId.slice(0, 12)}...
-• **Type**: ${orderType === 'GTC' ? 'Limit' : 'Market'} Sell
+• **Type**: ${orderType === "GTC" ? "Limit" : "Market"} Sell
 • **Price**: $${price.toFixed(4)} (${(price * 100).toFixed(2)}%)
 • **Size**: ${size} shares
 • **Expected Proceeds**: $${(price * size).toFixed(2)}
 
 Submitting sell order...`,
-          actions: ['SELL_ORDER'],
+          actions: ["SELL_ORDER"],
           data: { orderArgs, orderType },
         };
         await callback(orderContent);
@@ -309,7 +346,10 @@ Submitting sell order...`,
 
       // Create and post the sell order
       const signedOrder = await client.createOrder(orderArgs);
-      const orderResponse = await client.postOrder(signedOrder, orderType as OrderType);
+      const orderResponse = await client.postOrder(
+        signedOrder,
+        orderType as OrderType,
+      );
 
       // Format response
       let responseText: string;
@@ -321,7 +361,7 @@ Submitting sell order...`,
         responseText = `✅ **Sell Order Placed Successfully**
 
 **Order Details:**
-• **Type**: ${orderType === 'GTC' ? 'Limit' : 'Market'} sell order
+• **Type**: ${orderType === "GTC" ? "Limit" : "Market"} sell order
 • **Token ID**: ${tokenId.slice(0, 12)}...
 • **Price**: $${price.toFixed(4)} (${(price * 100).toFixed(2)}%)
 • **Size**: ${size} shares
@@ -329,27 +369,27 @@ Submitting sell order...`,
 • **Fee Rate**: ${feeRateBps} bps
 
 **Order Response:**
-• **Order ID**: ${orderResponse.orderId || 'Pending'}
-• **Status**: ${orderResponse.status || 'submitted'}
+• **Order ID**: ${orderResponse.orderId || "Pending"}
+• **Status**: ${orderResponse.status || "submitted"}
 ${
   orderResponse.orderHashes && orderResponse.orderHashes.length > 0
-    ? `• **Transaction Hash(es)**: ${orderResponse.orderHashes.join(', ')}`
-    : ''
+    ? `• **Transaction Hash(es)**: ${orderResponse.orderHashes.join(", ")}`
+    : ""
 }
 
 ${
-  orderResponse.status === 'matched'
-    ? '🎉 Your sell order was immediately matched and executed!'
-    : orderResponse.status === 'delayed'
-      ? '⏳ Your sell order is subject to a matching delay.'
-      : '📋 Your sell order has been placed and is waiting to be matched.'
+  orderResponse.status === "matched"
+    ? "🎉 Your sell order was immediately matched and executed!"
+    : orderResponse.status === "delayed"
+      ? "⏳ Your sell order is subject to a matching delay."
+      : "📋 Your sell order has been placed and is waiting to be matched."
 }`;
 
         responseData = {
           success: true,
           orderDetails: {
             tokenId,
-            side: 'SELL',
+            side: "SELL",
             price,
             size,
             orderType,
@@ -362,7 +402,7 @@ ${
       } else {
         responseText = `❌ **Sell Order Failed**
 
-**Error**: ${orderResponse.errorMsg || 'Unknown error occurred'}
+**Error**: ${orderResponse.errorMsg || "Unknown error occurred"}
 
 **Order Details Attempted:**
 • **Token ID**: ${tokenId.slice(0, 12)}...
@@ -383,7 +423,7 @@ Common issues with sell orders:
           error: orderResponse.errorMsg,
           orderDetails: {
             tokenId,
-            side: 'SELL',
+            side: "SELL",
             price,
             size,
             orderType,
@@ -395,7 +435,7 @@ Common issues with sell orders:
 
       const responseContent: Content = {
         text: responseText,
-        actions: ['SELL_ORDER'],
+        actions: ["SELL_ORDER"],
         data: responseData,
       };
 
@@ -404,9 +444,11 @@ Common issues with sell orders:
       }
 
       return contentToActionResult(responseContent);
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred while selling';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Unknown error occurred while selling";
       logger.error(`[sellOrderAction] Sell order error:`, error);
 
       const errorContent: Content = {
@@ -425,10 +467,10 @@ Please check:
 • Price and size are within acceptable ranges
 • Network connection is stable
 • Approvals are set for selling`,
-        actions: ['SELL_ORDER'],
+        actions: ["SELL_ORDER"],
         data: {
           error: errorMessage,
-          orderDetails: { tokenId, side: 'SELL', price, size, orderType },
+          orderDetails: { tokenId, side: "SELL", price, size, orderType },
         },
       };
 
@@ -442,31 +484,31 @@ Please check:
   examples: [
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Sell 50 shares of my YES position in the election market at $0.75',
+          text: "Sell 50 shares of my YES position in the election market at $0.75",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll place a limit sell order for your YES position at $0.75 per share...",
-          action: 'SELL_ORDER',
+          action: "SELL_ORDER",
         },
       },
     ],
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Close my position in token 123456 at market price',
+          text: "Close my position in token 123456 at market price",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll place a market sell order to close your position immediately...",
-          action: 'SELL_ORDER',
+          action: "SELL_ORDER",
         },
       },
     ],

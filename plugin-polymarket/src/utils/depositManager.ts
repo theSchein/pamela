@@ -1,25 +1,25 @@
-import { type IAgentRuntime, logger } from '@elizaos/core';
-import { ethers } from 'ethers';
-import { getProxyWalletAddress } from '@polymarket/sdk';
+import { type IAgentRuntime, logger } from "@elizaos/core";
+import { ethers } from "ethers";
+import { getProxyWalletAddress } from "@polymarket/sdk";
 
 // Polymarket proxy wallet factory addresses on Polygon
 const PROXY_WALLET_FACTORIES = {
   // For MetaMask users (Gnosis Safe factory)
-  GNOSIS_SAFE_FACTORY: '0xaacfeea03eb1561c4e67d661e40682bd20e3541b',
-  // For MagicLink users (Polymarket proxy factory)  
-  POLYMARKET_PROXY_FACTORY: '0xaB45c5A4B0c941a2F231C04C3f49182e1A254052',
+  GNOSIS_SAFE_FACTORY: "0xaacfeea03eb1561c4e67d661e40682bd20e3541b",
+  // For MagicLink users (Polymarket proxy factory)
+  POLYMARKET_PROXY_FACTORY: "0xaB45c5A4B0c941a2F231C04C3f49182e1A254052",
 };
 
 // USDC contract address on Polygon
-const USDC_CONTRACT_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
+const USDC_CONTRACT_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174";
 
 // ERC20 ABI for USDC transfer
 const ERC20_ABI = [
-  'function transfer(address to, uint256 amount) returns (bool)',
-  'function balanceOf(address owner) view returns (uint256)',
-  'function decimals() view returns (uint8)',
-  'function approve(address spender, uint256 amount) returns (bool)',
-  'function allowance(address owner, address spender) view returns (uint256)',
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function decimals() view returns (uint8)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
 ];
 
 /**
@@ -39,20 +39,25 @@ export interface DepositInfo {
  * @param runtime - Agent runtime for configuration
  * @returns The proxy wallet address where USDC should be deposited
  */
-export async function getDepositAddress(runtime: IAgentRuntime): Promise<string> {
-  logger.info('[depositManager] Getting Polymarket deposit address');
+export async function getDepositAddress(
+  runtime: IAgentRuntime,
+): Promise<string> {
+  logger.info("[depositManager] Getting Polymarket deposit address");
 
   try {
     // Get wallet private key and derive EOA address
-    const privateKey = runtime.getSetting('WALLET_PRIVATE_KEY') ||
-                      runtime.getSetting('PRIVATE_KEY') ||
-                      runtime.getSetting('POLYMARKET_PRIVATE_KEY');
+    const privateKey =
+      runtime.getSetting("WALLET_PRIVATE_KEY") ||
+      runtime.getSetting("PRIVATE_KEY") ||
+      runtime.getSetting("POLYMARKET_PRIVATE_KEY");
 
     if (!privateKey) {
-      throw new Error('No private key found for deposit address calculation');
+      throw new Error("No private key found for deposit address calculation");
     }
 
-    const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+    const formattedPrivateKey = privateKey.startsWith("0x")
+      ? privateKey
+      : `0x${privateKey}`;
     const wallet = new ethers.Wallet(formattedPrivateKey);
     const userAddress = wallet.address;
 
@@ -60,19 +65,21 @@ export async function getDepositAddress(runtime: IAgentRuntime): Promise<string>
     // TODO: Determine which factory to use based on user preference or detection
     const proxyAddress = getProxyWalletAddress(
       PROXY_WALLET_FACTORIES.GNOSIS_SAFE_FACTORY,
-      userAddress
+      userAddress,
     );
 
     logger.info(`[depositManager] Calculated proxy wallet address:`, {
       userAddress,
       proxyAddress,
-      factory: 'GNOSIS_SAFE_FACTORY',
+      factory: "GNOSIS_SAFE_FACTORY",
     });
 
     return proxyAddress;
   } catch (error) {
     logger.error(`[depositManager] Error calculating deposit address:`, error);
-    throw new Error(`Failed to calculate deposit address: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to calculate deposit address: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
   }
 }
 
@@ -84,27 +91,30 @@ export async function getDepositAddress(runtime: IAgentRuntime): Promise<string>
  */
 export async function depositUSDC(
   runtime: IAgentRuntime,
-  amount: string
+  amount: string,
 ): Promise<DepositInfo> {
   logger.info(`[depositManager] Initiating USDC deposit of $${amount}`);
 
   try {
     // Get wallet and provider setup
-    const privateKey = runtime.getSetting('WALLET_PRIVATE_KEY') ||
-                      runtime.getSetting('PRIVATE_KEY') ||
-                      runtime.getSetting('POLYMARKET_PRIVATE_KEY');
+    const privateKey =
+      runtime.getSetting("WALLET_PRIVATE_KEY") ||
+      runtime.getSetting("PRIVATE_KEY") ||
+      runtime.getSetting("POLYMARKET_PRIVATE_KEY");
 
     if (!privateKey) {
-      throw new Error('No private key found for deposit transaction');
+      throw new Error("No private key found for deposit transaction");
     }
 
-    const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
-    
+    const formattedPrivateKey = privateKey.startsWith("0x")
+      ? privateKey
+      : `0x${privateKey}`;
+
     // Create provider with fallbacks
     const rpcProviders = [
-      'https://polygon-rpc.com',
-      'https://rpc-mainnet.matic.network',
-      'https://rpc-mainnet.maticvigil.com',
+      "https://polygon-rpc.com",
+      "https://rpc-mainnet.matic.network",
+      "https://rpc-mainnet.maticvigil.com",
     ];
 
     let provider: ethers.JsonRpcProvider | null = null;
@@ -122,7 +132,7 @@ export async function depositUSDC(
     }
 
     if (!provider) {
-      throw new Error('All RPC providers failed');
+      throw new Error("All RPC providers failed");
     }
 
     const wallet = new ethers.Wallet(formattedPrivateKey, provider);
@@ -132,7 +142,11 @@ export async function depositUSDC(
     const proxyWalletAddress = await getDepositAddress(runtime);
 
     // Create USDC contract instance
-    const usdcContract = new ethers.Contract(USDC_CONTRACT_ADDRESS, ERC20_ABI, wallet);
+    const usdcContract = new ethers.Contract(
+      USDC_CONTRACT_ADDRESS,
+      ERC20_ABI,
+      wallet,
+    );
 
     // Get current USDC balance
     const balanceRaw = await usdcContract.balanceOf(userAddress);
@@ -144,7 +158,9 @@ export async function depositUSDC(
 
     // Check if user has enough USDC
     if (balanceRaw < depositAmountWei) {
-      throw new Error(`Insufficient USDC balance. Have: $${currentBalance}, Need: $${amount}`);
+      throw new Error(
+        `Insufficient USDC balance. Have: $${currentBalance}, Need: $${amount}`,
+      );
     }
 
     logger.info(`[depositManager] Executing USDC transfer:`, {
@@ -155,16 +171,23 @@ export async function depositUSDC(
     });
 
     // Execute the USDC transfer to proxy wallet
-    const transferTx = await usdcContract.transfer(proxyWalletAddress, depositAmountWei);
-    
-    logger.info(`[depositManager] Transfer transaction submitted: ${transferTx.hash}`);
+    const transferTx = await usdcContract.transfer(
+      proxyWalletAddress,
+      depositAmountWei,
+    );
+
+    logger.info(
+      `[depositManager] Transfer transaction submitted: ${transferTx.hash}`,
+    );
 
     // Wait for transaction confirmation
     const receipt = await transferTx.wait();
-    
+
     if (receipt?.status === 1) {
-      logger.info(`[depositManager] Deposit successful! Block: ${receipt.blockNumber}`);
-      
+      logger.info(
+        `[depositManager] Deposit successful! Block: ${receipt.blockNumber}`,
+      );
+
       return {
         userAddress,
         proxyWalletAddress,
@@ -174,17 +197,16 @@ export async function depositUSDC(
         success: true,
       };
     } else {
-      throw new Error('Transaction failed');
+      throw new Error("Transaction failed");
     }
-
   } catch (error) {
     logger.error(`[depositManager] Deposit failed:`, error);
-    
+
     return {
-      userAddress: '',
-      proxyWalletAddress: '',
+      userAddress: "",
+      proxyWalletAddress: "",
       depositAmount: amount,
-      userBalance: '0',
+      userBalance: "0",
       success: false,
     };
   }

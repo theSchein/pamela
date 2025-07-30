@@ -7,10 +7,13 @@ import {
   type Memory,
   type State,
   logger,
-} from '@elizaos/core';
-import { callLLMWithTimeout } from '../utils/llmHelpers';
-import { initializeClobClient } from '../utils/clobClient';
-import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
+} from "@elizaos/core";
+import { callLLMWithTimeout } from "../utils/llmHelpers";
+import { initializeClobClient } from "../utils/clobClient";
+import {
+  contentToActionResult,
+  createErrorResult,
+} from "../utils/actionHelpers";
 
 interface MarketPriceParams {
   tokenId?: string;
@@ -35,33 +38,42 @@ interface PriceInfo {
  * Analyzes orderbook to provide realistic pricing for trades
  */
 export const getMarketPriceAction: Action = {
-  name: 'GET_MARKET_PRICE',
+  name: "GET_MARKET_PRICE",
   similes: [
-    'GET_MARKET_PRICE',
-    'GET_PRICE',
-    'CHECK_PRICE',
-    'MARKET_PRICE',
-    'CURRENT_PRICE',
-    'PRICE_CHECK',
-    'GET_QUOTES',
-    'PRICE_DISCOVERY',
-    'MARKET_QUOTES',
-    'BID_ASK_PRICE',
-    'TRADING_PRICE',
+    "GET_MARKET_PRICE",
+    "GET_PRICE",
+    "CHECK_PRICE",
+    "MARKET_PRICE",
+    "CURRENT_PRICE",
+    "PRICE_CHECK",
+    "GET_QUOTES",
+    "PRICE_DISCOVERY",
+    "MARKET_QUOTES",
+    "BID_ASK_PRICE",
+    "TRADING_PRICE",
   ],
-  description: 'Get current market price and trading recommendations for a Polymarket token',
+  description:
+    "Get current market price and trading recommendations for a Polymarket token",
 
-  validate: async (runtime: IAgentRuntime, message: Memory, state?: State): Promise<boolean> => {
-    logger.info(`[getMarketPriceAction] Validate called for message: "${message.content?.text}"`);
+  validate: async (
+    runtime: IAgentRuntime,
+    message: Memory,
+    state?: State,
+  ): Promise<boolean> => {
+    logger.info(
+      `[getMarketPriceAction] Validate called for message: "${message.content?.text}"`,
+    );
 
-    const clobApiUrl = runtime.getSetting('CLOB_API_URL');
+    const clobApiUrl = runtime.getSetting("CLOB_API_URL");
 
     if (!clobApiUrl) {
-      logger.warn('[getMarketPriceAction] CLOB_API_URL is required but not provided');
+      logger.warn(
+        "[getMarketPriceAction] CLOB_API_URL is required but not provided",
+      );
       return false;
     }
 
-    logger.info('[getMarketPriceAction] Validation passed');
+    logger.info("[getMarketPriceAction] Validation passed");
     return true;
   },
 
@@ -70,19 +82,21 @@ export const getMarketPriceAction: Action = {
     message: Memory,
     state?: State,
     options?: { [key: string]: unknown },
-    callback?: HandlerCallback
+    callback?: HandlerCallback,
   ): Promise<ActionResult> => {
-    logger.info('[getMarketPriceAction] Handler called!');
+    logger.info("[getMarketPriceAction] Handler called!");
 
-    const clobApiUrl = runtime.getSetting('CLOB_API_URL');
+    const clobApiUrl = runtime.getSetting("CLOB_API_URL");
 
     if (!clobApiUrl) {
-      const errorMessage = 'CLOB_API_URL is required in configuration.';
-      logger.error(`[getMarketPriceAction] Configuration error: ${errorMessage}`);
+      const errorMessage = "CLOB_API_URL is required in configuration.";
+      logger.error(
+        `[getMarketPriceAction] Configuration error: ${errorMessage}`,
+      );
       return createErrorResult(errorMessage);
     }
 
-    let tokenId = '';
+    let tokenId = "";
 
     try {
       // Use LLM to extract token ID
@@ -106,34 +120,40 @@ Examples:
 "Get price for token 123456789..." -> {"tokenId": "123456789..."}
 "What's the current price of 0xabc..." -> {"tokenId": "0xabc..."}
 "Check market price" -> {"error": "No specific token ID provided"}`,
-        'getMarketPriceAction'
+        "getMarketPriceAction",
       );
 
-      logger.info('[getMarketPriceAction] LLM result:', JSON.stringify(llmResult));
+      logger.info(
+        "[getMarketPriceAction] LLM result:",
+        JSON.stringify(llmResult),
+      );
 
       if (llmResult?.error) {
-        return createErrorResult('Please specify a token ID to get pricing for. Example: "Get price for token 123456789..."');
+        return createErrorResult(
+          'Please specify a token ID to get pricing for. Example: "Get price for token 123456789..."',
+        );
       }
 
-      tokenId = llmResult?.tokenId || '';
-
+      tokenId = llmResult?.tokenId || "";
     } catch (error) {
-      logger.warn('[getMarketPriceAction] LLM extraction failed, trying regex fallback');
+      logger.warn(
+        "[getMarketPriceAction] LLM extraction failed, trying regex fallback",
+      );
 
       // Fallback to regex extraction
-      const text = message.content?.text || '';
+      const text = message.content?.text || "";
 
       // Look for long numeric token IDs
-      const tokenMatch = text.match(/(?:token|id)\s+(\d{50,})/i) || 
-                        text.match(/(\d{70,})/);
-      
+      const tokenMatch =
+        text.match(/(?:token|id)\s+(\d{50,})/i) || text.match(/(\d{70,})/);
+
       if (tokenMatch) {
         tokenId = tokenMatch[1];
       }
 
       if (!tokenId) {
-        const errorMessage = 'Please provide a token ID to get pricing for.';
-        
+        const errorMessage = "Please provide a token ID to get pricing for.";
+
         const errorContent: Content = {
           text: `❌ **Token ID Required**
 
@@ -148,7 +168,7 @@ Please specify a token ID to get current market pricing.
 • Usually 70+ digit numbers for Polymarket
 • Can be hexadecimal (starting with 0x)
 • Found in market URLs or previous trading data`,
-          actions: ['GET_MARKET_PRICE'],
+          actions: ["GET_MARKET_PRICE"],
           data: { error: errorMessage },
         };
 
@@ -171,44 +191,67 @@ Please specify a token ID to get current market pricing.
 **Source**: Polymarket CLOB Orderbook
 
 Analyzing current market conditions...`,
-          actions: ['GET_MARKET_PRICE'],
-          data: { tokenId, step: 'fetching' },
+          actions: ["GET_MARKET_PRICE"],
+          data: { tokenId, step: "fetching" },
         };
         await callback(startContent);
       }
 
       // Fetch order book data for both sides
-      logger.info(`[getMarketPriceAction] Fetching orderbook for token: ${tokenId}`);
-      
+      logger.info(
+        `[getMarketPriceAction] Fetching orderbook for token: ${tokenId}`,
+      );
+
       const [buyBook, sellBook] = await Promise.all([
-        client.getOrderBooks([{ token_id: tokenId, side: 'buy' as any }]),
-        client.getOrderBooks([{ token_id: tokenId, side: 'sell' as any }]),
+        client.getOrderBooks([{ token_id: tokenId, side: "buy" as any }]),
+        client.getOrderBooks([{ token_id: tokenId, side: "sell" as any }]),
       ]);
 
-      if (!buyBook || buyBook.length === 0 || !sellBook || sellBook.length === 0) {
-        return createErrorResult(`No orderbook data found for token ID: ${tokenId.substring(0, 20)}...`);
+      if (
+        !buyBook ||
+        buyBook.length === 0 ||
+        !sellBook ||
+        sellBook.length === 0
+      ) {
+        return createErrorResult(
+          `No orderbook data found for token ID: ${tokenId.substring(0, 20)}...`,
+        );
       }
 
       const orderBook = {
         ...buyBook[0],
-        bids: sellBook[0].bids, // bids are sells from the user's perspective  
+        bids: sellBook[0].bids, // bids are sells from the user's perspective
         asks: buyBook[0].asks, // asks are buys from the user's perspective
       };
 
       // Extract pricing information
-      const bestBid = orderBook.bids && orderBook.bids.length > 0 ? parseFloat(orderBook.bids[0].price) : 0;
-      const bestAsk = orderBook.asks && orderBook.asks.length > 0 ? parseFloat(orderBook.asks[0].price) : 0;
-      const bidLiquidity = orderBook.bids && orderBook.bids.length > 0 ? parseFloat(orderBook.bids[0].size) : 0;
-      const askLiquidity = orderBook.asks && orderBook.asks.length > 0 ? parseFloat(orderBook.asks[0].size) : 0;
+      const bestBid =
+        orderBook.bids && orderBook.bids.length > 0
+          ? parseFloat(orderBook.bids[0].price)
+          : 0;
+      const bestAsk =
+        orderBook.asks && orderBook.asks.length > 0
+          ? parseFloat(orderBook.asks[0].price)
+          : 0;
+      const bidLiquidity =
+        orderBook.bids && orderBook.bids.length > 0
+          ? parseFloat(orderBook.bids[0].size)
+          : 0;
+      const askLiquidity =
+        orderBook.asks && orderBook.asks.length > 0
+          ? parseFloat(orderBook.asks[0].size)
+          : 0;
 
       if (bestBid === 0 && bestAsk === 0) {
-        return createErrorResult(`No active pricing found for token ID: ${tokenId.substring(0, 20)}...`);
+        return createErrorResult(
+          `No active pricing found for token ID: ${tokenId.substring(0, 20)}...`,
+        );
       }
 
       // Calculate derived pricing metrics
       const midPrice = (bestBid + bestAsk) / 2;
       const spread = bestAsk - bestBid;
-      const spreadPercent = spread / midPrice * 100;
+      const spreadPercent = (spread / midPrice) * 100;
 
       // Recommend trading prices with small premiums for execution
       const buyPremium = 0.02; // 2% above best ask for reliable execution
@@ -235,7 +278,7 @@ Analyzing current market conditions...`,
 
       responseText += `**Token Information:**\n`;
       responseText += `• Token ID: \`${tokenId.substring(0, 12)}...\`\n`;
-      responseText += `• Market: ${orderBook.market || 'Unknown'}\n\n`;
+      responseText += `• Market: ${orderBook.market || "Unknown"}\n\n`;
 
       responseText += `**Current Pricing:**\n`;
       if (bestBid > 0) {
@@ -276,7 +319,7 @@ Analyzing current market conditions...`,
 
       const responseContent: Content = {
         text: responseText,
-        actions: ['GET_MARKET_PRICE'],
+        actions: ["GET_MARKET_PRICE"],
         data: {
           success: true,
           priceInfo,
@@ -289,9 +332,11 @@ Analyzing current market conditions...`,
       }
 
       return contentToActionResult(responseContent);
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred while fetching market price';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Unknown error occurred while fetching market price";
       logger.error(`[getMarketPriceAction] Price fetch error:`, error);
 
       const errorContent: Content = {
@@ -308,7 +353,7 @@ This could be due to:
 **Token ID**: ${tokenId.substring(0, 20)}...
 
 Please verify the token ID is correct and the market is active.`,
-        actions: ['GET_MARKET_PRICE'],
+        actions: ["GET_MARKET_PRICE"],
         data: {
           error: errorMessage,
           tokenId,
@@ -327,31 +372,31 @@ Please verify the token ID is correct and the market is active.`,
   examples: [
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Get current price for token 110911393156699128240765920158928840337199547754402639514182164506911446042781',
+          text: "Get current price for token 110911393156699128240765920158928840337199547754402639514182164506911446042781",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll get the current market price and trading recommendations for that token...",
-          action: 'GET_MARKET_PRICE',
+          action: "GET_MARKET_PRICE",
         },
       },
     ],
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'What is the current market price?',
+          text: "What is the current market price?",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I need a specific token ID to get pricing. Please provide the token ID you want to check.",
-          action: 'GET_MARKET_PRICE',
+          action: "GET_MARKET_PRICE",
         },
       },
     ],

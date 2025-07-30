@@ -1,6 +1,15 @@
-import { IAgentRuntime, Memory, State, HandlerCallback, logger } from '@elizaos/core';
-import { initializeClobClientWithCreds } from '../utils/clobClient';
-import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
+import {
+  IAgentRuntime,
+  Memory,
+  State,
+  HandlerCallback,
+  logger,
+} from "@elizaos/core";
+import { initializeClobClientWithCreds } from "../utils/clobClient";
+import {
+  contentToActionResult,
+  createErrorResult,
+} from "../utils/actionHelpers";
 
 export interface ApiKeyData {
   key: string;
@@ -24,74 +33,82 @@ export interface GetAllApiKeysResponse {
  * Retrieves all API keys associated with a Polygon address using ClobClient.getApiKeys()
  */
 export const getAllApiKeysAction = {
-  name: 'POLYMARKET_GET_API_KEYS',
+  name: "POLYMARKET_GET_API_KEYS",
   similes: [
-    'GET_ALL_API_KEYS',
-    'LIST_API_KEYS',
-    'RETRIEVE_API_KEYS',
-    'SHOW_API_KEYS',
-    'GET_POLYMARKET_API_KEYS',
-    'LIST_CLOB_CREDENTIALS',
-    'SHOW_MY_API_KEYS',
+    "GET_ALL_API_KEYS",
+    "LIST_API_KEYS",
+    "RETRIEVE_API_KEYS",
+    "SHOW_API_KEYS",
+    "GET_POLYMARKET_API_KEYS",
+    "LIST_CLOB_CREDENTIALS",
+    "SHOW_MY_API_KEYS",
   ],
-  description: 'Retrieve all API keys associated with your Polymarket account',
+  description: "Retrieve all API keys associated with your Polymarket account",
   examples: [
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Get my API keys via Polymarket',
+          text: "Get my API keys via Polymarket",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "I'll retrieve all API keys associated with your Polymarket account.",
-          action: 'POLYMARKET_GET_API_KEYS',
+          action: "POLYMARKET_GET_API_KEYS",
         },
       },
     ],
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Show me all my CLOB API credentials via Polymarket',
+          text: "Show me all my CLOB API credentials via Polymarket",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
-          text: 'Retrieving your Polymarket API keys...',
-          action: 'POLYMARKET_GET_API_KEYS',
+          text: "Retrieving your Polymarket API keys...",
+          action: "POLYMARKET_GET_API_KEYS",
         },
       },
     ],
   ],
 
-  validate: async (runtime: IAgentRuntime, message: Memory): Promise<boolean> => {
-    logger.info('[getAllApiKeysAction] Validating action');
+  validate: async (
+    runtime: IAgentRuntime,
+    message: Memory,
+  ): Promise<boolean> => {
+    logger.info("[getAllApiKeysAction] Validating action");
 
     // Check if private key is available for authentication
     const privateKey =
-      runtime.getSetting('WALLET_PRIVATE_KEY') ||
-      runtime.getSetting('PRIVATE_KEY') ||
-      runtime.getSetting('POLYMARKET_PRIVATE_KEY');
+      runtime.getSetting("WALLET_PRIVATE_KEY") ||
+      runtime.getSetting("PRIVATE_KEY") ||
+      runtime.getSetting("POLYMARKET_PRIVATE_KEY");
 
     if (!privateKey) {
-      logger.error('[getAllApiKeysAction] No private key found in environment');
+      logger.error("[getAllApiKeysAction] No private key found in environment");
       return false;
     }
 
     // Check if API credentials are available in environment variables first
-    const envApiKey = runtime.getSetting('CLOB_API_KEY');
-    const envApiSecret = runtime.getSetting('CLOB_API_SECRET') || runtime.getSetting('CLOB_SECRET');
+    const envApiKey = runtime.getSetting("CLOB_API_KEY");
+    const envApiSecret =
+      runtime.getSetting("CLOB_API_SECRET") ||
+      runtime.getSetting("CLOB_SECRET");
     const envApiPassphrase =
-      runtime.getSetting('CLOB_API_PASSPHRASE') || runtime.getSetting('CLOB_PASS_PHRASE');
+      runtime.getSetting("CLOB_API_PASSPHRASE") ||
+      runtime.getSetting("CLOB_PASS_PHRASE");
 
     if (!envApiKey || !envApiSecret || !envApiPassphrase) {
-      logger.error('[getAllApiKeysAction] API credentials not found in environment variables');
       logger.error(
-        '[getAllApiKeysAction] Please set: CLOB_API_KEY, CLOB_API_SECRET, CLOB_API_PASSPHRASE'
+        "[getAllApiKeysAction] API credentials not found in environment variables",
+      );
+      logger.error(
+        "[getAllApiKeysAction] Please set: CLOB_API_KEY, CLOB_API_SECRET, CLOB_API_PASSPHRASE",
       );
       return false;
     }
@@ -104,23 +121,30 @@ export const getAllApiKeysAction = {
     message: Memory,
     state: State,
     options: any,
-    callback: HandlerCallback
+    callback: HandlerCallback,
   ): Promise<void> => {
-    logger.info('[getAllApiKeysAction] Handler called!');
+    logger.info("[getAllApiKeysAction] Handler called!");
 
     try {
       // Check for API credentials in both runtime settings and environment variables
-      let apiKey = runtime.getSetting('CLOB_API_KEY');
-      let apiSecret = runtime.getSetting('CLOB_API_SECRET') || runtime.getSetting('CLOB_SECRET');
+      let apiKey = runtime.getSetting("CLOB_API_KEY");
+      let apiSecret =
+        runtime.getSetting("CLOB_API_SECRET") ||
+        runtime.getSetting("CLOB_SECRET");
       let apiPassphrase =
-        runtime.getSetting('CLOB_API_PASSPHRASE') || runtime.getSetting('CLOB_PASS_PHRASE');
+        runtime.getSetting("CLOB_API_PASSPHRASE") ||
+        runtime.getSetting("CLOB_PASS_PHRASE");
 
-      logger.info('[getAllApiKeysAction] Checking for API credentials...');
-      logger.info('[getAllApiKeysAction] Found credentials:', {
+      logger.info("[getAllApiKeysAction] Checking for API credentials...");
+      logger.info("[getAllApiKeysAction] Found credentials:", {
         hasApiKey: !!apiKey,
         hasApiSecret: !!apiSecret,
         hasApiPassphrase: !!apiPassphrase,
-        apiKeySource: apiKey ? (runtime.getSetting('CLOB_API_KEY') ? 'runtime' : 'env') : 'none',
+        apiKeySource: apiKey
+          ? runtime.getSetting("CLOB_API_KEY")
+            ? "runtime"
+            : "env"
+          : "none",
       });
 
       if (!apiKey || !apiSecret || !apiPassphrase) {
@@ -150,10 +174,10 @@ export const getAllApiKeysAction = {
         if (callback) {
           callback({
             text: helpMessage,
-            action: 'POLYMARKET_GET_API_KEYS',
+            action: "POLYMARKET_GET_API_KEYS",
             data: {
               success: false,
-              error: 'API credentials not found - see setup instructions above',
+              error: "API credentials not found - see setup instructions above",
             },
           });
         }
@@ -161,28 +185,32 @@ export const getAllApiKeysAction = {
       }
 
       // Initialize CLOB client with API credentials
-      logger.info('[getAllApiKeysAction] Initializing CLOB client with credentials...');
+      logger.info(
+        "[getAllApiKeysAction] Initializing CLOB client with credentials...",
+      );
       const clobClient = await initializeClobClientWithCreds(runtime);
 
       // Get wallet address for response
       const privateKey =
-        runtime.getSetting('WALLET_PRIVATE_KEY') ||
-        runtime.getSetting('PRIVATE_KEY') ||
-        runtime.getSetting('POLYMARKET_PRIVATE_KEY');
+        runtime.getSetting("WALLET_PRIVATE_KEY") ||
+        runtime.getSetting("PRIVATE_KEY") ||
+        runtime.getSetting("POLYMARKET_PRIVATE_KEY");
 
-      const { ethers } = await import('ethers');
+      const { ethers } = await import("ethers");
       const wallet = new ethers.Wallet(privateKey!);
       const address = wallet.address;
 
-      logger.info(`[getAllApiKeysAction] Retrieving API keys for address: ${address}`);
+      logger.info(
+        `[getAllApiKeysAction] Retrieving API keys for address: ${address}`,
+      );
 
       // Use ClobClient's getApiKeys method
-      logger.info('[getAllApiKeysAction] Calling clobClient.getApiKeys()...');
+      logger.info("[getAllApiKeysAction] Calling clobClient.getApiKeys()...");
       const apiKeysResponse = await clobClient.getApiKeys();
 
       logger.info(
-        '[getAllApiKeysAction] Raw response from ClobClient:',
-        JSON.stringify(apiKeysResponse, null, 2)
+        "[getAllApiKeysAction] Raw response from ClobClient:",
+        JSON.stringify(apiKeysResponse, null, 2),
       );
 
       // Format the response - handle different response structures
@@ -192,13 +220,15 @@ export const getAllApiKeysAction = {
       if (
         apiKeysResponse &&
         Array.isArray((apiKeysResponse as any).apiKeys) &&
-        (apiKeysResponse as any).apiKeys.every((k: any) => typeof k === 'string')
+        (apiKeysResponse as any).apiKeys.every(
+          (k: any) => typeof k === "string",
+        )
       ) {
         apiKeys = (apiKeysResponse as any).apiKeys.map((keyId: string) => ({
           key: keyId,
           // Other fields will be undefined as only IDs are provided in this format
           active: true, // Assume active if listed
-          permissions: ['trading'], // Default assumption
+          permissions: ["trading"], // Default assumption
         }));
       } else if (Array.isArray(apiKeysResponse)) {
         // Response is directly an array of more detailed key objects (original handling)
@@ -207,13 +237,14 @@ export const getAllApiKeysAction = {
           secret: key.secret || key.api_secret,
           passphrase: key.passphrase || key.api_passphrase,
           created_at: key.created_at || key.createdAt,
-          active: key.active !== undefined ? key.active : key.status === 'active', // Added status check
-          permissions: key.permissions || ['trading'],
+          active:
+            key.active !== undefined ? key.active : key.status === "active", // Added status check
+          permissions: key.permissions || ["trading"],
           label: key.label,
         }));
       } else if (
         apiKeysResponse &&
-        typeof apiKeysResponse === 'object' &&
+        typeof apiKeysResponse === "object" &&
         (apiKeysResponse as any).data &&
         Array.isArray((apiKeysResponse as any).data)
       ) {
@@ -223,13 +254,14 @@ export const getAllApiKeysAction = {
           secret: key.secret || key.api_secret,
           passphrase: key.passphrase || key.api_passphrase,
           created_at: key.created_at || key.createdAt,
-          active: key.active !== undefined ? key.active : key.status === 'active',
-          permissions: key.permissions || ['trading'],
+          active:
+            key.active !== undefined ? key.active : key.status === "active",
+          permissions: key.permissions || ["trading"],
           label: key.label,
         }));
       } else if (
         apiKeysResponse &&
-        typeof apiKeysResponse === 'object' &&
+        typeof apiKeysResponse === "object" &&
         ((apiKeysResponse as any).key ||
           (apiKeysResponse as any).api_key ||
           (apiKeysResponse as any).id ||
@@ -243,8 +275,9 @@ export const getAllApiKeysAction = {
             secret: key.secret || key.api_secret,
             passphrase: key.passphrase || key.api_passphrase,
             created_at: key.created_at || key.createdAt,
-            active: key.active !== undefined ? key.active : key.status === 'active',
-            permissions: key.permissions || ['trading'],
+            active:
+              key.active !== undefined ? key.active : key.status === "active",
+            permissions: key.permissions || ["trading"],
             label: key.label,
           },
         ];
@@ -257,7 +290,9 @@ export const getAllApiKeysAction = {
         address: address,
       };
 
-      logger.info(`[getAllApiKeysAction] Processed ${responseData.count} API keys`);
+      logger.info(
+        `[getAllApiKeysAction] Processed ${responseData.count} API keys`,
+      );
 
       // Create success message
       let successMessage = `✅ **API Keys Retrieved Successfully**
@@ -270,7 +305,7 @@ export const getAllApiKeysAction = {
       if (responseData.count === 0) {
         successMessage += `**No API keys found** for your account (Wallet: \`${address}\`).\n`;
       } else {
-        successMessage += '**API Key Details**:\n\n';
+        successMessage += "**API Key Details**:\n\n";
         responseData.apiKeys.forEach((apiKeyData, index) => {
           successMessage += `**Key ${index + 1}:**\n`;
           successMessage += `• **ID**: \`${apiKeyData.key}\`\n`;
@@ -282,9 +317,9 @@ export const getAllApiKeysAction = {
             successMessage += `• **Created**: ${new Date(apiKeyData.created_at).toLocaleString()}\n`;
           }
           if (apiKeyData.permissions) {
-            successMessage += `• **Permissions**: ${apiKeyData.permissions.join(', ')}\n`;
+            successMessage += `• **Permissions**: ${apiKeyData.permissions.join(", ")}\n`;
           }
-          successMessage += `• **Status**: ${apiKeyData.active ? '🟢 Active' : '🔴 Inactive'}\n\n`;
+          successMessage += `• **Status**: ${apiKeyData.active ? "🟢 Active" : "🔴 Inactive"}\n\n`;
         });
       }
 
@@ -297,18 +332,20 @@ export const getAllApiKeysAction = {
       if (callback) {
         await callback({
           text: successMessage,
-          action: 'POLYMARKET_GET_API_KEYS',
+          action: "POLYMARKET_GET_API_KEYS",
           data: responseData,
         });
       }
 
-      logger.info('[getAllApiKeysAction] API keys retrieval completed successfully');
+      logger.info(
+        "[getAllApiKeysAction] API keys retrieval completed successfully",
+      );
     } catch (error) {
-      logger.error('[getAllApiKeysAction] Error retrieving API keys:', error);
+      logger.error("[getAllApiKeysAction] Error retrieving API keys:", error);
 
       const errorMessage = `❌ **Failed to Retrieve API Keys**
 
-**Error**: ${error instanceof Error ? error.message : 'Unknown error occurred'}
+**Error**: ${error instanceof Error ? error.message : "Unknown error occurred"}
 
 **Possible Causes:**
 • No API credentials configured (need to create API keys first)
@@ -324,10 +361,10 @@ export const getAllApiKeysAction = {
       if (callback) {
         callback({
           text: errorMessage,
-          action: 'POLYMARKET_GET_API_KEYS',
+          action: "POLYMARKET_GET_API_KEYS",
           data: {
             success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: error instanceof Error ? error.message : "Unknown error",
           },
         });
       }

@@ -7,19 +7,25 @@ import {
   type Memory,
   type State,
   logger,
-} from '@elizaos/core';
-import { initializeClobClient } from '../utils/clobClient';
-import { OrderSide, OrderType } from '../types';
-import { contentToActionResult, createErrorResult } from '../utils/actionHelpers';
-import { checkPolymarketBalance, formatBalanceInfo } from '../utils/balanceChecker';
-import { ClobClient, Side } from '@polymarket/clob-client';
+} from "@elizaos/core";
+import { initializeClobClient } from "../utils/clobClient";
+import { OrderSide, OrderType } from "../types";
+import {
+  contentToActionResult,
+  createErrorResult,
+} from "../utils/actionHelpers";
+import {
+  checkPolymarketBalance,
+  formatBalanceInfo,
+} from "../utils/balanceChecker";
+import { ClobClient, Side } from "@polymarket/clob-client";
 
 interface DirectOrderParams {
   tokenId: string;
-  side: 'BUY' | 'SELL';
+  side: "BUY" | "SELL";
   price: number;
   size: number;
-  orderType?: 'GTC' | 'FOK' | 'GTD' | 'FAK';
+  orderType?: "GTC" | "FOK" | "GTD" | "FAK";
 }
 
 // Polymarket minimum order constants
@@ -30,17 +36,17 @@ const POLYMARKET_MIN_ORDER_VALUE = 1.0; // $1 minimum order value
  * Used for automated trading and testing scenarios
  */
 export const directPlaceOrderAction: Action = {
-  name: 'DIRECT_PLACE_ORDER',
-  similes: [
-    'DIRECT_ORDER',
-    'API_ORDER',
-    'BYPASS_ORDER',
-    'AUTOMATED_ORDER',
-  ],
-  description: 'Place orders directly with API parameters, bypassing LLM extraction',
+  name: "DIRECT_PLACE_ORDER",
+  similes: ["DIRECT_ORDER", "API_ORDER", "BYPASS_ORDER", "AUTOMATED_ORDER"],
+  description:
+    "Place orders directly with API parameters, bypassing LLM extraction",
 
-  validate: async (runtime: IAgentRuntime, message: Memory, state?: State): Promise<boolean> => {
-    const clobApiUrl = runtime.getSetting('CLOB_API_URL');
+  validate: async (
+    runtime: IAgentRuntime,
+    message: Memory,
+    state?: State,
+  ): Promise<boolean> => {
+    const clobApiUrl = runtime.getSetting("CLOB_API_URL");
     return !!clobApiUrl;
   },
 
@@ -49,24 +55,40 @@ export const directPlaceOrderAction: Action = {
     message: Memory,
     state?: State,
     options?: { [key: string]: unknown },
-    callback?: HandlerCallback
+    callback?: HandlerCallback,
   ): Promise<ActionResult> => {
-    logger.info('[directPlaceOrderAction] Direct order placement started');
+    logger.info("[directPlaceOrderAction] Direct order placement started");
 
     // Extract parameters from options or message
     const orderParams: DirectOrderParams = {
-      tokenId: (options?.tokenId as string) || extractTokenId(message.content?.text || ''),
-      side: (options?.side as 'BUY' | 'SELL') || extractSide(message.content?.text || ''),
-      price: (typeof options?.price === 'number' ? options.price : extractPrice(message.content?.text || '')) || 0,
-      size: (typeof options?.size === 'number' ? options.size : extractSize(message.content?.text || '')) || 0,
-      orderType: (options?.orderType as 'GTC' | 'FOK') || 'FOK',  // Default to FOK (market order)
+      tokenId:
+        (options?.tokenId as string) ||
+        extractTokenId(message.content?.text || ""),
+      side:
+        (options?.side as "BUY" | "SELL") ||
+        extractSide(message.content?.text || ""),
+      price:
+        (typeof options?.price === "number"
+          ? options.price
+          : extractPrice(message.content?.text || "")) || 0,
+      size:
+        (typeof options?.size === "number"
+          ? options.size
+          : extractSize(message.content?.text || "")) || 0,
+      orderType: (options?.orderType as "GTC" | "FOK") || "FOK", // Default to FOK (market order)
     };
 
-    logger.info('[directPlaceOrderAction] Extracted parameters:', orderParams);
+    logger.info("[directPlaceOrderAction] Extracted parameters:", orderParams);
 
     // Validate required parameters
-    if (!orderParams.tokenId || !orderParams.side || orderParams.price <= 0 || orderParams.size <= 0) {
-      const errorMessage = 'Invalid order parameters. Required: tokenId, side, price > 0, size > 0';
+    if (
+      !orderParams.tokenId ||
+      !orderParams.side ||
+      orderParams.price <= 0 ||
+      orderParams.size <= 0
+    ) {
+      const errorMessage =
+        "Invalid order parameters. Required: tokenId, side, price > 0, size > 0";
       return createErrorResult(errorMessage);
     }
 
@@ -91,9 +113,9 @@ export const directPlaceOrderAction: Action = {
 **Suggestions:**
 • Increase size to ${Math.ceil(POLYMARKET_MIN_ORDER_VALUE / orderParams.price)} shares
 • Or increase price to $${(POLYMARKET_MIN_ORDER_VALUE / orderParams.size).toFixed(4)} per share`,
-        actions: ['DIRECT_PLACE_ORDER'],
+        actions: ["DIRECT_PLACE_ORDER"],
         data: {
-          error: 'Below minimum order value',
+          error: "Below minimum order value",
           currentValue: totalValue,
           minimumValue: POLYMARKET_MIN_ORDER_VALUE,
           orderParams,
@@ -108,8 +130,11 @@ export const directPlaceOrderAction: Action = {
 
     try {
       // Check balance before placing order
-      const balanceInfo = await checkPolymarketBalance(runtime, totalValue.toString());
-      
+      const balanceInfo = await checkPolymarketBalance(
+        runtime,
+        totalValue.toString(),
+      );
+
       if (!balanceInfo.hasEnoughBalance) {
         const balanceDisplay = formatBalanceInfo(balanceInfo);
         const errorContent: Content = {
@@ -123,9 +148,9 @@ export const directPlaceOrderAction: Action = {
 • **Total Value**: $${totalValue.toFixed(2)}
 
 Insufficient balance for order.`,
-          actions: ['DIRECT_PLACE_ORDER'],
+          actions: ["DIRECT_PLACE_ORDER"],
           data: {
-            error: 'Insufficient balance',
+            error: "Insufficient balance",
             balanceInfo,
             orderDetails: orderParams,
           },
@@ -141,27 +166,36 @@ Insufficient balance for order.`,
       const client = await initializeClobClient(runtime);
 
       // Check and derive API credentials if needed
-      const hasApiKey = runtime.getSetting('CLOB_API_KEY');
-      const hasApiSecret = runtime.getSetting('CLOB_API_SECRET') || runtime.getSetting('CLOB_SECRET');
-      const hasApiPassphrase = runtime.getSetting('CLOB_API_PASSPHRASE') || runtime.getSetting('CLOB_PASS_PHRASE');
-      
+      const hasApiKey = runtime.getSetting("CLOB_API_KEY");
+      const hasApiSecret =
+        runtime.getSetting("CLOB_API_SECRET") ||
+        runtime.getSetting("CLOB_SECRET");
+      const hasApiPassphrase =
+        runtime.getSetting("CLOB_API_PASSPHRASE") ||
+        runtime.getSetting("CLOB_PASS_PHRASE");
+
       if (!hasApiKey || !hasApiSecret || !hasApiPassphrase) {
-        logger.info('[directPlaceOrderAction] Deriving API credentials');
-        
+        logger.info("[directPlaceOrderAction] Deriving API credentials");
+
         if (callback) {
           await callback({
-            text: '🔑 Deriving API credentials for order placement...',
-            actions: ['DIRECT_PLACE_ORDER'],
-            data: { status: 'deriving_credentials' },
+            text: "🔑 Deriving API credentials for order placement...",
+            actions: ["DIRECT_PLACE_ORDER"],
+            data: { status: "deriving_credentials" },
           });
         }
 
         const derivedCreds = await client.createOrDeriveApiKey();
-        await runtime.setSetting('CLOB_API_KEY', derivedCreds.key);
-        await runtime.setSetting('CLOB_API_SECRET', derivedCreds.secret);
-        await runtime.setSetting('CLOB_API_PASSPHRASE', derivedCreds.passphrase);
-        
-        logger.info('[directPlaceOrderAction] API credentials derived successfully');
+        await runtime.setSetting("CLOB_API_KEY", derivedCreds.key);
+        await runtime.setSetting("CLOB_API_SECRET", derivedCreds.secret);
+        await runtime.setSetting(
+          "CLOB_API_PASSPHRASE",
+          derivedCreds.passphrase,
+        );
+
+        logger.info(
+          "[directPlaceOrderAction] API credentials derived successfully",
+        );
       }
 
       // Re-initialize client with credentials
@@ -171,12 +205,15 @@ Insufficient balance for order.`,
       const orderArgs = {
         tokenID: orderParams.tokenId,
         price: orderParams.price,
-        side: orderParams.side === 'BUY' ? Side.BUY : Side.SELL,
+        side: orderParams.side === "BUY" ? Side.BUY : Side.SELL,
         size: orderParams.size,
         feeRateBps: 0,
       };
 
-      logger.info('[directPlaceOrderAction] Creating order with args:', orderArgs);
+      logger.info(
+        "[directPlaceOrderAction] Creating order with args:",
+        orderArgs,
+      );
 
       if (callback) {
         await callback({
@@ -190,18 +227,21 @@ Insufficient balance for order.`,
 • **Total**: $${totalValue.toFixed(2)}
 
 Creating signed order...`,
-          actions: ['DIRECT_PLACE_ORDER'],
-          data: { status: 'creating_order', orderDetails: orderParams },
+          actions: ["DIRECT_PLACE_ORDER"],
+          data: { status: "creating_order", orderDetails: orderParams },
         });
       }
 
       // Create the signed order
       const signedOrder = await authenticatedClient.createOrder(orderArgs);
-      logger.info('[directPlaceOrderAction] Order created successfully');
+      logger.info("[directPlaceOrderAction] Order created successfully");
 
       // Post the order
-      const orderResponse = await authenticatedClient.postOrder(signedOrder, orderParams.orderType as OrderType);
-      logger.info('[directPlaceOrderAction] Order posted successfully');
+      const orderResponse = await authenticatedClient.postOrder(
+        signedOrder,
+        orderParams.orderType as OrderType,
+      );
+      logger.info("[directPlaceOrderAction] Order posted successfully");
 
       // Format response
       let responseText: string;
@@ -211,18 +251,19 @@ Creating signed order...`,
         responseText = `✅ **Direct Order Placed Successfully**
 
 **Order Details:**
-• **Type**: ${orderParams.orderType.toLowerCase()} ${orderParams.side.toLowerCase()} order
+• **Type**: ${orderParams.orderType?.toLowerCase() || "FOK"} ${orderParams.side.toLowerCase()} order
 • **Token ID**: ${orderParams.tokenId.slice(0, 20)}...
 • **Price**: $${orderParams.price.toFixed(4)} (${(orderParams.price * 100).toFixed(2)}%)
 • **Size**: ${orderParams.size} shares
 • **Total Value**: $${totalValue.toFixed(2)}
 
 **Order Response:**
-• **Order ID**: ${orderResponse.orderId || 'Pending'}
-• **Status**: ${orderResponse.status || 'submitted'}
-${orderResponse.orderHashes && orderResponse.orderHashes.length > 0
-  ? `• **Transaction Hash(es)**: ${orderResponse.orderHashes.join(', ')}`
-  : ''
+• **Order ID**: ${orderResponse.orderId || "Pending"}
+• **Status**: ${orderResponse.status || "submitted"}
+${
+  orderResponse.orderHashes && orderResponse.orderHashes.length > 0
+    ? `• **Transaction Hash(es)**: ${orderResponse.orderHashes.join(", ")}`
+    : ""
 }
 
 🎉 Direct order placement completed!`;
@@ -237,7 +278,7 @@ ${orderResponse.orderHashes && orderResponse.orderHashes.length > 0
       } else {
         responseText = `❌ **Direct Order Placement Failed**
 
-**Error**: ${orderResponse.errorMsg || 'Unknown error'}
+**Error**: ${orderResponse.errorMsg || "Unknown error"}
 
 **Order Details:**
 • **Token ID**: ${orderParams.tokenId.slice(0, 20)}...
@@ -255,7 +296,7 @@ ${orderResponse.orderHashes && orderResponse.orderHashes.length > 0
 
       const responseContent: Content = {
         text: responseText,
-        actions: ['DIRECT_PLACE_ORDER'],
+        actions: ["DIRECT_PLACE_ORDER"],
         data: responseData,
       };
 
@@ -264,10 +305,10 @@ ${orderResponse.orderHashes && orderResponse.orderHashes.length > 0
       }
 
       return contentToActionResult(responseContent);
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('[directPlaceOrderAction] Order placement failed:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      logger.error("[directPlaceOrderAction] Order placement failed:", error);
 
       const errorContent: Content = {
         text: `❌ **Direct Order Placement Error**
@@ -281,7 +322,7 @@ ${orderResponse.orderHashes && orderResponse.orderHashes.length > 0
 • **Size**: ${orderParams.size} shares
 
 Direct API order placement failed.`,
-        actions: ['DIRECT_PLACE_ORDER'],
+        actions: ["DIRECT_PLACE_ORDER"],
         data: {
           error: errorMessage,
           orderDetails: orderParams,
@@ -298,16 +339,16 @@ Direct API order placement failed.`,
   examples: [
     [
       {
-        name: '{{user1}}',
+        name: "{{user1}}",
         content: {
-          text: 'Direct buy 5 shares of token 114304586861386186441621124384163963092522056897081085884483958561365015034812 at $0.12',
+          text: "Direct buy 5 shares of token 114304586861386186441621124384163963092522056897081085884483958561365015034812 at $0.12",
         },
       },
       {
-        name: '{{user2}}',
+        name: "{{user2}}",
         content: {
           text: "Placing direct order via API...",
-          action: 'DIRECT_PLACE_ORDER',
+          action: "DIRECT_PLACE_ORDER",
         },
       },
     ],
@@ -317,13 +358,13 @@ Direct API order placement failed.`,
 // Helper functions for parameter extraction
 function extractTokenId(text: string): string {
   const tokenMatch = text.match(/(?:token|id)\s+([0-9]{50,})/i);
-  return tokenMatch?.[1] || '';
+  return tokenMatch?.[1] || "";
 }
 
-function extractSide(text: string): 'BUY' | 'SELL' {
+function extractSide(text: string): "BUY" | "SELL" {
   const buyMatch = text.match(/\b(buy|purchase|long)\b/i);
   const sellMatch = text.match(/\b(sell|short)\b/i);
-  return buyMatch ? 'BUY' : sellMatch ? 'SELL' : 'BUY';
+  return buyMatch ? "BUY" : sellMatch ? "SELL" : "BUY";
 }
 
 function extractPrice(text: string): number {

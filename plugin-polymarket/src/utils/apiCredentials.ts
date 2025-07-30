@@ -1,5 +1,5 @@
-import { type IAgentRuntime, logger } from '@elizaos/core';
-import { initializeClobClient } from './clobClient';
+import { type IAgentRuntime, logger } from "@elizaos/core";
+import { initializeClobClient } from "./clobClient";
 
 /**
  * Interface for API credentials
@@ -16,8 +16,12 @@ export interface ApiCredentials {
  * @param runtime - Agent runtime for configuration
  * @returns API credentials including key, secret, and passphrase
  */
-export async function createApiCredentials(runtime: IAgentRuntime): Promise<ApiCredentials> {
-  logger.info('[apiCredentials] Creating new API credentials for L2 authentication');
+export async function createApiCredentials(
+  runtime: IAgentRuntime,
+): Promise<ApiCredentials> {
+  logger.info(
+    "[apiCredentials] Creating new API credentials for L2 authentication",
+  );
 
   try {
     // Initialize CLOB client (this uses L1 authentication with private key)
@@ -27,7 +31,7 @@ export async function createApiCredentials(runtime: IAgentRuntime): Promise<ApiC
     // This will make a POST request to /auth/api-key with wallet signature
     const credentialsResponse = await client.createApiKey();
 
-    logger.info('[apiCredentials] API credentials created successfully');
+    logger.info("[apiCredentials] API credentials created successfully");
 
     const credentials: ApiCredentials = {
       apiKey: credentialsResponse.key,
@@ -36,33 +40,37 @@ export async function createApiCredentials(runtime: IAgentRuntime): Promise<ApiC
     };
 
     // Log success (without revealing secrets)
-    logger.info('[apiCredentials] New credentials ready:', {
+    logger.info("[apiCredentials] New credentials ready:", {
       apiKey: credentials.apiKey,
       hasSecret: !!credentials.secret,
       hasPassphrase: !!credentials.passphrase,
     });
 
     return credentials;
-
   } catch (error) {
-    logger.error('[apiCredentials] Failed to create API credentials:', error);
-    throw new Error(`Failed to create API credentials: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.error("[apiCredentials] Failed to create API credentials:", error);
+    throw new Error(
+      `Failed to create API credentials: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
   }
 }
 
 /**
  * Check if API credentials are configured in environment
- * @param runtime - Agent runtime for configuration  
+ * @param runtime - Agent runtime for configuration
  * @returns True if all required credentials are present
  */
 export function hasApiCredentials(runtime: IAgentRuntime): boolean {
-  const apiKey = runtime.getSetting('CLOB_API_KEY');
-  const apiSecret = runtime.getSetting('CLOB_API_SECRET') || runtime.getSetting('CLOB_SECRET');
-  const apiPassphrase = runtime.getSetting('CLOB_API_PASSPHRASE') || runtime.getSetting('CLOB_PASS_PHRASE');
+  const apiKey = runtime.getSetting("CLOB_API_KEY");
+  const apiSecret =
+    runtime.getSetting("CLOB_API_SECRET") || runtime.getSetting("CLOB_SECRET");
+  const apiPassphrase =
+    runtime.getSetting("CLOB_API_PASSPHRASE") ||
+    runtime.getSetting("CLOB_PASS_PHRASE");
 
   const hasAll = !!(apiKey && apiSecret && apiPassphrase);
-  
-  logger.info('[apiCredentials] Credential check:', {
+
+  logger.info("[apiCredentials] Credential check:", {
     hasApiKey: !!apiKey,
     hasSecret: !!apiSecret,
     hasPassphrase: !!apiPassphrase,
@@ -77,27 +85,39 @@ export function hasApiCredentials(runtime: IAgentRuntime): boolean {
  * @param runtime - Agent runtime for configuration
  * @returns API credentials ready for use
  */
-export async function ensureApiCredentials(runtime: IAgentRuntime): Promise<ApiCredentials> {
-  logger.info('[apiCredentials] Ensuring API credentials are available');
+export async function ensureApiCredentials(
+  runtime: IAgentRuntime,
+): Promise<ApiCredentials> {
+  logger.info("[apiCredentials] Ensuring API credentials are available");
 
   // Check if credentials already exist in environment
   if (hasApiCredentials(runtime)) {
-    logger.info('[apiCredentials] Using existing credentials from environment');
-    
+    logger.info("[apiCredentials] Using existing credentials from environment");
+
     return {
-      apiKey: runtime.getSetting('CLOB_API_KEY')!,
-      secret: runtime.getSetting('CLOB_API_SECRET') || runtime.getSetting('CLOB_SECRET')!,
-      passphrase: runtime.getSetting('CLOB_API_PASSPHRASE') || runtime.getSetting('CLOB_PASS_PHRASE')!,
+      apiKey: runtime.getSetting("CLOB_API_KEY")!,
+      secret:
+        runtime.getSetting("CLOB_API_SECRET") ||
+        runtime.getSetting("CLOB_SECRET")!,
+      passphrase:
+        runtime.getSetting("CLOB_API_PASSPHRASE") ||
+        runtime.getSetting("CLOB_PASS_PHRASE")!,
     };
   }
 
   // Create new credentials if none exist
-  logger.info('[apiCredentials] No existing credentials found, creating new ones');
+  logger.info(
+    "[apiCredentials] No existing credentials found, creating new ones",
+  );
   const credentials = await createApiCredentials(runtime);
 
   // Note: In a production environment, these should be saved to secure storage
-  logger.warn('[apiCredentials] New credentials created but not persisted to environment');
-  logger.warn('[apiCredentials] Consider adding these to your .env file for persistence:');
+  logger.warn(
+    "[apiCredentials] New credentials created but not persisted to environment",
+  );
+  logger.warn(
+    "[apiCredentials] Consider adding these to your .env file for persistence:",
+  );
   logger.warn(`CLOB_API_KEY=${credentials.apiKey}`);
   logger.warn(`CLOB_API_SECRET=${credentials.secret}`);
   logger.warn(`CLOB_API_PASSPHRASE=${credentials.passphrase}`);
