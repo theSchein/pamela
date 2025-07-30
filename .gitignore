@@ -109,3 +109,7 @@ public
 # Temporary files
 *.tmp
 *.temp
+
+# this fucking file
+*.log
+server.log
