@@ -19,10 +19,10 @@
     <meta property="og:type" content="website" />
 
     <script>
-      // Dynamic config - will use Railway URL in production
+      // Production config - frontend points to backend service
       window.ELIZA_CONFIG = {
         agentId: "",
-        apiBase: window.location.origin,
+        apiBase: "https://pamela-backend-production.up.railway.app",
       };
     </script>
   </head>

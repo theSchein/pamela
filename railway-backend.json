@@ -1,0 +1,17 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "bun install && bun run build"
+  },
+  "deploy": {
+    "runtime": "V2",
+    "numReplicas": 1,
+    "overlapSeconds": 0,
+    "drainingSeconds": 0,
+    "sleepApplication": false,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10,
+    "startCommand": "elizaos start"
+  }
+}
