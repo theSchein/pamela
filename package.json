@@ -79,7 +79,7 @@
   },
   "scripts": {
     "start": "elizaos start",
-    "serve:frontend": "vite preview --host 0.0.0.0 --port $PORT",
+    "serve:frontend": "vite preview --host 0.0.0.0 --port $PORT --outDir dist/client",
     "dev": "elizaos dev",
     "dev:frontend": "vite",
     "build": "tsc --noEmit && vite build && tsup && mkdir -p dist/client && cp -r dist/frontend/* dist/client/ && rm -rf dist/frontend",
