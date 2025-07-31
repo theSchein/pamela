@@ -21,6 +21,7 @@ const Chat = () => {
   ]);
   const [inputValue, setInputValue] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
+  const thinkingMessageIdRef = React.useRef<string | null>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -120,24 +121,43 @@ const Chat = () => {
     });
 
     newSocket.on('messageBroadcast', (data) => {
-      console.log('Received message broadcast:', data);
       
-      // Create Pamela's response from WebSocket message
+      // Ignore messages sent by the current user
+      // Ignore messages sent by the current user (the echo)
+      if (data.payload?.senderId === senderId || data.senderId === senderId) {
+        return;
+      }
+
+      // It's a real response from Pamela, so replace the placeholder
       const pamelaResponse: Message = {
         id: (Date.now() + Math.random()).toString(),
-        text: data.message || data.text || data.content?.text || "I received your message.",
+        text: data.message || data.text || data.content?.text || "I received a response.",
         sender: "pamela",
         timestamp: new Date(),
       };
 
-      setMessages((prev) => [...prev, pamelaResponse]);
+      if (thinkingMessageIdRef.current) {
+        setMessages((prev) => {
+          const filtered = prev.filter((msg) => msg.id !== thinkingMessageIdRef.current);
+          return [...filtered, pamelaResponse];
+        });
+        thinkingMessageIdRef.current = null;
+      } else {
+        setMessages((prev) => [...prev, pamelaResponse]);
+      }
+
       setIsLoading(false);
     });
 
     newSocket.on('message', (data) => {
-      console.log('Received message:', data);
       
-      // Handle any message responses
+      // Ignore messages sent by the current user
+      // Ignore messages sent by the current user (the echo)
+      if (data.payload?.senderId === senderId || data.senderId === senderId) {
+        return;
+      }
+
+      // It's a real response from Pamela, so replace the placeholder
       if (data && data.text) {
         const pamelaResponse: Message = {
           id: (Date.now() + Math.random()).toString(),
@@ -146,7 +166,16 @@ const Chat = () => {
           timestamp: new Date(),
         };
 
-        setMessages((prev) => [...prev, pamelaResponse]);
+        if (thinkingMessageIdRef.current) {
+          setMessages((prev) => {
+            const filtered = prev.filter((msg) => msg.id !== thinkingMessageIdRef.current);
+            return [...filtered, pamelaResponse];
+          });
+          thinkingMessageIdRef.current = null;
+        } else {
+          setMessages((prev) => [...prev, pamelaResponse]);
+        }
+
         setIsLoading(false);
       }
     });
@@ -208,7 +237,15 @@ const Chat = () => {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const thinkingMessage: Message = {
+      id: (Date.now() + 1).toString(), // Ensure unique ID
+      text: "Pamela is thinking...",
+      sender: "pamela",
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage, thinkingMessage]);
+    thinkingMessageIdRef.current = thinkingMessage.id;
     setInputValue("");
     setIsLoading(true);
 
@@ -228,9 +265,6 @@ const Chat = () => {
       };
 
       console.log('Sending message via WebSocket:', messageData);
-      
-      // Try both formats
-      socket.emit("message", messageData);
       
       // Use the exact working format from localhost:3000 logs
       socket.emit("message", {
@@ -314,13 +348,7 @@ const Chat = () => {
             </div>
           </div>
         ))}
-        {isLoading && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '20px' }}>
-            <div style={{ backgroundColor: '#f0f0f0', borderRadius: '10px', padding: '10px', maxWidth: '80%' }}>
-              Pamela is thinking...
-            </div>
-          </div>
-        )}
+        
       </div>
       <div style={{ padding: '20px', borderTop: '1px solid #ccc' }}>
         <div style={{ display: 'flex' }}>
