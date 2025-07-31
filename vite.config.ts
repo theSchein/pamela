@@ -36,4 +36,14 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    port: parseInt(process.env.PORT) || 4173,
+    host: '0.0.0.0',
+    allowedHosts: [
+      'pamela-production.up.railway.app',
+      '.railway.app',
+      'localhost',
+      '127.0.0.1'
+    ],
+  },
 });
