@@ -1,6 +1,6 @@
 import React from 'react';
 import { apiClient } from '../../api/client';
-import type { Portfolio as PortfolioType, Position } from '@pamela/shared';
+import type { Portfolio as PortfolioType } from '@pamela/shared';
 import { wsEvents } from '../../config';
 
 const Portfolio = () => {
@@ -8,8 +8,8 @@ const Portfolio = () => {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Fetch portfolio data
-  const fetchPortfolio = async () => {
+  // Fetch portfolio data with retry
+  const fetchPortfolio = async (retryCount = 0) => {
     try {
       setLoading(true);
       setError(null);
@@ -17,9 +17,21 @@ const Portfolio = () => {
       setPortfolio(data);
     } catch (err) {
       console.error('Failed to fetch portfolio:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch portfolio');
+      
+      // Retry up to 3 times with exponential backoff
+      if (retryCount < 3) {
+        console.log(`Retrying portfolio fetch (attempt ${retryCount + 1}/3)...`);
+        setTimeout(() => {
+          fetchPortfolio(retryCount + 1);
+        }, Math.pow(2, retryCount) * 1000); // 1s, 2s, 4s
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to fetch portfolio');
+        setLoading(false);
+      }
     } finally {
-      setLoading(false);
+      if (retryCount === 0 || retryCount >= 3) {
+        setLoading(false);
+      }
     }
   };
 

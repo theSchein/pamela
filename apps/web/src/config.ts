@@ -1,4 +1,5 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// @ts-ignore
+export const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3000';
 
 export const api = {
   // Chat endpoints
@@ -30,6 +31,7 @@ export const wsEvents = {
   PRICE_UPDATE: 'price:update',
   ORDER_UPDATE: 'order:update',
   POSITION_UPDATE: 'position:update',
+  PORTFOLIO_UPDATE: 'portfolio:update',
   
   // Outgoing events
   SUBSCRIBE_MARKET: 'market:subscribe',

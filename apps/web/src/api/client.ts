@@ -6,10 +6,6 @@ import type {
   Order,
   ApiResponse,
   WsMessage,
-  MarketUpdatePayload,
-  PriceUpdatePayload,
-  OrderUpdatePayload,
-  PositionUpdatePayload,
 } from '@pamela/shared';
 
 class ApiClient {
@@ -62,14 +58,24 @@ class ApiClient {
 
   // Portfolio methods
   async getPortfolio(): Promise<Portfolio> {
-    const response = await fetch(api.portfolio);
-    const result: ApiResponse<Portfolio> = await response.json();
-    
-    if (!result.success || !result.data) {
-      throw new Error(result.error || 'Failed to fetch portfolio');
+    try {
+      const response = await fetch(api.portfolio);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result: ApiResponse<Portfolio> = await response.json();
+      
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to fetch portfolio');
+      }
+      
+      return result.data;
+    } catch (error) {
+      console.error('Portfolio fetch error:', error);
+      throw error;
     }
-    
-    return result.data;
   }
 
   // Trading methods

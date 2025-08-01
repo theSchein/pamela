@@ -12,11 +12,6 @@ export default defineConfig({
   build: {
     outDir: './dist',
     emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'src/index.html'),
-      },
-    },
   },
   optimizeDeps: {
     include: ['react', 'react-dom', '@tanstack/react-query'],
@@ -30,7 +25,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': {
+      '^/api/(?!client)': {
         target: 'http://localhost:3000',
         changeOrigin: true,
       },

@@ -34,9 +34,10 @@ services:
     command: npm run dev
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   # Web frontend service
   web:
@@ -44,8 +45,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
     depends_on:
-      agent:
-        condition: service_healthy
+      - agent
     environment:
       VITE_API_URL: http://localhost:3000
       PORT: 5173

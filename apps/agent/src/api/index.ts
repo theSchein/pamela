@@ -1,229 +1,15 @@
 import { Plugin, type IAgentRuntime, logger } from "@elizaos/core";
-import { z } from "zod";
-import type { 
-  ChatMessage, 
-  Market, 
-  Portfolio, 
-  Order, 
-  ApiResponse,
-  WsMessage 
-} from "@pamela/shared";
-import { WebSocketServer } from "ws";
-import { createServer } from "http";
 
-// Request validation schemas
-const chatRequestSchema = z.object({
-  message: z.string().min(1),
-  conversationId: z.string().optional(),
-});
-
-const orderRequestSchema = z.object({
-  marketId: z.string(),
-  outcomeId: z.string(),
-  side: z.enum(["buy", "sell"]),
-  type: z.enum(["limit", "market"]),
-  amount: z.number().positive(),
-  price: z.number().positive().optional(),
-});
-
+// Simple API plugin with placeholder endpoints
 export const apiPlugin: Plugin = {
   name: "api",
-  description: "REST API and WebSocket endpoints for frontend communication",
-  
-  async init(runtime: IAgentRuntime) {
-    logger.info("Initializing API plugin");
-    // The plugin doesn't need special initialization
-    // Database is handled by the SQL plugin
-  },
+  description: "REST API endpoints for frontend communication",
   
   routes: [
-    // Chat endpoint
-    {
-      path: "/api/chat",
-      method: "POST",
-      handler: async (req: any, res: any, runtime: IAgentRuntime) => {
-        try {
-          const body = await chatRequestSchema.parseAsync(req.body);
-          
-          // Process chat message through the agent
-          const response = await runtime.processMessage({
-            userId: req.session?.userId || "anonymous",
-            content: { text: body.message },
-            roomId: body.conversationId || "default",
-          });
-          
-          const apiResponse: ApiResponse<ChatMessage> = {
-            success: true,
-            data: {
-              id: response.id,
-              role: "assistant",
-              content: response.content.text || "I couldn't process that message.",
-              timestamp: new Date(),
-              metadata: response.content.metadata,
-            },
-          };
-          
-          res.json(apiResponse);
-        } catch (error) {
-          logger.error("Chat API error:", error);
-          res.status(400).json({
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to process message",
-          });
-        }
-      },
-    },
-    
-    // Get markets
-    {
-      path: "/api/markets",
-      method: "GET",
-      handler: async (req: any, res: any, runtime: IAgentRuntime) => {
-        try {
-          // Get markets from Polymarket plugin
-          const polymarketService = runtime.getService("polymarket");
-          if (!polymarketService) {
-            throw new Error("Polymarket service not available");
-          }
-          
-          // Call the getSamplingMarkets action
-          const markets = await runtime.executeAction("GET_SAMPLING_MARKETS", {
-            limit: req.query.limit || 20,
-            active: req.query.active !== "false",
-          });
-          
-          const apiResponse: ApiResponse<Market[]> = {
-            success: true,
-            data: markets,
-          };
-          
-          res.json(apiResponse);
-        } catch (error) {
-          logger.error("Markets API error:", error);
-          res.status(500).json({
-            success: false,
-            error: "Failed to fetch markets",
-          });
-        }
-      },
-    },
-    
-    // Get market details
-    {
-      path: "/api/markets/:id",
-      method: "GET",
-      handler: async (req: any, res: any, runtime: IAgentRuntime) => {
-        try {
-          const marketId = req.params.id;
-          
-          const marketDetails = await runtime.executeAction("GET_MARKET_DETAILS", {
-            marketId,
-          });
-          
-          const apiResponse: ApiResponse<Market> = {
-            success: true,
-            data: marketDetails,
-          };
-          
-          res.json(apiResponse);
-        } catch (error) {
-          logger.error("Market details API error:", error);
-          res.status(500).json({
-            success: false,
-            error: "Failed to fetch market details",
-          });
-        }
-      },
-    },
-    
-    // Get portfolio
-    {
-      path: "/api/portfolio",
-      method: "GET",
-      handler: async (req: any, res: any, runtime: IAgentRuntime) => {
-        try {
-          const portfolio = await runtime.executeAction("GET_PORTFOLIO_POSITIONS", {});
-          
-          const apiResponse: ApiResponse<Portfolio> = {
-            success: true,
-            data: portfolio,
-          };
-          
-          res.json(apiResponse);
-        } catch (error) {
-          logger.error("Portfolio API error:", error);
-          res.status(500).json({
-            success: false,
-            error: "Failed to fetch portfolio",
-          });
-        }
-      },
-    },
-    
-    // Place order
-    {
-      path: "/api/orders",
-      method: "POST",
-      handler: async (req: any, res: any, runtime: IAgentRuntime) => {
-        try {
-          const body = await orderRequestSchema.parseAsync(req.body);
-          
-          const order = await runtime.executeAction("PLACE_ORDER", {
-            tokenId: body.marketId,
-            side: body.side,
-            amount: body.amount,
-            price: body.price,
-            orderType: body.type === "market" ? "FOK" : "GTC",
-          });
-          
-          const apiResponse: ApiResponse<Order> = {
-            success: true,
-            data: order,
-          };
-          
-          res.json(apiResponse);
-        } catch (error) {
-          logger.error("Place order API error:", error);
-          res.status(400).json({
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to place order",
-          });
-        }
-      },
-    },
-    
-    // Cancel order
-    {
-      path: "/api/orders/:id/cancel",
-      method: "POST",
-      handler: async (req: any, res: any, runtime: IAgentRuntime) => {
-        try {
-          const orderId = req.params.id;
-          
-          await runtime.executeAction("CANCEL_ORDER", {
-            orderId,
-          });
-          
-          const apiResponse: ApiResponse<void> = {
-            success: true,
-            message: "Order cancelled successfully",
-          };
-          
-          res.json(apiResponse);
-        } catch (error) {
-          logger.error("Cancel order API error:", error);
-          res.status(400).json({
-            success: false,
-            error: "Failed to cancel order",
-          });
-        }
-      },
-    },
-    
     // Health check
     {
       path: "/api/health",
-      method: "GET",
+      type: "GET",
       handler: async (_req: any, res: any) => {
         res.json({
           success: true,
@@ -232,62 +18,110 @@ export const apiPlugin: Plugin = {
         });
       },
     },
-  ],
-  
-  // WebSocket setup
-  services: [
+    
+    // Chat endpoint
     {
-      name: "websocket",
-      getInstance: (runtime: IAgentRuntime) => {
-        const server = createServer();
-        const wss = new WebSocketServer({ server });
+      path: "/api/chat",
+      type: "POST",
+      handler: async (req: any, res: any) => {
+        const { message } = req.body;
         
-        wss.on("connection", (ws) => {
-          logger.info("WebSocket client connected");
-          
-          ws.on("message", async (message) => {
-            try {
-              const data = JSON.parse(message.toString()) as WsMessage;
-              
-              switch (data.type) {
-                case "market:subscribe":
-                  // Subscribe to market updates
-                  runtime.on(`market:${data.payload.marketId}`, (update) => {
-                    ws.send(JSON.stringify({
-                      type: "market:update",
-                      payload: update,
-                      timestamp: new Date(),
-                    }));
-                  });
-                  break;
-                  
-                case "portfolio:subscribe":
-                  // Subscribe to portfolio updates
-                  runtime.on("portfolio:update", (update) => {
-                    ws.send(JSON.stringify({
-                      type: "portfolio:update",
-                      payload: update,
-                      timestamp: new Date(),
-                    }));
-                  });
-                  break;
-              }
-            } catch (error) {
-              logger.error("WebSocket message error:", error);
-            }
-          });
-          
-          ws.on("close", () => {
-            logger.info("WebSocket client disconnected");
-          });
+        // Placeholder response
+        res.json({
+          success: true,
+          data: {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `I received your message: "${message}". The full Polymarket integration is being set up!`,
+            timestamp: new Date(),
+          },
         });
-        
-        // Start WebSocket server on port 3001
-        server.listen(3001, () => {
-          logger.info("WebSocket server started on port 3001");
+      },
+    },
+    
+    // Portfolio endpoint
+    {
+      path: "/api/portfolio",
+      type: "GET",
+      handler: async (_req: any, res: any) => {
+        // Placeholder portfolio data
+        res.json({
+          success: true,
+          data: {
+            totalValue: 1000.00,
+            availableBalance: 500.00,
+            totalPnl: -0.30,
+            totalPnlPercent: -0.03,
+            positions: [
+              {
+                id: "1",
+                marketId: "placeholder-market-1",
+                marketTitle: "Will BTC reach $100k by end of 2025?",
+                outcome: "YES",
+                shares: 10,
+                avgPrice: 0.65,
+                currentPrice: 0.72,
+                value: 7.20,
+                pnl: 0.70,
+                pnlPercent: 10.77,
+              },
+              {
+                id: "2",
+                marketId: "placeholder-market-2",
+                marketTitle: "Will ETH flip BTC market cap in 2025?",
+                outcome: "NO",
+                shares: 20,
+                avgPrice: 0.80,
+                currentPrice: 0.75,
+                value: 15.00,
+                pnl: -1.00,
+                pnlPercent: -6.25,
+              },
+            ],
+            stats: {
+              totalTrades: 15,
+              winRate: 0.67,
+              avgReturn: 0.08,
+            },
+            openOrders: [],
+          },
         });
-        
-        return { wss, server };
+      },
+    },
+    
+    // Markets endpoint
+    {
+      path: "/api/markets",
+      type: "GET",
+      handler: async (_req: any, res: any) => {
+        // Placeholder markets data
+        res.json({
+          success: true,
+          data: [
+            {
+              id: "market-1",
+              title: "Will BTC reach $100k by end of 2025?",
+              endDate: "2025-12-31T23:59:59Z",
+              volume: 2500000,
+              liquidity: 500000,
+              outcomes: [
+                { id: "yes", name: "YES", price: 0.72 },
+                { id: "no", name: "NO", price: 0.28 },
+              ],
+            },
+            {
+              id: "market-2",
+              title: "Will ETH flip BTC market cap in 2025?",
+              endDate: "2025-12-31T23:59:59Z",
+              volume: 1500000,
+              liquidity: 300000,
+              outcomes: [
+                { id: "yes", name: "YES", price: 0.25 },
+                { id: "no", name: "NO", price: 0.75 },
+              ],
+            },
+          ],
+        });
       },
     },
   ],
