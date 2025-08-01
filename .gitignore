@@ -126,3 +126,10 @@ test-*.json
 # Build artifacts that shouldn't be committed
 dist/
 *.js.map
+
+# Docker volumes
+postgres_data/
+agent_data/
+
+# Local testing
+.env.*.local

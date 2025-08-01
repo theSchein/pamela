@@ -28,9 +28,22 @@ Pamela is an autonomous prediction market trading agent that can independently e
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ (recommended: use with `npm` for PGLite compatibility)
+- Node.js 20+ (required)
+- Docker & Docker Compose (for containerized testing)
 - Polygon wallet with USDC for trading
 - OpenAI API key for language model
+
+### Monorepo Structure
+
+```
+pamela/
+├── apps/
+│   ├── agent/     # ElizaOS backend with API
+│   └── web/       # React frontend
+├── packages/
+│   └── shared/    # Shared TypeScript types
+└── scripts/       # Testing and deployment scripts
+```
 
 ### Installation
 
@@ -39,11 +52,15 @@ Pamela is an autonomous prediction market trading agent that can independently e
 git clone https://github.com/your-org/pamela
 cd pamela
 
-# Install dependencies
-npm install
+# Quick start with Docker
+cp .env.local.example .env.local
+# Edit .env.local with your API keys
+./scripts/test-local.sh
 
-# Copy environment template
-cp .env.example .env
+# OR install manually
+npm install
+cp apps/agent/.env.example apps/agent/.env
+# Edit apps/agent/.env with your API keys
 ```
 
 ### Configuration
@@ -70,15 +87,22 @@ PGLITE_DATA_DIR=./.eliza/.elizadb
 ### Running Pamela
 
 ```bash
-# Development mode (with hot reload)
+# Development with Docker (recommended)
+./scripts/test-local.sh
+
+# Development without Docker
 npm run dev
 
-# Production mode
-npm start
+# Test production build locally
+./scripts/test-production.sh
 
 # Run tests
 npm test
 ```
+
+### Local Testing
+
+See [TESTING.md](TESTING.md) for comprehensive local testing guide.
 
 ## 📊 Trading Capabilities
 
@@ -171,12 +195,23 @@ elizaos dev --character ./src/character.ts
 ## 🚀 Deployment
 
 ### Railway (Recommended)
+
+Deploy as two separate services:
+
 ```bash
-# Deploy to Railway
+# Deploy Agent Backend
+cd apps/agent
 railway login
-railway link
+railway link  # Link to agent service
+railway up
+
+# Deploy Web Frontend (in new terminal)
+cd apps/web
+railway link  # Link to web service
 railway up
 ```
+
+Configure environment variables in Railway dashboard for each service.
 
 ### Docker
 ```bash

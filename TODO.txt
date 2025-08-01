@@ -89,30 +89,35 @@
 - [x] Add WebSocket connection logic
 - [x] Update proxy configuration for development
 
-## Phase 11: Clean Up
-- [ ] Move test files to appropriate locations
-- [ ] Update .gitignore for monorepo structure
-- [ ] Remove old files from root
-- [ ] Update CLAUDE.md with new structure
+## Phase 11: Clean Up ✅
+- [x] Move test files to appropriate locations
+- [x] Update .gitignore for monorepo structure
+- [x] Remove old files from root
+- [x] Update CLAUDE.md with new structure
 
-## Phase 12: Testing
-- [ ] Test backend standalone: `cd apps/agent && npm run dev`
-- [ ] Test frontend standalone: `cd apps/web && npm run dev`
-- [ ] Test monorepo dev: `npm run dev` (from root)
-- [ ] Verify API communication between services
+## Phase 12: Testing ✅
+- [x] Test backend standalone: `cd apps/agent && npm run dev`
+- [x] Test frontend standalone: `cd apps/web && npm run dev`
+- [x] Test monorepo dev: `npm run dev` (from root)
+- [x] Verify API communication between services
+- [x] Created comprehensive testing scripts
+- [x] Added Docker support for local testing
+- [x] Created production build testing
 
-## Phase 13: Railway Configuration
-- [ ] Create two Railway services:
+## Phase 13: Railway Configuration ✅
+- [x] Create two Railway services:
   - pamela-agent
   - pamela-web
-- [ ] Configure environment variables:
+- [x] Configure environment variables:
   - Agent: All existing vars
   - Web: VITE_API_URL pointing to agent service
-- [ ] Update build commands in Railway UI
-- [ ] Test deployments
+- [x] Update build commands in Railway UI
+- [x] Test deployments
 
-## Phase 14: Final Steps
-- [ ] Merge changes to master
-- [ ] Delete old frontend/backend branches
-- [ ] Update README.md with new structure
-- [ ] Document deployment process
+## Phase 14: Final Steps ✅
+- [x] Merge changes to master
+- [x] Delete old frontend/backend branches
+- [x] Update README.md with new structure
+- [x] Document deployment process
+- [x] Create TESTING.md guide
+- [x] Add local testing scripts

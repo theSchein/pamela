@@ -1,0 +1,55 @@
+# Production Dockerfile for Agent
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install dependencies for building native modules
+RUN apk add --no-cache python3 make g++ git
+
+# Copy package files
+COPY package*.json ./
+COPY apps/agent/package*.json ./apps/agent/
+COPY packages/shared/package*.json ./packages/shared/
+
+# Install all dependencies
+RUN npm ci
+
+# Copy source code
+COPY packages/shared ./packages/shared
+COPY apps/agent ./apps/agent
+
+# Build shared package
+WORKDIR /app/packages/shared
+RUN npm run build || true
+
+# Build agent
+WORKDIR /app/apps/agent
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install only production dependencies
+COPY package*.json ./
+COPY apps/agent/package*.json ./apps/agent/
+COPY packages/shared/package*.json ./packages/shared/
+
+RUN npm ci --only=production
+
+# Copy built application
+COPY --from=builder /app/apps/agent/dist ./apps/agent/dist
+COPY --from=builder /app/packages/shared ./packages/shared
+COPY --from=builder /app/apps/agent/plugin-polymarket ./apps/agent/plugin-polymarket
+
+# Create data directory
+RUN mkdir -p /app/data && chown -R node:node /app
+
+USER node
+
+EXPOSE 3000 3001
+
+WORKDIR /app/apps/agent
+
+CMD ["npm", "start"]

@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for ElizaOS
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pamela
+      POSTGRES_PASSWORD: pamela_dev
+      POSTGRES_DB: pamela_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pamela"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Agent backend service
+  agent:
+    build:
+      context: .
+      dockerfile: apps/agent/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database
+      DATABASE_URL: postgresql://pamela:pamela_dev@postgres:5432/pamela_db
+      PGLITE_DATA_DIR: /app/data
+      
+      # API Keys (use your actual keys in .env.local)
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      POLYMARKET_PRIVATE_KEY: ${POLYMARKET_PRIVATE_KEY}
+      CLOB_API_URL: ${CLOB_API_URL:-https://clob.polymarket.com/}
+      
+      # Trading Config
+      TRADING_ENABLED: ${TRADING_ENABLED:-false}
+      MAX_POSITION_SIZE: ${MAX_POSITION_SIZE:-100}
+      MIN_CONFIDENCE_THRESHOLD: ${MIN_CONFIDENCE_THRESHOLD:-0.7}
+      
+      # Service Config
+      PORT: 3000
+      NODE_ENV: development
+    ports:
+      - "3000:3000"
+      - "3001:3001"  # WebSocket port
+    volumes:
+      - agent_data:/app/data
+      - ./apps/agent:/app
+      - /app/node_modules  # Prevent overwriting node_modules
+    command: npm run dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Web frontend service
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      agent:
+        condition: service_healthy
+    environment:
+      VITE_API_URL: http://localhost:3000
+      PORT: 5173
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  postgres_data:
+  agent_data:
