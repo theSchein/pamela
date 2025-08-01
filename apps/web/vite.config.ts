@@ -8,13 +8,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  root: 'src/frontend',
+  root: '.',
   build: {
-    outDir: '../../dist/frontend',
+    outDir: './dist',
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, 'src/frontend/index.html'),
+        main: path.resolve(__dirname, 'src/index.html'),
       },
     },
   },
@@ -24,7 +24,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@elizaos/core': path.resolve(__dirname, '../../core/src'),
+      '@pamela/shared': path.resolve(__dirname, '../../packages/shared/src'),
     },
   },
   server: {
@@ -32,6 +32,11 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/ws': {
+        target: 'ws://localhost:3000',
+        ws: true,
         changeOrigin: true,
       },
     },
