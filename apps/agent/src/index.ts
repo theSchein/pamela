@@ -7,6 +7,7 @@ import {
 import bootstrapPlugin from "@elizaos/plugin-bootstrap";
 import starterPlugin from "./plugin.ts";
 import polymarketPlugin from "../plugin-polymarket/src/plugin.ts";
+import { apiPlugin } from "./api/index.ts";
 import { character } from "./character.ts";
 
 // Additional plugins can be imported here as needed
@@ -23,6 +24,9 @@ export const projectAgent: ProjectAgent = {
   plugins: [
     // Bootstrap plugin for proper message handling (REQUIRED)
     bootstrapPlugin,
+
+    // API endpoints for frontend communication
+    apiPlugin,
 
     // Basic conversational capabilities
     starterPlugin,

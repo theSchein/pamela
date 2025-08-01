@@ -75,19 +75,19 @@
 - [x] Create packages/shared/package.json
 - [x] Create packages/shared/src/index.ts for shared types
 
-## Phase 9: Add API Routes to Backend
-- [ ] Create apps/agent/src/api/index.ts
-- [ ] Add REST endpoints:
+## Phase 9: Add API Routes to Backend ✅
+- [x] Create apps/agent/src/api/index.ts
+- [x] Add REST endpoints:
   - POST /api/chat
   - GET /api/markets
   - GET /api/portfolio
   - WebSocket /ws
-- [ ] Register API plugin in character.ts
+- [x] Register API plugin in character.ts
 
-## Phase 10: Update Frontend API Integration
-- [ ] Update API calls to use environment variable
-- [ ] Add WebSocket connection logic
-- [ ] Update proxy configuration for development
+## Phase 10: Update Frontend API Integration ✅
+- [x] Update API calls to use environment variable
+- [x] Add WebSocket connection logic
+- [x] Update proxy configuration for development
 
 ## Phase 11: Clean Up
 - [ ] Move test files to appropriate locations
