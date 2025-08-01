@@ -1,171 +1,144 @@
-# Pamela - Autonomous Prediction Market Trading Agent
-# Comprehensive Development Roadmap
+# Monorepo Setup TODO List
 
-## PHASE 1: FRAMEWORK MATURATION & OPEN SOURCE PREPARATION
-### Repository & Documentation
-- [ ] Mature current repo into production-ready prediction market framework
-- [ ] Create comprehensive README with setup instructions, API docs, examples
-- [ ] Add LICENSE file (MIT/Apache 2.0)
-- [ ] Clean up codebase and remove unused dependencies/commented code
-- [ ] Add CONTRIBUTING.md and code of conduct
-- [ ] Create proper .gitignore for production deployment
-- [ ] Add security.md for responsible disclosure
+## Phase 1: Backup and Preparation ✅
+- [x] Create a backup branch: `git checkout -b backup-before-monorepo`
+- [x] Push backup branch: `git push origin backup-before-monorepo`
+- [x] Return to master: `git checkout master`
+- [x] Ensure all changes are committed
 
-### Code Quality & Architecture
-- [ ] Implement proper error handling throughout codebase
-- [ ] Add comprehensive logging and monitoring
-- [ ] Create configuration management system
-- [ ] Add input validation and sanitization
-- [ ] Implement rate limiting for API calls
-- [ ] Add health check endpoints
+## Phase 2: Create Monorepo Structure ✅
+- [x] Create directory structure:
+  ```
+  mkdir -p apps/agent/src
+  mkdir -p apps/web/src
+  mkdir -p packages/shared/src
+  ```
 
-## PHASE 2: COMPLETE POLYMARKET TRADING INTEGRATION
-### Core Trading Operations
-- [✅] Implement comprehensive market reading functionality
-  - [✅] Get all active markets with filtering
-  - [✅] Fetch market details, odds, volume
-  - [✅] Real-time price updates via WebSocket
-  - [✅] Market search and categorization
+## Phase 3: Move Backend Files ✅
+- [x] Move agent source files:
+  ```
+  mv src/character.ts apps/agent/src/
+  mv src/plugin.ts apps/agent/src/
+  mv src/index.ts apps/agent/src/
+  ```
+- [x] Move Polymarket plugin:
+  ```
+  mv plugin-polymarket apps/agent/
+  ```
+- [x] Copy backend package.json:
+  ```
+  cp package.json apps/agent/package.json
+  ```
+- [x] Copy TypeScript config:
+  ```
+  cp tsconfig.json apps/agent/
+  cp tsup.config.ts apps/agent/
+  ```
+- [x] Copy environment example:
+  ```
+  cp .env.example apps/agent/
+  ```
 
-- [✅] Add buy position capability
-  - [✅] Market order execution
-  - [✅] Limit order placement
-  - [✅] Position size calculation
-  - [ ] Slippage protection
+## Phase 4: Move Frontend Files ✅
+- [x] Move frontend source:
+  ```
+  mv src/frontend/* apps/web/src/
+  ```
+- [x] Move Vite config:
+  ```
+  mv vite.config.ts apps/web/
+  ```
+- [x] Create frontend package.json
 
-- [ ] Add sell position capability
-  - [ ] Sell existing positions
-  - [ ] Partial position sales
-  - [ ] Stop-loss functionality
-  - [ ] Take-profit orders
+## Phase 5: Update Backend Configuration
+- [ ] Update apps/agent/package.json:
+  - Change name to "@pamela/agent"
+  - Remove frontend-related dependencies
+  - Update build scripts
+- [ ] Update apps/agent/tsconfig.json paths
+- [ ] Create apps/agent/railway.json for backend deployment
 
-- [ ] Add redeem position capability
-  - [ ] Automatic redemption of winning positions
-  - [ ] Batch redemption of multiple positions
-  - [ ] Redemption status tracking
+## Phase 6: Update Frontend Configuration
+- [ ] Create apps/web/package.json with:
+  - Name: "@pamela/web"
+  - React dependencies
+  - Vite scripts
+- [ ] Update apps/web/vite.config.ts paths
+- [ ] Create apps/web/railway.json for frontend deployment
+- [ ] Create apps/web/src/config.ts for API configuration
 
-### Trading Intelligence & Risk Management
-- [ ] Implement autonomous decision-making logic
-  - [ ] Market opportunity scoring
-  - [ ] Risk assessment algorithms
-  - [✅] Position sizing based on confidence
-  - [✅] Portfolio balance management
+## Phase 7: Create Root Configuration
+- [ ] Create root package.json with workspaces:
+  ```json
+  {
+    "name": "pamela-monorepo",
+    "private": true,
+    "workspaces": [
+      "apps/*",
+      "packages/*"
+    ],
+    "scripts": {
+      "dev": "concurrently \"npm run dev:agent\" \"npm run dev:web\"",
+      "dev:agent": "cd apps/agent && npm run dev",
+      "dev:web": "cd apps/web && npm run dev",
+      "build": "npm run build:agent && npm run build:web",
+      "build:agent": "cd apps/agent && npm run build",
+      "build:web": "cd apps/web && npm run build"
+    }
+  }
+  ```
+- [ ] Install root dependencies: `npm install -D concurrently`
 
-- [ ] Add comprehensive testing
-  - [ ] Unit tests for all trading functions
-  - [ ] Integration tests with testnet
-  - [ ] Live trading tests with small amounts ($1-5)
-  - [ ] Error scenario testing
+## Phase 8: Create Shared Package
+- [ ] Create packages/shared/package.json:
+  ```json
+  {
+    "name": "@pamela/shared",
+    "version": "1.0.0",
+    "main": "src/index.ts",
+    "types": "src/index.ts"
+  }
+  ```
+- [ ] Create packages/shared/src/index.ts for shared types
 
-## PHASE 3: NEWS INTEGRATION FOR MARKET INTELLIGENCE
-### Research & Integration
-- [ ] Research existing news plugins in ElizaOS repository
-  - [ ] Evaluate @elizaos/plugin-news capabilities
-  - [ ] Test integration with current framework
-  - [ ] Document news source coverage
+## Phase 9: Add API Routes to Backend
+- [ ] Create apps/agent/src/api/index.ts
+- [ ] Add REST endpoints:
+  - POST /api/chat
+  - GET /api/markets
+  - GET /api/portfolio
+  - WebSocket /ws
+- [ ] Register API plugin in character.ts
 
-- [ ] Configure news integration for market intelligence
-  - [ ] Connect news feeds to market analysis
-  - [ ] Implement news sentiment analysis
-  - [ ] Create news-to-market correlation system
-  - [ ] Add news-based trading signals
+## Phase 10: Update Frontend API Integration
+- [ ] Update API calls to use environment variable
+- [ ] Add WebSocket connection logic
+- [ ] Update proxy configuration for development
 
-### Data Pipeline
-- [ ] Build news processing pipeline
-  - [ ] Real-time news ingestion
-  - [ ] Relevance filtering for prediction markets
-  - [ ] Market impact assessment
-  - [ ] Integration with trading decisions
+## Phase 11: Clean Up
+- [ ] Move test files to appropriate locations
+- [ ] Update .gitignore for monorepo structure
+- [ ] Remove old files from root
+- [ ] Update CLAUDE.md with new structure
 
-## PHASE 4: RAILWAY CHATBOT DEPLOYMENT
-### Platform Setup
-- [ ] Configure Railway deployment environment
-  - [ ] Set up Railway project and domain
-  - [ ] Configure environment variables securely
-  - [ ] Set up database persistence (PostgreSQL)
-  - [ ] Configure logging and monitoring
+## Phase 12: Testing
+- [ ] Test backend standalone: `cd apps/agent && npm run dev`
+- [ ] Test frontend standalone: `cd apps/web && npm run dev`
+- [ ] Test monorepo dev: `npm run dev` (from root)
+- [ ] Verify API communication between services
 
-### Chatbot Interface
-- [ ] Implement web-based chat interface
-  - [ ] Real-time WebSocket communication
-  - [ ] Trading command interface
-  - [ ] Position status reporting
-  - [ ] Market analysis sharing
+## Phase 13: Railway Configuration
+- [ ] Create two Railway services:
+  - pamela-agent
+  - pamela-web
+- [ ] Configure environment variables:
+  - Agent: All existing vars
+  - Web: VITE_API_URL pointing to agent service
+- [ ] Update build commands in Railway UI
+- [ ] Test deployments
 
-### Production Configuration
-- [ ] Optimize for production deployment
-  - [ ] Configure auto-scaling
-  - [ ] Set up health monitoring
-  - [ ] Implement backup systems
-  - [ ] Add performance metrics
-
-## PHASE 5: TEE-COMPATIBLE ARCHITECTURE
-### Architecture Design
-- [ ] Design TEE-compatible system architecture
-  - [ ] Minimize external dependencies
-  - [ ] Create secure configuration management
-  - [ ] Design for isolated execution environment
-  - [ ] Plan for encrypted communication
-
-### Containerization & Portability
-- [ ] Create Docker containerization
-  - [ ] Multi-stage build optimization
-  - [ ] Security-hardened base images
-  - [ ] Minimal attack surface design
-  - [ ] Resource usage optimization
-
-- [ ] TEE preparation (future-ready)
-  - [ ] Document TEE requirements and constraints
-  - [ ] Create TEE deployment guides
-  - [ ] Test in simulated isolated environment
-  - [ ] Prepare secure key management strategies
-
-## PHASE 6: AUTONOMOUS OPERATION VALIDATION
-### Production Testing
-- [ ] Deploy autonomous trading agent
-  - [ ] Start with small position sizes ($10-50)
-  - [ ] Monitor trading decisions and rationale
-  - [ ] Track position management over time
-  - [ ] Validate risk management systems
-
-### Performance Monitoring
-- [ ] Implement comprehensive monitoring
-  - [ ] Trading performance metrics
-  - [ ] Decision-making transparency logs
-  - [ ] Risk exposure tracking
-  - [ ] System health monitoring
-
-### Success Criteria
-- [ ] Agent successfully reads markets autonomously
-- [ ] Agent makes buy/sell decisions without human intervention
-- [ ] Agent manages multiple positions simultaneously
-- [ ] Agent redeems winning positions automatically
-- [ ] Agent operates for 7+ days without manual intervention
-- [ ] All trading operations logged and auditable
-
-## CRITICAL SUCCESS METRICS
-1. **Autonomous Operation**: Agent trades independently for 1+ week
-2. **Complete Trading Cycle**: Buy → Monitor → Sell/Redeem without human input
-3. **Risk Management**: No position exceeds configured risk limits
-4. **System Reliability**: 99%+ uptime during testing period
-5. **Auditability**: All decisions and trades fully logged and explainable
-
-## TECHNICAL REQUIREMENTS
-- Node.js runtime compatibility
-- PostgreSQL database support
-- WebSocket real-time connections
-- RESTful API integrations
-- Secure environment variable management
-- Comprehensive error handling and recovery
-- Scalable architecture for multiple agents
-
-## DEPLOYMENT TARGETS
-1. **Development**: Local testing environment
-2. **Staging**: Railway chatbot deployment
-3. **Production**: Autonomous trading environment
-4. **Future**: TEE-compatible deployment
-
----
-Last Updated: 2025-07-25
-Status: Planning Phase
-Priority: High Impact Milestone
+## Phase 14: Final Steps
+- [ ] Merge changes to master
+- [ ] Delete old frontend/backend branches
+- [ ] Update README.md with new structure
+- [ ] Document deployment process
