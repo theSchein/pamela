@@ -22,6 +22,10 @@ This guide explains how to test the Pamela monorepo locally before deploying to 
 
 3. **Run local development**:
    ```bash
+   # Simple version (uses PGLite, no external DB)
+   ./scripts/test-simple.sh
+   
+   # OR full version with PostgreSQL
    ./scripts/test-local.sh
    ```
 

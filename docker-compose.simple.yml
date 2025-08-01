@@ -1,35 +1,14 @@
 version: '3.8'
 
 services:
-  # PostgreSQL database for ElizaOS
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: pamela
-      POSTGRES_PASSWORD: pamela_dev
-      POSTGRES_DB: pamela_db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5433:5432"  # Changed to avoid conflict with existing postgres
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pamela"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # Agent backend service
+  # Agent backend service (using PGLite - no external DB needed)
   agent:
     build:
       context: .
       dockerfile: apps/agent/Dockerfile
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
-      # Database
-      DATABASE_URL: postgresql://pamela:pamela_dev@postgres:5432/pamela_db
-      PGLITE_DATA_DIR: /app/data
+      # PGLite local database
+      PGLITE_DATA_DIR: /app/data/.eliza
       
       # API Keys (use your actual keys in .env.local)
       OPENAI_API_KEY: ${OPENAI_API_KEY}
@@ -49,11 +28,12 @@ services:
       - "3001:3001"  # WebSocket port
     volumes:
       - agent_data:/app/data
-      - ./apps/agent:/app
+      - ./apps/agent:/app/apps/agent
+      - ./packages/shared:/app/packages/shared
       - /app/node_modules  # Prevent overwriting node_modules
     command: npm run dev
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -72,10 +52,10 @@ services:
     ports:
       - "5173:5173"
     volumes:
-      - ./apps/web:/app
+      - ./apps/web:/app/apps/web
+      - ./packages/shared:/app/packages/shared
       - /app/node_modules
     command: npm run dev -- --host 0.0.0.0
 
 volumes:
-  postgres_data:
   agent_data:

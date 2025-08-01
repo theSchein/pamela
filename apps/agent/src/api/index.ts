@@ -30,6 +30,12 @@ export const apiPlugin: Plugin = {
   name: "api",
   description: "REST API and WebSocket endpoints for frontend communication",
   
+  async init(runtime: IAgentRuntime) {
+    logger.info("Initializing API plugin");
+    // The plugin doesn't need special initialization
+    // Database is handled by the SQL plugin
+  },
+  
   routes: [
     // Chat endpoint
     {

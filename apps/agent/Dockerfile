@@ -3,8 +3,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies for building native modules
-RUN apk add --no-cache python3 make g++ git
+# Install dependencies for building native modules and health checks
+RUN apk add --no-cache python3 make g++ git wget
 
 # Copy package files
 COPY package*.json ./
