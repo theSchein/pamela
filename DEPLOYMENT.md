@@ -10,6 +10,14 @@ The application consists of two main services:
 
 ## Deployment to Railway
 
+### Important Note on Monorepo Setup
+
+This is a monorepo with two services, each with its own `railway.json`:
+- `apps/agent/railway.json` - Agent backend configuration
+- `apps/web/railway.json` - Frontend configuration
+
+**Note**: There should be NO `railway.json` at the root to avoid conflicts.
+
 ### Prerequisites
 
 1. Railway account (https://railway.app)
@@ -28,17 +36,15 @@ The application consists of two main services:
 
 ### Step 2: Set Up Services
 
-Railway will detect the monorepo structure. You need to create two services:
+Since this is a monorepo, you'll need to create two separate Railway services:
 
-#### Agent Service
+#### Agent Service (Backend)
 
 1. Click "New Service" → "GitHub Repo"
 2. Configure:
    - **Service Name**: `pamela-agent`
-   - **Root Directory**: `/`
-   - **Build Command**: `cd apps/agent && npm ci && npm run build`
-   - **Start Command**: `cd apps/agent && npm start`
-   - **Dockerfile Path**: `apps/agent/Dockerfile.production`
+   - **Root Directory**: `/apps/agent`
+   - Railway will detect and use `apps/agent/railway.json`
 
 3. Add environment variables:
    ```env
@@ -58,12 +64,11 @@ Railway will detect the monorepo structure. You need to create two services:
 
 #### Frontend Service
 
-1. Click "New Service" → "GitHub Repo"
+1. Click "New Service" → "GitHub Repo" (same repo)
 2. Configure:
    - **Service Name**: `pamela-web`
-   - **Root Directory**: `/`
-   - **Build Command**: `cd apps/web && npm ci && npm run build`
-   - **Dockerfile Path**: `apps/web/Dockerfile.production`
+   - **Root Directory**: `/apps/web`
+   - Railway will detect and use `apps/web/railway.json`
 
 3. Add environment variables:
    ```env

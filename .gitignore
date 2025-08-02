@@ -142,3 +142,7 @@ capture-*.js
 *-bridge.mjs
 *-bridge.ts
 EOF < /dev/null
+
+# Backup files
+*.backup
+railway.json.backup
