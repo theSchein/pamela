@@ -42,6 +42,8 @@ RUN npm ci --only=production
 COPY --from=builder /app/apps/agent/dist ./apps/agent/dist
 COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/apps/agent/plugin-polymarket ./apps/agent/plugin-polymarket
+COPY --from=builder /app/apps/agent/src/api-server.mjs ./apps/agent/src/
+COPY --from=builder /app/apps/agent/src/start-production.mjs ./apps/agent/src/
 
 # Create data directory
 RUN mkdir -p /app/data && chown -R node:node /app

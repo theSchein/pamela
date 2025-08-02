@@ -23,6 +23,7 @@ services:
       # Service Config
       PORT: 3000
       NODE_ENV: development
+      DISABLE_WEB_UI: "true"
     ports:
       - "3000:3000"
       - "3001:3001"  # WebSocket port
@@ -47,7 +48,7 @@ services:
     depends_on:
       - agent
     environment:
-      VITE_API_URL: http://localhost:3000
+      VITE_API_URL: http://localhost:3001
       PORT: 5173
     ports:
       - "5173:5173"

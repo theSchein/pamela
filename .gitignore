@@ -133,3 +133,12 @@ agent_data/
 
 # Local testing
 .env.*.local
+# Test files
+test-*.js
+test-*.html
+monitor-*.sh
+capture-*.js
+*-bridge.js
+*-bridge.mjs
+*-bridge.ts
+EOF < /dev/null

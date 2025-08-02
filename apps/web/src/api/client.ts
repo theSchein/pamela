@@ -10,7 +10,7 @@ import type {
 
 class ApiClient {
   private ws: WebSocket | null = null;
-  private wsReconnectTimeout: NodeJS.Timeout | null = null;
+  private wsReconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private wsListeners: Map<string, Set<(data: any) => void>> = new Map();
 
   // Chat methods

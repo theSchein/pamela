@@ -1,5 +1,5 @@
 // @ts-ignore
-export const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3000';
+export const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001';
 
 export const api = {
   // Chat endpoints
@@ -21,7 +21,7 @@ export const api = {
   orderStatus: (id: string) => `${API_URL}/api/orders/${id}`,
   
   // WebSocket endpoint
-  ws: API_URL.replace(/^http/, 'ws') + '/ws'
+  ws: API_URL.replace(/^http/, 'ws')
 };
 
 // WebSocket events

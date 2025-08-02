@@ -28,5 +28,5 @@ WORKDIR /app/apps/agent
 # Expose ports
 EXPOSE 3000 3001
 
-# Start development server
-CMD ["npm", "run", "dev"]
+# Start both ElizaOS and API server
+CMD ["sh", "-c", "node src/api-server.mjs & npm run dev"]

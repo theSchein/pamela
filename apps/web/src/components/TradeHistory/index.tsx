@@ -1,5 +1,3 @@
-import React from 'react';
-
 const TradeHistory = () => {
   return (
     <div style={{ width: '25%', backgroundColor: '#f0f0f0', padding: '20px', borderLeft: '1px solid #ccc' }}>

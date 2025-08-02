@@ -120,6 +120,18 @@ See `PLUGIN_COMPATIBILITY_NOTES.md` for detailed technical fixes.
 - **Tailwind CSS**: Styling framework
 - **Path Aliases**: `@elizaos/core` mapped to `../../core/src`
 
+## Frontend Integration
+
+The custom frontend communicates with ElizaOS using Socket.IO. Key points:
+
+- **Connection**: Frontend connects to `ws://localhost:3000` using Socket.IO client
+- **Message Format**: Must use `message` field (not `text`) when sending
+- **Channel Management**: Use persistent channel IDs for conversation history
+- **Event Types**: ElizaOS uses numeric events (1=ROOM_JOINING, 2=SEND_MESSAGE)
+- **Response Handling**: Listen for `messageBroadcast` events for agent responses
+
+See `SOCKETIO_INTEGRATION.md` for detailed implementation guide.
+
 ## Testing Strategy
 
 - **Unit Tests**: Individual component and service testing
