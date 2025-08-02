@@ -6,13 +6,20 @@ WORKDIR /app
 # Install dependencies for building native modules
 RUN apk add --no-cache python3 make g++ git
 
-# Copy all package files including lock file
+# Copy root package files first (includes workspaces config)
 COPY package*.json ./
+COPY tsconfig*.json ./
+
+# Create directory structure
+RUN mkdir -p apps/agent apps/web packages/shared apps/agent/plugin-polymarket
+
+# Copy all package.json files to maintain workspace structure
 COPY apps/agent/package*.json ./apps/agent/
+COPY apps/web/package*.json ./apps/web/
 COPY packages/shared/package*.json ./packages/shared/
 COPY apps/agent/plugin-polymarket/package*.json ./apps/agent/plugin-polymarket/
 
-# Install all dependencies (including workspace dependencies)
+# Install all dependencies (workspace aware)
 RUN npm install --frozen-lockfile
 
 # Copy source code
@@ -35,13 +42,20 @@ WORKDIR /app
 # Install only production dependencies
 RUN apk add --no-cache curl
 
-# Copy all package files including lock file
+# Copy root package files first (includes workspaces config)
 COPY package*.json ./
+COPY tsconfig*.json ./
+
+# Create directory structure
+RUN mkdir -p apps/agent apps/web packages/shared apps/agent/plugin-polymarket
+
+# Copy all package.json files to maintain workspace structure
 COPY apps/agent/package*.json ./apps/agent/
+COPY apps/web/package*.json ./apps/web/
 COPY packages/shared/package*.json ./packages/shared/
 COPY apps/agent/plugin-polymarket/package*.json ./apps/agent/plugin-polymarket/
 
-# Install production dependencies only
+# Install production dependencies only (workspace aware)
 RUN npm install --frozen-lockfile --omit=dev
 
 # Copy built files from builder

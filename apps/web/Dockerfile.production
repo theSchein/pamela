@@ -3,12 +3,19 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy all package files including lock file
+# Copy root package files first (includes workspaces config)
 COPY package*.json ./
+COPY tsconfig*.json ./
+
+# Create directory structure
+RUN mkdir -p apps/agent apps/web packages/shared
+
+# Copy all package.json files to maintain workspace structure
+COPY apps/agent/package*.json ./apps/agent/
 COPY apps/web/package*.json ./apps/web/
 COPY packages/shared/package*.json ./packages/shared/
 
-# Install all dependencies
+# Install all dependencies (workspace aware)
 RUN npm install --frozen-lockfile
 
 # Copy source code
