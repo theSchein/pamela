@@ -1,0 +1,66 @@
+# Production Dockerfile for Agent
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install dependencies for building native modules
+RUN apk add --no-cache python3 make g++ git
+
+# Copy package files
+COPY package*.json ./
+COPY apps/agent/package*.json ./apps/agent/
+COPY packages/shared/package*.json ./packages/shared/
+COPY apps/agent/plugin-polymarket/package*.json ./apps/agent/plugin-polymarket/
+
+# Install all dependencies
+RUN npm ci
+
+# Copy source code
+COPY packages/shared ./packages/shared
+COPY apps/agent ./apps/agent
+
+# Build shared package
+WORKDIR /app/packages/shared
+RUN npm run build
+
+# Build agent
+WORKDIR /app/apps/agent
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install only production dependencies
+RUN apk add --no-cache curl
+
+# Copy package files
+COPY package*.json ./
+COPY apps/agent/package*.json ./apps/agent/
+COPY packages/shared/package*.json ./packages/shared/
+COPY apps/agent/plugin-polymarket/package*.json ./apps/agent/plugin-polymarket/
+
+# Install production dependencies only
+RUN npm ci --only=production
+
+# Copy built files from builder
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/apps/agent/dist ./apps/agent/dist
+COPY --from=builder /app/apps/agent/src ./apps/agent/src
+COPY --from=builder /app/apps/agent/plugin-polymarket ./apps/agent/plugin-polymarket
+
+# Create data directory
+RUN mkdir -p /app/data
+
+WORKDIR /app/apps/agent
+
+# Expose ports
+EXPOSE 3000 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:3001/api/health || exit 1
+
+# Start with production script that includes health check
+CMD ["node", "src/start-production.mjs"]

@@ -48,7 +48,7 @@ const SimpleChat = () => {
   React.useEffect(() => {
     console.log("Connecting to ElizaOS Socket.IO...");
     
-    const newSocket = io('http://localhost:3000', {
+    const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:3000', {
       transports: ['websocket', 'polling'],
       upgrade: true,
       reconnection: true,
