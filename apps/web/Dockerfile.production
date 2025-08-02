@@ -3,13 +3,13 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy all package files including lock file
 COPY package*.json ./
 COPY apps/web/package*.json ./apps/web/
 COPY packages/shared/package*.json ./packages/shared/
 
 # Install all dependencies
-RUN npm ci
+RUN npm install --frozen-lockfile
 
 # Copy source code
 COPY packages/shared ./packages/shared

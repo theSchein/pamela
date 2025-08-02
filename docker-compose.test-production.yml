@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pamela
+      POSTGRES_PASSWORD: pamela_dev
+      POSTGRES_DB: pamela_db
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"  # Different port to avoid conflicts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pamela"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Agent backend service (using built image)
+  agent:
+    image: pamela-agent:production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database
+      DATABASE_URL: postgresql://pamela:pamela_dev@postgres:5432/pamela_db
+      PGLITE_DATA_DIR: /app/data
+      
+      # Core settings
+      NODE_ENV: production
+      PORT: 3000
+      
+      # API Keys from .env
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      POLYMARKET_PRIVATE_KEY: ${POLYMARKET_PRIVATE_KEY}
+      CLOB_API_URL: ${CLOB_API_URL:-https://clob.polymarket.com/}
+      
+      # Trading Config
+      TRADING_ENABLED: ${TRADING_ENABLED:-false}
+      MAX_POSITION_SIZE: ${MAX_POSITION_SIZE:-100}
+      MIN_CONFIDENCE_THRESHOLD: ${MIN_CONFIDENCE_THRESHOLD:-0.7}
+    ports:
+      - "3000:3000"
+      - "3001:3001"  # Health check port
+    volumes:
+      - agent_test_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Web frontend service (using built image)
+  web:
+    image: pamela-web:production
+    depends_on:
+      agent:
+        condition: service_healthy
+    environment:
+      VITE_API_URL: http://localhost:3000
+    ports:
+      - "8080:80"  # Using 8080 to avoid conflicts
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_test_data:
+  agent_test_data:

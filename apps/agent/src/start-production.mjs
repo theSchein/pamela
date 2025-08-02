@@ -24,38 +24,30 @@ healthServer.listen(healthPort, () => {
   console.log(`Health check server running on port ${healthPort}`);
 });
 
-// Start ElizaOS
+// Start ElizaOS directly using node
 console.log('Starting Pamela agent with ElizaOS...');
-const elizaProcess = spawn('node', [
-  '--experimental-specifier-resolution=node',
-  '../../node_modules/@elizaos/cli/dist/index.js',
-  'start'
-], {
-  stdio: 'inherit',
-  cwd: process.cwd(),
-  env: process.env
-});
 
-elizaProcess.on('error', (error) => {
+// Set NODE_ENV to avoid Bun check
+process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+
+// Use dynamic import to load ElizaOS
+import('../../node_modules/@elizaos/cli/dist/index.js').then(() => {
+  console.log('ElizaOS started successfully');
+}).catch((error) => {
   console.error('Failed to start ElizaOS:', error);
-  process.exit(1);
-});
-
-elizaProcess.on('exit', (code) => {
-  console.log(`ElizaOS exited with code ${code}`);
   healthServer.close();
-  process.exit(code);
+  process.exit(1);
 });
 
 // Handle shutdown gracefully
 process.on('SIGTERM', () => {
   console.log('Received SIGTERM, shutting down gracefully...');
-  elizaProcess.kill('SIGTERM');
   healthServer.close();
+  process.exit(0);
 });
 
 process.on('SIGINT', () => {
   console.log('Received SIGINT, shutting down gracefully...');
-  elizaProcess.kill('SIGINT');
   healthServer.close();
+  process.exit(0);
 });

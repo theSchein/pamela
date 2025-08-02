@@ -6,14 +6,14 @@ WORKDIR /app
 # Install dependencies for building native modules
 RUN apk add --no-cache python3 make g++ git
 
-# Copy package files
+# Copy all package files including lock file
 COPY package*.json ./
 COPY apps/agent/package*.json ./apps/agent/
 COPY packages/shared/package*.json ./packages/shared/
 COPY apps/agent/plugin-polymarket/package*.json ./apps/agent/plugin-polymarket/
 
-# Install all dependencies
-RUN npm ci
+# Install all dependencies (including workspace dependencies)
+RUN npm install --frozen-lockfile
 
 # Copy source code
 COPY packages/shared ./packages/shared
@@ -35,17 +35,17 @@ WORKDIR /app
 # Install only production dependencies
 RUN apk add --no-cache curl
 
-# Copy package files
+# Copy all package files including lock file
 COPY package*.json ./
 COPY apps/agent/package*.json ./apps/agent/
 COPY packages/shared/package*.json ./packages/shared/
 COPY apps/agent/plugin-polymarket/package*.json ./apps/agent/plugin-polymarket/
 
 # Install production dependencies only
-RUN npm ci --only=production
+RUN npm install --frozen-lockfile --omit=dev
 
 # Copy built files from builder
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/apps/agent/dist ./apps/agent/dist
 COPY --from=builder /app/apps/agent/src ./apps/agent/src
 COPY --from=builder /app/apps/agent/plugin-polymarket ./apps/agent/plugin-polymarket
@@ -62,5 +62,9 @@ EXPOSE 3000 3001
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:3001/api/health || exit 1
 
-# Start with production script that includes health check
-CMD ["node", "src/start-production.mjs"]
+# Copy start script
+COPY apps/agent/start.sh ./start.sh
+RUN chmod +x ./start.sh
+
+# Start with shell script
+CMD ["./start.sh"]
