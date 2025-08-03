@@ -1,6 +1,9 @@
 # Production Dockerfile for Web Frontend
 FROM node:20-alpine AS builder
 
+# Accept build arguments with default
+ARG VITE_API_URL=http://localhost:3000
+
 WORKDIR /app
 
 # Copy root package files first (includes workspaces config)
@@ -26,8 +29,9 @@ COPY apps/web ./apps/web
 WORKDIR /app/packages/shared
 RUN npm run build
 
-# Build web app
+# Build web app with environment variable
 WORKDIR /app/apps/web
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Production stage using nginx
