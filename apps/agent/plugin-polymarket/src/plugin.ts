@@ -20,6 +20,10 @@ import { getOrderBookSummaryAction } from "./actions/getOrderBookSummary";
 
 // MARKET DATA ACTIONS
 import { getSamplingMarkets } from "./actions/getSamplingMarkets";
+import { searchMarketsAction } from "./actions/searchMarkets";
+import { showFavoriteMarketsAction } from "./actions/showFavoriteMarkets";
+import { explainMarketAction } from "./actions/explainMarket";
+import { getMarketDataAction } from "./actions/getMarketData";
 import { getPriceHistory } from "./actions/getPriceHistory";
 import { placeOrderAction } from "./actions/placeOrder";
 import { createApiKeyAction } from "./actions/createApiKey";
@@ -47,6 +51,7 @@ import { getPortfolioPositionsAction } from "./actions/getPortfolioPositions";
 import { polymarketSchema } from "./schema";
 import { MarketSyncService } from "./services/MarketSyncService";
 import { MarketDetailService } from "./services/MarketDetailService";
+import { marketDataProvider } from "./providers/marketDataProvider";
 
 /**
  * Define the configuration schema for the Polymarket plugin
@@ -239,6 +244,10 @@ const plugin: Plugin = {
     cancelOrderAction, // Cancel orders
 
     // Market Discovery & Data
+    explainMarketAction, // Explain specific market with prices (HIGH PRIORITY)
+    getMarketDataAction, // Get market data by condition ID
+    showFavoriteMarketsAction, // Show favorite markets with commentary
+    searchMarketsAction, // Search for markets in database
     getSamplingMarkets, // Active markets with rewards
     getOrderBookSummaryAction, // Order book data
     getMarketPriceAction, // Current prices and recommendations
@@ -263,7 +272,7 @@ const plugin: Plugin = {
     setupWebsocketAction,
     handleRealtimeUpdatesAction,
   ],
-  providers: [polymarketProvider],
+  providers: [polymarketProvider, marketDataProvider],
 };
 
 export default plugin;

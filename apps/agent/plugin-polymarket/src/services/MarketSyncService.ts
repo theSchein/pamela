@@ -214,14 +214,14 @@ export class MarketSyncService extends Service {
 
       const gammaUrl = "https://gamma-api.polymarket.com/markets";
 
-      // Build query parameters for active markets with real liquidity (indicates actual trading)
+      // Build query parameters for active markets with real volume (indicates actual trading)
       const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
       const params = new URLSearchParams({
+        limit: "500",
         active: "true",
-        closed: "false", // Explicitly exclude closed markets
-        liquidity_num_min: "10000", // Only markets with $10k+ liquidity - real active markets
+        volume_num_min: "1000", // Only markets with $1k+ volume
+        closed: "false",
         end_date_min: today, // Only markets ending today or later
-        limit: "100",
       });
 
       logger.info(`Gamma API query: ${gammaUrl}?${params.toString()}`);
