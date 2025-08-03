@@ -7,18 +7,10 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:agent\" \"npm run dev:web\"",
-    "dev:agent": "cd apps/agent && npm run dev",
-    "dev:web": "cd apps/web && npm run dev",
-    "build": "npm run build:shared && npm run build:agent && npm run build:web",
-    "build:shared": "cd packages/shared && npm run build",
-    "build:agent": "cd apps/agent && npm run build",
-    "build:web": "cd apps/web && npm run build",
-    "start:agent": "cd apps/agent && npm start",
-    "start:web": "cd apps/web && npm start",
-    "test": "npm run test:agent && npm run test:web",
-    "test:agent": "cd apps/agent && npm test",
-    "test:web": "cd apps/web && npm test",
+    "dev": "cd apps/agent && bun run dev",
+    "build": "cd apps/agent && npm run build",
+    "start": "cd apps/agent && npm start",
+    "test": "cd apps/agent && npm test",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,md}\"",
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist packages/*/dist"

@@ -46,7 +46,6 @@ services:
       NODE_ENV: development
     ports:
       - "3000:3000"
-      - "3001:3001"  # WebSocket port
     volumes:
       - agent_data:/app/data
       - ./apps/agent:/app
@@ -58,23 +57,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Web frontend service
-  web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-    depends_on:
-      agent:
-        condition: service_healthy
-    environment:
-      VITE_API_URL: http://localhost:3000
-      PORT: 5173
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./apps/web:/app
-      - /app/node_modules
-    command: npm run dev -- --host 0.0.0.0
 
 volumes:
   postgres_data:
