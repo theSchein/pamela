@@ -8,7 +8,6 @@ import { type Character } from "@elizaos/core";
 export const character: Character = {
   id: (process.env.AGENT_ID || "df35947c-da83-0a0a-aa27-c4cc3ec722cd") as `${string}-${string}-${string}-${string}-${string}`,
   name: "Pamela",
-  clients: ["direct"],
   plugins: [
     // Core plugins first
     "@elizaos/plugin-sql",

@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Add Bun to PATH
+export PATH="/usr/local/bin:$PATH"
+
 # Start health check server in background
 node -e "
 const http = require('http');
@@ -22,6 +25,6 @@ server.listen(3001, () => {
 });
 " &
 
-# Start ElizaOS using npm
+# Start ElizaOS using npm which will use Bun
 cd /app/apps/agent
-npm run start:eliza
+NODE_ENV=production npm run start:eliza

@@ -32,14 +32,23 @@ Pamela is an autonomous prediction market trading agent that can independently e
 - Docker & Docker Compose (for containerized testing)
 - Polygon wallet with USDC for trading
 - OpenAI API key for language model
+- Telegram Bot Token (for Telegram deployment)
+
+### Deployment Options
+
+Pamela can be deployed as:
+1. **Telegram Bot** (Recommended) - Stable, production-ready
+2. **Web Interface** - Custom React frontend (experimental)
+3. **Discord Bot** - Using Discord plugin
+4. **API Service** - Direct HTTP/WebSocket access
 
 ### Monorepo Structure
 
 ```
 pamela/
 ├── apps/
-│   ├── agent/     # ElizaOS backend with API
-│   └── web/       # React frontend
+│   ├── agent/     # ElizaOS backend with Polymarket integration
+│   └── web/       # React frontend (optional)
 ├── packages/
 │   └── shared/    # Shared TypeScript types
 └── scripts/       # Testing and deployment scripts
@@ -62,6 +71,37 @@ npm install
 cp apps/agent/.env.example apps/agent/.env
 # Edit apps/agent/.env with your API keys
 ```
+
+### Telegram Bot Setup
+
+1. **Create Bot with BotFather**
+   ```bash
+   # In Telegram, message @BotFather
+   /newbot
+   # Follow prompts to get your bot token
+   ```
+
+2. **Configure Environment**
+   ```bash
+   # Add to .env
+   TELEGRAM_BOT_TOKEN=your_bot_token_here
+   ```
+
+3. **Start Telegram Bot**
+   ```bash
+   # Quick start
+   ./start-telegram.sh
+   
+   # Or with Docker
+   docker-compose -f docker-compose.telegram.yml up
+   ```
+
+4. **Chat with Pamela**
+   - Find your bot on Telegram
+   - Send `/start` to begin
+   - Ask about markets, prices, or place trades
+
+See [TELEGRAM_SETUP.md](TELEGRAM_SETUP.md) for detailed setup instructions.
 
 ### Configuration
 

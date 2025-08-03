@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # PostgreSQL database
+  # PostgreSQL database for ElizaOS
   postgres:
     image: postgres:16-alpine
     environment:
@@ -9,18 +9,20 @@ services:
       POSTGRES_PASSWORD: pamela_dev
       POSTGRES_DB: pamela_db
     volumes:
-      - postgres_test_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5434:5432"  # Different port to avoid conflicts
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pamela"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # Agent backend service (using built image)
+  # Pamela Telegram Bot
   agent:
-    image: pamela-agent:production
+    build:
+      context: .
+      dockerfile: apps/agent/Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
@@ -29,12 +31,10 @@ services:
       DATABASE_URL: postgresql://pamela:pamela_dev@postgres:5432/pamela_db
       PGLITE_DATA_DIR: /app/data
       
-      # Core settings
-      NODE_ENV: production
-      PORT: 3000
-      AGENT_ID: df35947c-da83-0a0a-aa27-c4cc3ec722cd
+      # Telegram Bot
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       
-      # API Keys from .env
+      # API Keys
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       POLYMARKET_PRIVATE_KEY: ${POLYMARKET_PRIVATE_KEY}
       CLOB_API_URL: ${CLOB_API_URL:-https://clob.polymarket.com/}
@@ -43,34 +43,25 @@ services:
       TRADING_ENABLED: ${TRADING_ENABLED:-false}
       MAX_POSITION_SIZE: ${MAX_POSITION_SIZE:-100}
       MIN_CONFIDENCE_THRESHOLD: ${MIN_CONFIDENCE_THRESHOLD:-0.7}
+      
+      # Service Config
+      NODE_ENV: development
+      
+      # Fixed Agent ID
+      AGENT_ID: df35947c-da83-0a0a-aa27-c4cc3ec722cd
     ports:
-      - "3000:3000"
-      - "3001:3001"  # Health check port
+      - "3001:3001"  # Health check port only
     volumes:
-      - agent_test_data:/app/data
+      - agent_data:/app/data
+      - ./apps/agent:/app
+      - /app/node_modules
+    command: npm run dev
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
-
-  # Web frontend service (using built image)
-  web:
-    image: pamela-web:production
-    depends_on:
-      agent:
-        condition: service_healthy
-    environment:
-      VITE_API_URL: http://localhost:3000
-    ports:
-      - "8080:80"  # Using 8080 to avoid conflicts
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
 volumes:
-  postgres_test_data:
-  agent_test_data:
+  postgres_data:
+  agent_data:
