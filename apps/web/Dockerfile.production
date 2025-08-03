@@ -3,6 +3,7 @@ FROM node:20-alpine AS builder
 
 # Accept build arguments with default
 ARG VITE_API_URL=http://localhost:3000
+ARG VITE_AGENT_ID=df35947c-da83-0a0a-aa27-c4cc3ec722cd
 
 WORKDIR /app
 
@@ -29,9 +30,10 @@ COPY apps/web ./apps/web
 WORKDIR /app/packages/shared
 RUN npm run build
 
-# Build web app with environment variable
+# Build web app with environment variables
 WORKDIR /app/apps/web
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_AGENT_ID=$VITE_AGENT_ID
 RUN npm run build
 
 # Production stage using nginx

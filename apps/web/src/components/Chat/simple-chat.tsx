@@ -34,7 +34,7 @@ const SimpleChat = () => {
   const channelId = '7226c0c4-f213-489e-a032-50d0079a5833'; // Persistent channel
   const [userId] = React.useState(() => generateUUID());
   const serverId = '00000000-0000-0000-0000-000000000000'; // Default server
-  const agentId = "df35947c-da83-0a0a-aa27-c4cc3ec722cd"; // Pamela's ID
+  const agentId = import.meta.env.VITE_AGENT_ID || "df35947c-da83-0a0a-aa27-c4cc3ec722cd"; // Pamela's ID
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

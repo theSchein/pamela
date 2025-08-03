@@ -6,6 +6,7 @@ import { type Character } from "@elizaos/core";
  * She focuses on helping users understand prediction markets and make informed trading decisions.
  */
 export const character: Character = {
+  id: process.env.AGENT_ID || "df35947c-da83-0a0a-aa27-c4cc3ec722cd",
   name: "Pamela",
   plugins: [
     // Core plugins first
