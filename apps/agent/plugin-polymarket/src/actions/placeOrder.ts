@@ -151,7 +151,7 @@ export const placeOrderAction: Action = {
         // For market orders, we need to get the current market price
         if (price <= 0) {
           // We'll set a reasonable price for market orders - this will be updated later
-          price = side === "BUY" ? 0.999 : 0.001; // Aggressive pricing for market orders
+          price = side === "BUY" ? 0.99 : 0.01; // Market order pricing with 2 decimal precision
         }
       }
 
@@ -222,7 +222,7 @@ Requested outcome: ${outcome}
 - "Buy YES in [market name]"
 - "Buy NO in [market name]"
 - Or use the exact outcome names listed above`,
-              actions: ["POLYMARKET_PLACE_ORDER"],
+              actions: [],
               data: {
                 error: "Outcome not found",
                 market: marketResult.market,
@@ -253,7 +253,7 @@ Requested outcome: ${outcome}
 **Token ID**: ${tokenId.slice(0, 12)}...
 
 Proceeding with order verification...`,
-              actions: ["POLYMARKET_PLACE_ORDER"],
+              actions: [],
               data: {
                 marketResolution: {
                   market: marketResult.market,
@@ -295,6 +295,174 @@ This could be due to:
             await callback(errorContent);
           }
           return createErrorResult("Market lookup failed");
+        }
+      }
+
+      // Check if tokenId looks like a condition ID (0x... format)
+      if (tokenId && tokenId.startsWith('0x') && tokenId.length === 66) {
+        logger.info(`[placeOrderAction] Detected condition ID: ${tokenId}, fetching token IDs from Gamma API`);
+        
+        try {
+          // Fetch market data using condition ID
+          const gammaUrl = `https://gamma-api.polymarket.com/markets?active=true&condition_ids=${tokenId}`;
+          const gammaResponse = await fetch(gammaUrl);
+          
+          if (!gammaResponse.ok) {
+            throw new Error(`Gamma API returned ${gammaResponse.status}`);
+          }
+          
+          const gammaData = await gammaResponse.json() as any[];
+          
+          if (!gammaData || gammaData.length === 0) {
+            const errorContent: Content = {
+              text: `❌ **Market not found for condition ID**
+              
+Condition ID: ${tokenId}
+
+This market may be:
+• Inactive or closed
+• Not yet synced
+• Invalid condition ID
+
+Please try:
+- "Show me active markets" to browse available markets
+- Use the GET_MARKET_DATA action with this condition ID to verify it exists`,
+              actions: [],
+              data: {
+                error: "Market not found",
+                conditionId: tokenId,
+              },
+            };
+            
+            if (callback) {
+              await callback(errorContent);
+            }
+            return createErrorResult("Market not found for condition ID");
+          }
+          
+          const market = gammaData[0];
+          
+          // Parse clobTokenIds
+          let clobTokenIds: string[] = [];
+          try {
+            clobTokenIds = JSON.parse(market.clobTokenIds || '[]');
+          } catch (e) {
+            logger.error(`[placeOrderAction] Failed to parse clobTokenIds:`, e);
+          }
+          
+          if (clobTokenIds.length < 2) {
+            const errorContent: Content = {
+              text: `❌ **Token IDs not available for this market**
+              
+Market: ${market.question}
+Condition ID: ${tokenId}
+
+This market may not have trading tokens configured yet.`,
+              actions: [],
+              data: {
+                error: "Token IDs not found",
+                market: market,
+              },
+            };
+            
+            if (callback) {
+              await callback(errorContent);
+            }
+            return createErrorResult("Token IDs not available for market");
+          }
+          
+          // Determine which token to use based on outcome
+          const outcome = llmResult?.outcome?.toUpperCase() || (side === "BUY" ? "YES" : "NO");
+          
+          // Parse outcomes to determine token mapping
+          let outcomes: string[] = [];
+          try {
+            outcomes = JSON.parse(market.outcomes || '["Yes", "No"]');
+          } catch (e) {
+            outcomes = ["Yes", "No"];
+          }
+          
+          // Find the index of the desired outcome
+          const outcomeIndex = outcomes.findIndex(o => o.toUpperCase() === outcome.toUpperCase());
+          
+          if (outcomeIndex === -1 || outcomeIndex >= clobTokenIds.length) {
+            const errorContent: Content = {
+              text: `❌ **Invalid outcome for market**
+              
+Market: ${market.question}
+Available outcomes: ${outcomes.join(", ")}
+Requested outcome: ${outcome}
+
+Please specify YES or NO (or the exact outcome name).`,
+              actions: [],
+              data: {
+                error: "Invalid outcome",
+                market: market,
+                availableOutcomes: outcomes,
+                requestedOutcome: outcome,
+              },
+            };
+            
+            if (callback) {
+              await callback(errorContent);
+            }
+            return createErrorResult("Invalid outcome for market");
+          }
+          
+          // Get the correct token ID
+          const originalTokenId = tokenId;
+          tokenId = clobTokenIds[outcomeIndex];
+          
+          logger.info(`[placeOrderAction] Resolved condition ID ${originalTokenId} -> ${outcome} -> ${tokenId}`);
+          
+          // Show resolution to user
+          if (callback) {
+            const resolutionContent: Content = {
+              text: `✅ **Market Resolved from Condition ID**
+
+**Market**: ${market.question}
+**Outcome**: ${outcome} (${outcomes[outcomeIndex]})
+**Token ID**: ${tokenId}
+**Original Condition ID**: ${originalTokenId}
+
+Proceeding with order verification...`,
+              actions: [],
+              data: {
+                marketResolution: {
+                  market: market,
+                  selectedOutcome: outcomes[outcomeIndex],
+                  resolvedTokenId: tokenId,
+                  conditionId: originalTokenId,
+                },
+              },
+            };
+            await callback(resolutionContent);
+          }
+          
+        } catch (conditionLookupError) {
+          logger.error(`[placeOrderAction] Condition ID lookup failed:`, conditionLookupError);
+          const errorContent: Content = {
+            text: `❌ **Failed to resolve condition ID**
+
+Condition ID: ${tokenId}
+Error: ${conditionLookupError instanceof Error ? conditionLookupError.message : "Unknown error"}
+
+Please try:
+- Using the specific token ID instead of condition ID
+- Verifying the market is active
+- Using "Show me active markets" to find the correct market`,
+            actions: [],
+            data: {
+              error: "Condition ID lookup failed",
+              conditionId: tokenId,
+              lookupError: conditionLookupError instanceof Error ? conditionLookupError.message : "Unknown error",
+            },
+          };
+          
+          if (callback) {
+            await callback(errorContent);
+          }
+          return createErrorResult("Failed to resolve condition ID to token ID");
         }
       }
 
@@ -348,7 +516,7 @@ This could be due to:
 
       // Set market order pricing if no price given
       if (orderType === "FOK" && price <= 0) {
-        price = side === "BUY" ? 0.999 : 0.001; // Aggressive pricing for market orders
+        price = side === "BUY" ? 0.99 : 0.01; // Market order pricing with 2 decimal precision
       }
 
       if (!tokenId || size <= 0 || (orderType === "GTC" && price <= 0)) {
@@ -424,7 +592,7 @@ Please provide order details in your request. Examples:
 • **Total Value**: $${totalValue.toFixed(2)}
 
 Please add more USDC to your wallet and try again.`,
-          actions: ["POLYMARKET_PLACE_ORDER"],
+          actions: [],
           data: {
             error: "Insufficient USDC balance",
             balanceInfo,
@@ -456,7 +624,7 @@ Please add more USDC to your wallet and try again.`,
 • **Size**: ${size} shares
 
 Please reduce your order size to stay within the configured limit.`,
-          actions: ["POLYMARKET_PLACE_ORDER"],
+          actions: [],
           data: {
             error: "Order exceeds position limit",
             maxPositionSize,
@@ -489,7 +657,7 @@ Please reduce your order size to stay within the configured limit.`,
 • **Total Value**: $${totalValue.toFixed(2)}
 
 Creating order...`,
-          actions: ["POLYMARKET_PLACE_ORDER"],
+          actions: [],
           data: {
             balanceInfo,
             orderDetails: { tokenId, side, price, size, totalValue },
@@ -515,7 +683,7 @@ Unable to verify wallet balance before placing order. This could be due to:
 • **Total Value**: $${totalValue.toFixed(2)}
 
 Please check your wallet configuration and try again.`,
-        actions: ["POLYMARKET_PLACE_ORDER"],
+        actions: [],
         data: {
           error: "Balance check failed",
           balanceError:
@@ -560,7 +728,7 @@ Please check your wallet configuration and try again.`,
 • **Purpose**: Enable order posting to Polymarket
 
 Deriving credentials...`,
-            actions: ["POLYMARKET_PLACE_ORDER"],
+            actions: [],
             data: { derivingCredentials: true },
           };
           await callback(derivingContent);
@@ -592,7 +760,7 @@ Deriving credentials...`,
 • **Method**: Wallet-derived L2 credentials
 
 Reinitializing client with credentials...`,
-              actions: ["POLYMARKET_PLACE_ORDER"],
+              actions: [],
               data: { credentialsReady: true, apiKey: derivedCreds.key },
             };
             await callback(successContent);
@@ -613,7 +781,7 @@ This could be due to:
 • Polymarket API issues
 
 Please ensure your wallet is properly configured and try again.`,
-            actions: ["POLYMARKET_PLACE_ORDER"],
+            actions: [],
             data: {
               error: "Failed to derive API credentials",
               deriveError:
@@ -778,7 +946,7 @@ Please check your parameters and try again. Common issues:
 
       const responseContent: Content = {
         text: responseText,
-        actions: ["POLYMARKET_PLACE_ORDER"],
+        actions: [], // Don't suggest the same action again
         data: responseData,
       };
 
@@ -810,7 +978,7 @@ Please check your configuration and try again. Make sure:
 • Token ID is valid and active
 • Price and size are within acceptable ranges
 • Network connection is stable`,
-        actions: ["POLYMARKET_PLACE_ORDER"],
+        actions: [],
         data: {
           error: errorMessage,
           orderDetails: { tokenId, side, price, size, orderType },

@@ -228,6 +228,8 @@ export const character: Character = {
       "Include market stats in your analysis - don't just give generic commentary",
       "When showing market lists, include the condition ID so users can ask for specific details",
       "If a user provides a condition ID (0x... format), use GET_MARKET_DATA to fetch real-time prices",
+      "When placing orders, you can use the condition ID directly - the system will automatically resolve it to the correct YES/NO token",
+      "Always specify the outcome (YES or NO) when placing orders with a condition ID",
     ],
   },
 };

@@ -239,9 +239,11 @@ const plugin: Plugin = {
     // Core Trading
     placeOrderAction, // Buy orders (enhanced with market lookup)
     sellOrderAction, // Sell orders (new streamlined selling)
-    directPlaceOrderAction, // Direct API buy orders (bypasses LLM)
-    directSellOrderAction, // Direct API sell orders (bypasses LLM)
     cancelOrderAction, // Cancel orders
+    
+    // Advanced/API Trading (not for general use)
+    // directPlaceOrderAction, // Direct API buy orders (bypasses LLM) - DISABLED
+    // directSellOrderAction, // Direct API sell orders (bypasses LLM) - DISABLED
 
     // Market Discovery & Data
     explainMarketAction, // Explain specific market with prices (HIGH PRIORITY)

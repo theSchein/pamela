@@ -112,10 +112,12 @@ Based on the conversation, identify:
 
 **Token ID Extraction Rules:**
 1. Look for explicit token IDs (long numeric strings like "71321045679252212594626385532706912750332728571942532289631379312455583992563")
-2. Look for market names like "Nuggets NBA Champion", "Chiefs vs Raiders", "Nobel Peace Prize", "Macron out in 2025?"
-3. If only market name is provided, set tokenId to "MARKET_NAME_LOOKUP" and include the market name and outcome
-4. NEVER generate fake or example token IDs - only use real ones from the conversation
-5. If no valid token ID is found, return an error
+2. Look for condition IDs (0x... format, 66 characters long) - these are acceptable and will be automatically resolved
+3. If the previous message shows "YES Token:" or "NO Token:" with a token ID, use that token ID based on the user's desired outcome
+4. Look for market names like "Nuggets NBA Champion", "Chiefs vs Raiders", "Nobel Peace Prize", "Macron out in 2025?"
+5. If only market name is provided, set tokenId to "MARKET_NAME_LOOKUP" and include the market name and outcome
+6. NEVER generate fake or example token IDs - only use real ones from the conversation
+7. If no valid token ID is found, return an error
 
 **Examples:**
 - "Buy 5 shares at $0.75 for the Nobel Peace Prize market" → tokenId: "MARKET_NAME_LOOKUP", marketName: "Nobel Peace Prize market", side: "buy", price: 0.75, size: 5
@@ -123,6 +125,9 @@ Based on the conversation, identify:
 - "Sell NO position in Trump election" → tokenId: "MARKET_NAME_LOOKUP", marketName: "Trump election", outcome: "NO", side: "sell", orderType: "market"
 - "Place buy order for token 71321045679252212594626385532706912750332728571942532289631379312455583992563" → tokenId: "71321045679252212594626385532706912750332728571942532289631379312455583992563", orderType: "market"
 - "Buy $10 of Chiefs to win" → tokenId: "MARKET_NAME_LOOKUP", marketName: "Chiefs", outcome: "YES" (inferred), orderType: "market"
+- If previous message shows "YES Token: 12345..." and user says "buy yes" → tokenId: "12345...", side: "buy", orderType: "market"
+- If previous message shows market data with token IDs and user says "buy the NO token" → extract the NO token ID from the previous message
+- If message shows condition ID like "0x7f6e9f3aee46ac8031a9879ed7e9d94b082c3e0e76395e82f9e7d5c57362efd8" and user says "buy yes" → tokenId: "0x7f6e9f3aee46ac8031a9879ed7e9d94b082c3e0e76395e82f9e7d5c57362efd8", side: "buy", outcome: "YES", orderType: "market"
 
 **Pattern Recognition:**
 - "Buy/Sell YES/NO in [market]" → outcome-based trading

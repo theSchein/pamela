@@ -174,7 +174,9 @@ ${priceData.spread !== "N/A" ? `• Spread: ${priceData.spread}` : ''}
 **Details:**
 • Condition ID: \`${conditionId}\`
 • Market Slug: ${marketData.market_slug || 'N/A'}
-• End Date: ${marketData.end_date_iso ? new Date(marketData.end_date_iso).toLocaleDateString() : 'N/A'}`;
+• End Date: ${marketData.end_date_iso ? new Date(marketData.end_date_iso).toLocaleDateString() : 'N/A'}
+
+To place an order: "buy YES" or "buy NO" with the amount you want to trade!`;
       
       const responseContent: Content = {
         text: responseText,
