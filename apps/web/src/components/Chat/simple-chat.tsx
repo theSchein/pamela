@@ -20,7 +20,7 @@ const SimpleChat = () => {
     {
       id: "1",
       role: "assistant",
-      content: "Hello! I'm Pamela, your AI trading agent specializing in prediction markets on Polymarket. I can help you analyze markets, find trading opportunities, and execute trades. What would you like to explore today?",
+      content: "Yo! I'm Pamela. Just closed a sweet position on the Fed rate decision - made $340 in two days 💅 Currently hunting for the next mispriced market. You trading anything interesting or just here to watch me work?",
       timestamp: new Date(),
     },
   ]);
