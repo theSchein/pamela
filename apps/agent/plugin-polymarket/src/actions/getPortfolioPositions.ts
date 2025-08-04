@@ -64,8 +64,17 @@ export const getPortfolioPositionsAction: Action = {
     logger.info("[getPortfolioPositionsAction] Getting portfolio positions");
 
     try {
-      // Initialize CLOB client
+      // Initialize CLOB client to get wallet address
       const client = await initializeClobClient(runtime);
+      
+      // Get wallet address from the client
+      const walletAddress = (client as any).wallet?.address || (client as any).signer?.address;
+      
+      if (!walletAddress) {
+        throw new Error("Unable to determine wallet address from CLOB client");
+      }
+
+      logger.info(`[getPortfolioPositions] Using wallet address: ${walletAddress}`);
 
       if (callback) {
         await callback({
@@ -75,30 +84,56 @@ export const getPortfolioPositionsAction: Action = {
         });
       }
 
-      // Get positions from CLOB API
+      // Get positions from public data API
       let positions: any[] = [];
       let trades: any[] = [];
       let openOrders: any[] = [];
 
       try {
-        // Try to get trade history to see executed orders
-        logger.info("[getPortfolioPositions] Getting trade history...");
-        const tradesResponse = await client.getTradesPaginated({});
-        trades = Array.isArray(tradesResponse)
-          ? tradesResponse
-          : tradesResponse?.trades || [];
+        // Use public data API to get positions directly
+        logger.info("[getPortfolioPositions] Getting positions from public API...");
+        const positionsUrl = `https://data-api.polymarket.com/positions?sizeThreshold=1&limit=50&sortDirection=DESC&user=${walletAddress}`;
+        logger.info(`[getPortfolioPositions] Fetching from: ${positionsUrl}`);
+        
+        const positionsResponse = await fetch(positionsUrl);
+        if (!positionsResponse.ok) {
+          throw new Error(`Failed to fetch positions: ${positionsResponse.status} ${positionsResponse.statusText}`);
+        }
+        
+        const positionsData = await positionsResponse.json() as any;
+        positions = Array.isArray(positionsData) ? positionsData : positionsData.positions || [];
         logger.info(
-          `[getPortfolioPositions] Retrieved ${trades.length} trades`,
+          `[getPortfolioPositions] Retrieved ${positions.length} positions from public API`,
         );
-      } catch (tradesError) {
+      } catch (positionsError) {
         logger.warn(
-          "[getPortfolioPositions] Failed to get trades:",
-          tradesError,
+          "[getPortfolioPositions] Failed to get positions from public API:",
+          positionsError,
         );
+        
+        // Fallback to trades endpoint to calculate positions
+        try {
+          logger.info("[getPortfolioPositions] Falling back to trades endpoint...");
+          const tradesUrl = `https://data-api.polymarket.com/trades?limit=100&takerOnly=true&user=${walletAddress}`;
+          const tradesResponse = await fetch(tradesUrl);
+          
+          if (tradesResponse.ok) {
+            const tradesData = await tradesResponse.json() as any;
+            trades = Array.isArray(tradesData) ? tradesData : tradesData.trades || [];
+            logger.info(
+              `[getPortfolioPositions] Retrieved ${trades.length} trades from public API`,
+            );
+          }
+        } catch (tradesError) {
+          logger.warn(
+            "[getPortfolioPositions] Failed to get trades from public API:",
+            tradesError,
+          );
+        }
       }
 
+      // Try to get open orders (still need auth for this)
       try {
-        // Get open orders
         logger.info("[getPortfolioPositions] Getting open orders...");
         const ordersResponse = await client.getOpenOrders({});
         openOrders = Array.isArray(ordersResponse)
@@ -109,73 +144,104 @@ export const getPortfolioPositionsAction: Action = {
         );
       } catch (ordersError) {
         logger.warn(
-          "[getPortfolioPositions] Failed to get open orders:",
+          "[getPortfolioPositions] Failed to get open orders (API credentials needed):",
           ordersError,
         );
       }
 
-      // Build positions from trades (this represents executed orders)
-      const positionMap = new Map<string, any>();
+      // Process positions data
+      let processedPositionsData: any[] = [];
+      
+      if (positions.length > 0) {
+        // Direct positions from API
+        processedPositionsData = positions;
+      } else if (trades.length > 0) {
+        // Build positions from trades as fallback
+        const positionMap = new Map<string, any>();
 
-      // Process completed trades to build positions
-      for (const trade of trades) {
-        const tokenId = trade.asset_id || trade.token_id;
-        if (!tokenId) continue;
+        for (const trade of trades) {
+          // Handle both public API format and CLOB API format
+          const tokenId = trade.asset_id || trade.token_id || trade.tokenId;
+          const side = trade.side || trade.takerSide;
+          const size = parseFloat(trade.size || trade.takerAmount || "0");
+          const price = parseFloat(trade.price || "0");
+          const marketId = trade.market || trade.market_id || trade.conditionId || "Unknown";
+          
+          if (!tokenId) {
+            logger.warn("[getPortfolioPositions] Trade missing token ID:", trade);
+            continue;
+          }
 
-        const existing = positionMap.get(tokenId) || {
-          tokenId: tokenId,
-          marketConditionId: trade.market || "Unknown",
-          outcome: trade.outcome || "Unknown",
-          totalSize: 0,
-          totalValue: 0,
-          trades: [],
-        };
+          const existing = positionMap.get(tokenId) || {
+            tokenId: tokenId,
+            conditionId: marketId,
+            outcome: trade.outcome || "Unknown",
+            size: 0,
+            value: 0,
+            trades: [],
+          };
 
-        const size = parseFloat(trade.size || "0");
-        const price = parseFloat(trade.price || "0");
-        const value = size * price;
+          const value = size * price;
 
-        if (trade.side === "BUY") {
-          existing.totalSize += size;
-          existing.totalValue += value;
-        } else if (trade.side === "SELL") {
-          existing.totalSize -= size;
-          existing.totalValue -= value;
+          if (side === "BUY" || side === "buy") {
+            existing.size += size;
+            existing.value += value;
+          } else if (side === "SELL" || side === "sell") {
+            existing.size -= size;
+            existing.value -= value;
+          }
+
+          existing.trades.push(trade);
+          positionMap.set(tokenId, existing);
         }
 
-        existing.trades.push(trade);
-        positionMap.set(tokenId, existing);
+        // Convert to positions array, filtering out zero positions
+        processedPositionsData = Array.from(positionMap.values()).filter(
+          (pos) => Math.abs(pos.size) > 0.001,
+        );
       }
-
-      // Convert to positions array, filtering out zero positions
-      positions = Array.from(positionMap.values()).filter(
-        (pos) => Math.abs(pos.totalSize) > 0.001,
-      );
 
       // Process and format positions
       const processedPositions: PortfolioPosition[] = [];
       let totalValue = 0;
 
-      for (const position of positions) {
+      for (const position of processedPositionsData) {
         try {
-          const avgPrice =
-            position.totalSize > 0
-              ? position.totalValue / position.totalSize
-              : 0;
+          // Log the raw position data to understand the API format
+          if (processedPositionsData.indexOf(position) === 0) {
+            logger.info("[getPortfolioPositions] Sample position data:", JSON.stringify(position, null, 2));
+          }
+          
+          // Handle direct API positions format
+          const tokenId = position.asset || position.tokenId || position.token_id || position.asset_id || position.assetId;
+          const marketId = position.conditionId || position.condition_id || position.market || position.marketId || "Unknown";
+          const size = parseFloat(position.size || position.position_size || position.positionSize || "0");
+          const outcome = position.outcome || position.outcome_name || position.outcomeName || "Unknown";
+          const currentPrice = parseFloat(position.curPrice || position.price || position.current_price || position.currentPrice || "0");
+          const avgPrice = parseFloat(position.avgPrice || position.average_price || position.avg_price || position.averagePrice || "0");
+          const value = parseFloat(position.currentValue || "0") || (size * currentPrice);
+          const marketQuestion = position.title || position.question || position.market_question || position.marketQuestion || "";
+          const unrealizedPnl = position.cashPnl !== undefined ? position.cashPnl.toString() : 
+                               position.unrealizedPnl || position.unrealized_pnl || 
+                               (avgPrice > 0 && currentPrice > 0 ? ((currentPrice - avgPrice) * size).toFixed(6) : undefined);
+          const realizedPnl = position.realizedPnl !== undefined ? position.realizedPnl.toString() : 
+                             position.realized_pnl;
+          const percentPnl = position.percentPnl || 0;
 
           const processed: PortfolioPosition = {
-            tokenId: position.tokenId,
-            marketConditionId: position.marketConditionId,
-            outcome: position.outcome,
-            size: position.totalSize.toFixed(6),
-            value: position.totalValue.toFixed(6),
+            tokenId: tokenId,
+            marketConditionId: marketId,
+            outcome: outcome,
+            size: size.toFixed(6),
+            value: value.toFixed(6),
             averagePrice: avgPrice.toFixed(6),
-            unrealizedPnl: undefined, // Would need current market price to calculate
-            realizedPnl: undefined, // Would need to track sells vs buys
+            unrealizedPnl: unrealizedPnl,
+            realizedPnl: realizedPnl,
+            marketQuestion: marketQuestion,
           };
 
-          // Try to get market info for better display
-          if (processed.marketConditionId !== "Unknown") {
+          // Try to get market info if not already present
+          if (!processed.marketQuestion && processed.marketConditionId !== "Unknown") {
             try {
               const marketResponse = await fetch(
                 `https://gamma-api.polymarket.com/markets?condition_ids=${processed.marketConditionId}`,
@@ -195,7 +261,7 @@ export const getPortfolioPositionsAction: Action = {
           }
 
           processedPositions.push(processed);
-          totalValue += position.totalValue;
+          totalValue += value;
         } catch (processError) {
           logger.warn(
             "[getPortfolioPositions] Error processing position:",
@@ -215,9 +281,11 @@ export const getPortfolioPositionsAction: Action = {
         ).toFixed(6);
       } catch (balanceError) {
         logger.warn(
-          "[getPortfolioPositions] Failed to get balance:",
+          "[getPortfolioPositions] Failed to get balance (API credentials needed):",
           balanceError,
         );
+        // Balance info not available without API credentials
+        usdcBalance = "N/A";
       }
 
       // Format response
@@ -245,7 +313,7 @@ ${openOrders
 `
     : ""
 }**Account Summary:**
-• **Available USDC**: $${usdcBalance}
+• **Available USDC**: ${usdcBalance === "N/A" ? "N/A (API credentials required)" : `$${usdcBalance}`}
 • **Total Positions**: 0
 • **Position Value**: $0.00
 • **Open Orders**: ${openOrders.length}
@@ -280,11 +348,27 @@ ${
               ? parseFloat(pos.averagePrice)
               : value / size;
 
-            return `**${index + 1}. ${pos.outcome.toUpperCase()}** ${pos.marketQuestion ? `"${pos.marketQuestion}"` : `(${pos.tokenId.slice(0, 12)}...)`}
+            const tokenIdDisplay = pos.tokenId ? 
+              (pos.tokenId.length > 20 ? `${pos.tokenId.slice(0, 20)}...` : pos.tokenId) : 
+              "Unknown";
+            const shortTokenId = pos.tokenId ? 
+              (pos.tokenId.length > 12 ? `${pos.tokenId.slice(0, 12)}...` : pos.tokenId) : 
+              "Unknown";
+
+            const unrealizedPnl = parseFloat(pos.unrealizedPnl || "0");
+            const pnlDisplay = unrealizedPnl !== 0 ? 
+              `${unrealizedPnl >= 0 ? "+" : ""}$${Math.abs(unrealizedPnl).toFixed(2)}` : 
+              "$0.00";
+            const pnlPercentValue = avgPrice > 0 ? ((value / (size * avgPrice) - 1) * 100) : 0;
+            const pnlPercentStr = pnlPercentValue.toFixed(1);
+
+            return `**${index + 1}. ${(pos.outcome || "Unknown").toUpperCase()}** ${pos.marketQuestion ? `"${pos.marketQuestion}"` : `(${shortTokenId})`}
 • **Size**: ${size.toFixed(2)} shares
 • **Value**: $${value.toFixed(2)}
 • **Avg Price**: $${avgPrice.toFixed(4)}
-• **Token ID**: ${pos.tokenId.slice(0, 20)}...${pos.unrealizedPnl ? `\n• **Unrealized P&L**: $${parseFloat(pos.unrealizedPnl).toFixed(2)}` : ""}`;
+• **Current Price**: $${(value / size).toFixed(4)}
+• **Unrealized P&L**: ${pnlDisplay} (${pnlPercentValue >= 0 ? "+" : ""}${pnlPercentStr}%)
+• **Token ID**: ${tokenIdDisplay}`;
           })
           .join("\n\n");
 
@@ -310,11 +394,11 @@ ${openOrders
 `
     : ""
 }**Account Summary:**
-• **Available USDC**: $${usdcBalance}
+• **Available USDC**: ${usdcBalance === "N/A" ? "N/A (API credentials required)" : `$${usdcBalance}`}
 • **Total Positions**: ${processedPositions.length}
 • **Position Value**: $${totalValue.toFixed(2)}
 • **Open Orders**: ${openOrders.length}
-• **Total Portfolio**: $${(parseFloat(usdcBalance) + totalValue).toFixed(2)}`;
+• **Total Portfolio**: ${usdcBalance === "N/A" ? `$${totalValue.toFixed(2)}+ (balance unavailable)` : `$${(parseFloat(usdcBalance) + totalValue).toFixed(2)}`}`;
 
         responseData = {
           success: true,
