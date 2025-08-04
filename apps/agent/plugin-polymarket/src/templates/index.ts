@@ -1,3 +1,5 @@
+export * from "./searchMarketsTemplate";
+
 export const getBestPriceTemplate = `
 Extract the token ID and side (buy/sell) from the user's request to get the best price for a market.
 

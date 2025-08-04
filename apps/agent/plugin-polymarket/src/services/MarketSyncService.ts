@@ -34,8 +34,9 @@ export class MarketSyncService extends Service {
   private clobClient: ClobClient | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
   private readonly SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
-  private readonly MAX_PAGES = 100; // Fetch up to 100 pages to find current markets (API returns mostly old data)
-  private readonly PAGE_SIZE = 500; // Markets per page (use the larger size that's working)
+  private readonly MAX_PAGES = 10; // Fetch up to 10 pages if needed for pagination
+  private readonly PAGE_SIZE = 500; // Markets per page (Gamma API default)
+  private readonly MAX_MARKETS = 5000; // Maximum markets to sync in one run
   private isRunning = false;
 
   constructor(runtime: IAgentRuntime) {
@@ -127,6 +128,7 @@ export class MarketSyncService extends Service {
    */
   async performSync(
     syncType: "startup" | "scheduled" | "manual",
+    searchTerm?: string,
   ): Promise<void> {
     if (this.isRunning) {
       logger.warn("Sync already in progress, skipping...");
@@ -150,15 +152,27 @@ export class MarketSyncService extends Service {
       logger.info(`Starting ${syncType} market sync...`);
 
       // Fetch active markets from Polymarket API
-      const markets = await this.fetchActiveMarkets();
-      logger.info(`Fetched ${markets.length} active markets from API`);
+      const markets = searchTerm 
+        ? await this.fetchFromGammaApi(searchTerm)
+        : await this.fetchActiveMarkets();
+      logger.info(`Fetched ${markets.length} active markets from API${searchTerm ? ` for search term: ${searchTerm}` : ''}`);
 
       // Sync markets to database
       let syncedCount = 0;
-      for (const market of markets) {
+      const totalMarkets = markets.length;
+      const logInterval = Math.max(100, Math.floor(totalMarkets / 10)); // Log progress every 10% or 100 markets
+      
+      for (let i = 0; i < markets.length; i++) {
+        const market = markets[i];
         try {
           await this.syncMarketToDatabase(market);
           syncedCount++;
+          
+          // Log progress at intervals
+          if ((i + 1) % logInterval === 0 || i === markets.length - 1) {
+            const progress = ((i + 1) / totalMarkets * 100).toFixed(1);
+            logger.info(`Sync progress: ${i + 1}/${totalMarkets} markets (${progress}%)`);
+          }
         } catch (error) {
           logger.error(`Failed to sync market ${market.condition_id}:`, error);
         }
@@ -208,7 +222,7 @@ export class MarketSyncService extends Service {
   /**
    * Fetch markets from Gamma API with liquidity filtering
    */
-  private async fetchFromGammaApi(): Promise<Market[]> {
+  private async fetchFromGammaApi(searchTerm?: string): Promise<Market[]> {
     try {
       logger.info("Attempting to fetch from Gamma API...");
 
@@ -217,15 +231,22 @@ export class MarketSyncService extends Service {
       // Build query parameters for active markets with real volume (indicates actual trading)
       const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
       const params = new URLSearchParams({
-        limit: "500",
+        limit: String(this.MAX_MARKETS), // Fetch up to 5000 markets
         active: "true",
-        volume_num_min: "1000", // Only markets with $1k+ volume
+        volume_num_min: "100", // Lower threshold to catch more niche markets like F1
         closed: "false",
         end_date_min: today, // Only markets ending today or later
       });
 
+      // Add search term if provided
+      if (searchTerm) {
+        params.append("search", searchTerm);
+        logger.info(`Adding search term to Gamma API: ${searchTerm}`);
+      }
+
       logger.info(`Gamma API query: ${gammaUrl}?${params.toString()}`);
 
+      // Note: Gamma API may not support pagination, but we'll try to get as many as possible
       const response = await fetch(`${gammaUrl}?${params}`);
 
       if (!response.ok) {

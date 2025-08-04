@@ -9,7 +9,9 @@ import {
   logger,
 } from "@elizaos/core";
 import { polymarketMarketsTable } from "../schema";
-import { sql, like, or, and, desc } from "drizzle-orm";
+import { sql, like, or, and, desc, ilike } from "drizzle-orm";
+import { callLLMWithTimeout } from "../utils/llmHelpers";
+import { searchMarketsTemplate } from "../templates/searchMarketsTemplate";
 
 export const searchMarketsAction: Action = {
   name: "SEARCH_POLYMARKET_MARKETS",
@@ -68,9 +70,14 @@ export const searchMarketsAction: Action = {
     ];
     
     const text = (message.content.text || "").toLowerCase();
+    
+    // Check for direct topic queries (e.g., "f1 markets", "bitcoin markets")
+    const hasTopicMarket = /\b\w+\s+markets?\b/i.test(text);
+    
+    // Check for market keywords
     const hasMarketKeyword = marketKeywords.some(keyword => text.includes(keyword));
     
-    if (hasMarketKeyword) {
+    if (hasMarketKeyword || hasTopicMarket) {
       logger.info("[searchMarketsAction] Validation passed - market keywords found");
       return true;
     }
@@ -94,58 +101,131 @@ export const searchMarketsAction: Action = {
         throw new Error("Database not available");
       }
       
-      const text = (message.content.text || "").toLowerCase();
+      const text = message.content.text || "";
       
-      // Extract search terms
+      // Use LLM to extract search intent and terms
       let searchTerm = "";
-      const searchPatterns = [
-        /(?:markets? about|markets? for|markets? on) (.+?)(?:\?|$)/i,
-        /(?:search for|find|show me) (.+?) markets?/i,
-        /(.+?) markets?/i,
-      ];
+      let searchType = "general";
       
-      for (const pattern of searchPatterns) {
-        const match = text.match(pattern);
-        if (match && match[1]) {
+      try {
+        const llmExtraction = await callLLMWithTimeout<{
+          searchType: string;
+          searchTerm: string;
+          confidence: number;
+        }>(
+          runtime,
+          state,
+          searchMarketsTemplate.replace("{{text}}", text),
+          "searchMarketsAction",
+          10000 // 10 second timeout
+        );
+        
+        logger.info(`[searchMarketsAction] LLM extraction result:`, llmExtraction);
+        
+        if (llmExtraction && llmExtraction.confidence > 0.7) {
+          searchType = llmExtraction.searchType || "general";
+          searchTerm = llmExtraction.searchTerm || "";
+        }
+      } catch (error) {
+        logger.warn(`[searchMarketsAction] LLM extraction failed, falling back to regex:`, error);
+        // Fallback to simple regex extraction
+        const match = text.toLowerCase().match(/(?:about|for|on)\s+(.+?)\s+markets?/i);
+        if (match) {
           searchTerm = match[1].trim();
-          break;
+          searchType = "specific";
         }
       }
       
       // Build query
       let query = db.select().from(polymarketMarketsTable);
       
-      // Add search filter if we have a search term
-      if (searchTerm && !["some", "popular", "hot", "trending", "interesting", "active", "favorite", "your"].includes(searchTerm)) {
-        logger.info(`[searchMarketsAction] Searching for: "${searchTerm}"`);
-        query = query.where(
+      // Log extracted search info
+      logger.info(`[searchMarketsAction] Search type: "${searchType}", term: "${searchTerm}"`);
+      
+      
+      // Add search filter based on search type
+      const isSpecificSearch = searchType === "specific" || searchType === "category";
+      
+      // Build WHERE conditions
+      const conditions: any[] = [
+        sql`${polymarketMarketsTable.active} = true`,
+        sql`${polymarketMarketsTable.closed} = false`
+      ];
+      
+      if (isSpecificSearch && searchTerm) {
+        logger.info(`[searchMarketsAction] Applying ${searchType} search for: "${searchTerm}"`);
+        conditions.push(
           or(
-            like(polymarketMarketsTable.question, `%${searchTerm}%`),
-            like(polymarketMarketsTable.category, `%${searchTerm}%`)
+            ilike(polymarketMarketsTable.question, `%${searchTerm}%`),
+            ilike(polymarketMarketsTable.category, `%${searchTerm}%`)
           )
         );
       } else {
-        logger.info("[searchMarketsAction] No specific search term, returning popular markets");
+        logger.info(`[searchMarketsAction] Search type: ${searchType}, returning popular/trending markets`);
       }
       
-      // Filter for active markets only
-      query = query.where(
-        and(
-          sql`${polymarketMarketsTable.active} = true`,
-          sql`${polymarketMarketsTable.closed} = false`
-        )
-      );
+      // Apply all conditions at once
+      query = query.where(and(...conditions));
       
       // Order by end date (sooner ending markets first) and limit
       query = query
         .orderBy(polymarketMarketsTable.endDateIso)
         .limit(10);
       
+      // Debug: Log the SQL query being executed
+      logger.info(`[searchMarketsAction] Executing query with ${conditions.length} conditions`);
+      
       const markets: any[] = await query;
+      
+      // Debug: Log first few results
+      if (markets.length > 0) {
+        logger.info(`[searchMarketsAction] First result: ${markets[0].question} (category: ${markets[0].category})`);
+      }
+      
+      // If no results for specific search, try a broader search
+      if (markets.length === 0 && isSpecificSearch) {
+        logger.info(`[searchMarketsAction] No results for "${searchTerm}", checking all text fields`);
+        
+        // Try searching in more fields
+        const broaderQuery = await db.select()
+          .from(polymarketMarketsTable)
+          .where(
+            and(
+              or(
+                ilike(polymarketMarketsTable.question, `%${searchTerm}%`),
+                ilike(polymarketMarketsTable.category, `%${searchTerm}%`)
+              ),
+              sql`${polymarketMarketsTable.active} = true`,
+              sql`${polymarketMarketsTable.closed} = false`
+            )
+          )
+          .orderBy(polymarketMarketsTable.endDateIso)
+          .limit(10);
+          
+        if (broaderQuery.length > 0) {
+          logger.info(`[searchMarketsAction] Found ${broaderQuery.length} markets in broader search`);
+          markets.push(...broaderQuery);
+        } else {
+          // Get some sample markets to help debug
+          const sampleMarkets = await db.select()
+            .from(polymarketMarketsTable)
+            .where(
+              and(
+                sql`${polymarketMarketsTable.active} = true`,
+                sql`${polymarketMarketsTable.closed} = false`
+              )
+            )
+            .limit(5);
+            
+          logger.info(`[searchMarketsAction] Still no results. Sample active markets: ${sampleMarkets.map((m: any) => m.question).join(', ')}`);
+        }
+      }
       
       if (markets.length === 0) {
         const noResultsContent: Content = {
-          text: `Shit, I couldn't find any markets about "${searchTerm}". Try something else?`,
+          text: searchTerm 
+            ? `No active markets found for "${searchTerm}". The database might not have any markets matching that term right now. Try a different search or ask me to show popular markets!`
+            : `No active markets found at the moment. The market database might be updating.`,
           action: "SEARCH_POLYMARKET_MARKETS",
         };
         
@@ -154,8 +234,12 @@ export const searchMarketsAction: Action = {
         }
         
         return {
-          success: false,
-          data: {},
+          success: true,
+          data: {
+            markets: [],
+            searchTerm: searchTerm || "popular/recent",
+            totalResults: 0,
+          },
         };
       }
       
@@ -181,8 +265,8 @@ export const searchMarketsAction: Action = {
       logger.info(`[searchMarketsAction] Found ${markets.length} markets`);
       
       // Create response text
-      let responseText = searchTerm && !["some", "popular", "hot", "trending", "interesting", "active", "favorite", "your"].includes(searchTerm)
-        ? `Found ${markets.length} markets about "${searchTerm}":\n\n`
+      let responseText = isSpecificSearch
+        ? `Found ${markets.length} ${searchTerm.toUpperCase()} markets:\n\n`
         : `Here are some hot markets I'm watching:\n\n`;
       
       formattedMarkets.slice(0, 5).forEach((market, index) => {
