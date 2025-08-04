@@ -240,7 +240,7 @@ const plugin: Plugin = {
     // Core Trading
     placeOrderAction, // Buy orders (enhanced with market lookup)
     sellOrderAction, // Sell orders (new streamlined selling)
-    cancelOrderAction, // Cancel orders
+    // cancelOrderAction, // Cancel orders - REQUIRES L2
     
     // Advanced/API Trading (not for general use)
     // directPlaceOrderAction, // Direct API buy orders (bypasses LLM) - DISABLED
@@ -257,24 +257,24 @@ const plugin: Plugin = {
     getMarketPriceAction, // Current prices and recommendations
     getPriceHistory, // Historical price data
 
-    // Order Management
-    getOrderDetailsAction, // Order status
-    getActiveOrdersAction, // Open orders
-    getTradeHistoryAction, // Trade history
+    // Order Management (L2 Required - Disabled)
+    // getOrderDetailsAction, // Order status - REQUIRES L2
+    // getActiveOrdersAction, // Open orders - REQUIRES L2
+    // getTradeHistoryAction, // Trade history - REQUIRES L2
 
-    // Account Management
-    createApiKeyAction,
-    revokeApiKeyAction,
-    getAllApiKeysAction,
-    checkOrderScoringAction,
-    getAccountAccessStatusAction,
+    // Account Management (L2 Required - Disabled)
+    // createApiKeyAction, // REQUIRES L2
+    // revokeApiKeyAction, // REQUIRES L2
+    // getAllApiKeysAction, // REQUIRES L2
+    // checkOrderScoringAction, // REQUIRES L2
+    getAccountAccessStatusAction, // Works with L1
 
     // Advanced Features
     depositUSDCAction, // USDC deposits
     getDepositAddressAction, // Deposit address info
-    handleAuthenticationAction,
-    setupWebsocketAction,
-    handleRealtimeUpdatesAction,
+    // handleAuthenticationAction, // L2 auth - DISABLED
+    // setupWebsocketAction, // REQUIRES L2
+    // handleRealtimeUpdatesAction, // REQUIRES L2
   ],
   providers: [polymarketProvider, marketDataProvider],
 };

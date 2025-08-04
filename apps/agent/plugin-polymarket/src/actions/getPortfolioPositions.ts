@@ -87,7 +87,6 @@ export const getPortfolioPositionsAction: Action = {
       // Get positions from public data API
       let positions: any[] = [];
       let trades: any[] = [];
-      let openOrders: any[] = [];
 
       try {
         // Use public data API to get positions directly
@@ -132,22 +131,8 @@ export const getPortfolioPositionsAction: Action = {
         }
       }
 
-      // Try to get open orders (still need auth for this)
-      try {
-        logger.info("[getPortfolioPositions] Getting open orders...");
-        const ordersResponse = await client.getOpenOrders({});
-        openOrders = Array.isArray(ordersResponse)
-          ? ordersResponse
-          : ordersResponse || [];
-        logger.info(
-          `[getPortfolioPositions] Retrieved ${openOrders.length} open orders`,
-        );
-      } catch (ordersError) {
-        logger.warn(
-          "[getPortfolioPositions] Failed to get open orders (API credentials needed):",
-          ordersError,
-        );
-      }
+      // Skip open orders - requires L2 auth
+      // Open orders would require API credentials, so we skip this for L1-only mode
 
       // Process positions data
       let processedPositionsData: any[] = [];
@@ -270,23 +255,7 @@ export const getPortfolioPositionsAction: Action = {
         }
       }
 
-      // Get wallet balance for context
-      let usdcBalance = "0";
-      try {
-        const balanceResponse = await client.getBalanceAllowance({
-          asset_type: "COLLATERAL" as any,
-        });
-        usdcBalance = (
-          parseFloat(balanceResponse.balance || "0") / 1000000
-        ).toFixed(6);
-      } catch (balanceError) {
-        logger.warn(
-          "[getPortfolioPositions] Failed to get balance (API credentials needed):",
-          balanceError,
-        );
-        // Balance info not available without API credentials
-        usdcBalance = "N/A";
-      }
+      // Skip wallet balance - not needed for portfolio display
 
       // Format response
       let responseText: string;
@@ -297,45 +266,21 @@ export const getPortfolioPositionsAction: Action = {
 
 **Current Holdings**: No active positions found
 
-${
-  openOrders.length > 0
-    ? `**Open Orders**: ${openOrders.length} pending
-${openOrders
-  .slice(0, 5)
-  .map(
-    (order) =>
-      `• ${order.side} ${order.size} @ $${order.price} (${order.status})`,
-  )
-  .join(
-    "\n",
-  )}${openOrders.length > 5 ? `\n• ... and ${openOrders.length - 5} more` : ""}
-
-`
-    : ""
-}**Account Summary:**
-• **Available USDC**: ${usdcBalance === "N/A" ? "N/A (API credentials required)" : `$${usdcBalance}`}
+**Account Summary:**
 • **Total Positions**: 0
 • **Position Value**: $0.00
-• **Open Orders**: ${openOrders.length}
 • **Total Trades**: ${trades.length}
 
-${
-  openOrders.length > 0
-    ? "**Status**: You have pending orders that may execute soon."
-    : trades.length > 0
-      ? "**Status**: You have trading history but no current positions."
-      : "**Status**: No positions detected. Place some orders to see holdings here."
-}`;
+**Status**: ${trades.length > 0 
+  ? "You have trading history but no current positions." 
+  : "No positions detected. Place some orders to see holdings here."}`;
 
         responseData = {
           success: true,
           positions: processedPositions,
           totalPositions: 0,
           totalValue: 0,
-          usdcBalance,
-          openOrders: openOrders.length,
           totalTrades: trades.length,
-          rawTrades: trades.slice(0, 5), // Include some recent trades for debugging
           timestamp: new Date().toISOString(),
         };
       } else {
@@ -348,11 +293,10 @@ ${
               ? parseFloat(pos.averagePrice)
               : value / size;
 
-            const tokenIdDisplay = pos.tokenId ? 
-              (pos.tokenId.length > 20 ? `${pos.tokenId.slice(0, 20)}...` : pos.tokenId) : 
-              "Unknown";
+            // Show full token ID - users need this for trading
+            const tokenIdDisplay = pos.tokenId || "Unknown";
             const shortTokenId = pos.tokenId ? 
-              (pos.tokenId.length > 12 ? `${pos.tokenId.slice(0, 12)}...` : pos.tokenId) : 
+              (pos.tokenId.length > 30 ? `${pos.tokenId.slice(0, 30)}...` : pos.tokenId) : 
               "Unknown";
 
             const unrealizedPnl = parseFloat(pos.unrealizedPnl || "0");
@@ -378,34 +322,15 @@ ${
 
 ${positionsDisplay}
 
-${
-  openOrders.length > 0
-    ? `**Open Orders**: ${openOrders.length} pending
-${openOrders
-  .slice(0, 3)
-  .map(
-    (order) =>
-      `• ${order.side} ${order.size} @ $${order.price} (${order.status})`,
-  )
-  .join(
-    "\n",
-  )}${openOrders.length > 3 ? `\n• ... and ${openOrders.length - 3} more` : ""}
-
-`
-    : ""
-}**Account Summary:**
-• **Available USDC**: ${usdcBalance === "N/A" ? "N/A (API credentials required)" : `$${usdcBalance}`}
+**Account Summary:**
 • **Total Positions**: ${processedPositions.length}
-• **Position Value**: $${totalValue.toFixed(2)}
-• **Open Orders**: ${openOrders.length}
-• **Total Portfolio**: ${usdcBalance === "N/A" ? `$${totalValue.toFixed(2)}+ (balance unavailable)` : `$${(parseFloat(usdcBalance) + totalValue).toFixed(2)}`}`;
+• **Position Value**: $${totalValue.toFixed(2)}`;
 
         responseData = {
           success: true,
           positions: processedPositions,
           totalPositions: processedPositions.length,
           totalValue,
-          usdcBalance,
           timestamp: new Date().toISOString(),
         };
       }
