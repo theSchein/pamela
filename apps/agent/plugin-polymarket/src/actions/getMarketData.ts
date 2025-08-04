@@ -94,16 +94,33 @@ export const getMarketDataAction: Action = {
         if (clobResponse.ok) {
           marketData = await clobResponse.json();
           
-          // Extract prices from tokens
+          // Extract prices from tokens with proper handling for closed/active markets
           if (marketData.tokens && marketData.tokens.length >= 2) {
             const yesToken = marketData.tokens.find((t: any) => t.outcome === "Yes");
             const noToken = marketData.tokens.find((t: any) => t.outcome === "No");
             
+            // Check if market is closed/resolved (prices will be 0/1)
+            const isResolved = marketData.closed || !marketData.active || !marketData.accepting_orders;
+            
             if (yesToken?.price !== undefined) {
-              priceData.yesPrice = String(yesToken.price);
+              const price = typeof yesToken.price === 'number' ? yesToken.price : parseFloat(yesToken.price);
+              if (isResolved && (price === 0 || price === 1)) {
+                // For resolved markets, indicate the final outcome
+                priceData.yesPrice = price === 1 ? "1.00" : "0.00";
+              } else {
+                // For active markets, use the actual trading price
+                priceData.yesPrice = price.toFixed(3);
+              }
             }
             if (noToken?.price !== undefined) {
-              priceData.noPrice = String(noToken.price);
+              const price = typeof noToken.price === 'number' ? noToken.price : parseFloat(noToken.price);
+              if (isResolved && (price === 0 || price === 1)) {
+                // For resolved markets, indicate the final outcome
+                priceData.noPrice = price === 1 ? "1.00" : "0.00";
+              } else {
+                // For active markets, use the actual trading price
+                priceData.noPrice = price.toFixed(3);
+              }
             }
           }
         }

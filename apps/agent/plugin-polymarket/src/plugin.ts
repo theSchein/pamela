@@ -44,6 +44,7 @@ import { getDepositAddressAction } from "./actions/getDepositAddress";
 import { approveUSDCAction } from "./actions/approveUSDC";
 import { setupTradingAction } from "./actions/setupTrading";
 import { sellOrderAction } from "./actions/sellOrder";
+import { sellInfoAction } from "./actions/sellInfoAction";
 import { cancelOrderAction } from "./actions/cancelOrder";
 import { getMarketPriceAction } from "./actions/getMarketPrice";
 import { directPlaceOrderAction } from "./actions/directPlaceOrder";
@@ -239,7 +240,8 @@ const plugin: Plugin = {
 
     // Core Trading
     placeOrderAction, // Buy orders (enhanced with market lookup)
-    sellOrderAction, // Sell orders (new streamlined selling)
+    sellOrderAction, // Sell orders (now works with derived L2 credentials)
+    // sellInfoAction, // No longer needed - sell works now
     // cancelOrderAction, // Cancel orders - REQUIRES L2
     
     // Advanced/API Trading (not for general use)

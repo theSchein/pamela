@@ -14,6 +14,11 @@ import {
   contentToActionResult,
   createErrorResult,
 } from "../utils/actionHelpers";
+import {
+  extractOrderBookPrices,
+  calculateTradingPrices,
+  formatPrice,
+} from "../utils/priceHelpers";
 
 interface MarketPriceParams {
   tokenId?: string;
@@ -224,46 +229,34 @@ Analyzing current market conditions...`,
         asks: buyBook[0].asks, // asks are buys from the user's perspective
       };
 
-      // Extract pricing information
-      const bestBid =
-        orderBook.bids && orderBook.bids.length > 0
-          ? parseFloat(orderBook.bids[0].price)
-          : 0;
-      const bestAsk =
-        orderBook.asks && orderBook.asks.length > 0
-          ? parseFloat(orderBook.asks[0].price)
-          : 0;
-      const bidLiquidity =
-        orderBook.bids && orderBook.bids.length > 0
-          ? parseFloat(orderBook.bids[0].size)
-          : 0;
-      const askLiquidity =
-        orderBook.asks && orderBook.asks.length > 0
-          ? parseFloat(orderBook.asks[0].size)
-          : 0;
+      // Extract pricing information using utility functions
+      const { bestBid, bestAsk, bidSize, askSize } = extractOrderBookPrices(orderBook);
 
-      if (bestBid === 0 && bestAsk === 0) {
+      if (!bestBid && !bestAsk) {
         return createErrorResult(
           `No active pricing found for token ID: ${tokenId.substring(0, 20)}...`,
         );
       }
 
-      // Calculate derived pricing metrics
-      const midPrice = (bestBid + bestAsk) / 2;
-      const spread = bestAsk - bestBid;
-      const spreadPercent = (spread / midPrice) * 100;
+      // Use fallback values if one side is missing
+      const safeBestBid = bestBid || 0;
+      const safeBestAsk = bestAsk || 0;
+      const bidLiquidity = bidSize || 0;
+      const askLiquidity = askSize || 0;
 
-      // Recommend trading prices with small premiums for execution
-      const buyPremium = 0.02; // 2% above best ask for reliable execution
-      const sellDiscount = 0.02; // 2% below best bid for reliable execution
-
-      const recommendedBuyPrice = Math.min(0.99, bestAsk * (1 + buyPremium)); // Cap at 99%
-      const recommendedSellPrice = Math.max(0.01, bestBid * (1 - sellDiscount)); // Floor at 1%
+      // Calculate derived pricing metrics using utility functions
+      const {
+        recommendedBuyPrice,
+        recommendedSellPrice,
+        midPrice,
+        spread,
+        spreadPercent,
+      } = calculateTradingPrices(safeBestBid, safeBestAsk);
 
       const priceInfo: PriceInfo = {
         tokenId,
-        bestBid,
-        bestAsk,
+        bestBid: safeBestBid,
+        bestAsk: safeBestAsk,
         midPrice,
         spread,
         spreadPercent,
@@ -281,25 +274,31 @@ Analyzing current market conditions...`,
       responseText += `• Market: ${orderBook.market || "Unknown"}\n\n`;
 
       responseText += `**Current Pricing:**\n`;
-      if (bestBid > 0) {
-        responseText += `• **Best Bid**: $${bestBid.toFixed(4)} (${(bestBid * 100).toFixed(2)}%) - ${bidLiquidity.toFixed(0)} available\n`;
+      if (safeBestBid > 0) {
+        const bidFormatted = formatPrice(safeBestBid);
+        responseText += `• **Best Bid**: ${bidFormatted.display} (${bidFormatted.cents}) - ${bidLiquidity.toFixed(0)} available\n`;
       } else {
         responseText += `• **Best Bid**: No bids available\n`;
       }
 
-      if (bestAsk > 0) {
-        responseText += `• **Best Ask**: $${bestAsk.toFixed(4)} (${(bestAsk * 100).toFixed(2)}%) - ${askLiquidity.toFixed(0)} available\n`;
+      if (safeBestAsk > 0) {
+        const askFormatted = formatPrice(safeBestAsk);
+        responseText += `• **Best Ask**: ${askFormatted.display} (${askFormatted.cents}) - ${askLiquidity.toFixed(0)} available\n`;
       } else {
         responseText += `• **Best Ask**: No asks available\n`;
       }
 
-      if (bestBid > 0 && bestAsk > 0) {
-        responseText += `• **Mid Price**: $${midPrice.toFixed(4)} (${(midPrice * 100).toFixed(2)}%)\n`;
-        responseText += `• **Spread**: $${spread.toFixed(4)} (${spreadPercent.toFixed(2)}%)\n\n`;
+      if (safeBestBid > 0 && safeBestAsk > 0) {
+        const midFormatted = formatPrice(midPrice);
+        const spreadFormatted = formatPrice(spread);
+        responseText += `• **Mid Price**: ${midFormatted.display} (${midFormatted.cents})\n`;
+        responseText += `• **Spread**: ${spreadFormatted.display} (${spreadPercent.toFixed(2)}%)\n\n`;
 
         responseText += `**🎯 Trading Recommendations:**\n`;
-        responseText += `• **To Buy**: Use $${recommendedBuyPrice.toFixed(4)} (${(recommendedBuyPrice * 100).toFixed(2)}%)\n`;
-        responseText += `• **To Sell**: Use $${recommendedSellPrice.toFixed(4)} (${(recommendedSellPrice * 100).toFixed(2)}%)\n\n`;
+        const buyFormatted = formatPrice(recommendedBuyPrice);
+        const sellFormatted = formatPrice(recommendedSellPrice);
+        responseText += `• **To Buy**: Use ${buyFormatted.display} (${buyFormatted.cents})\n`;
+        responseText += `• **To Sell**: Use ${sellFormatted.display} (${sellFormatted.cents})\n\n`;
 
         // Market assessment
         if (spreadPercent < 2) {
