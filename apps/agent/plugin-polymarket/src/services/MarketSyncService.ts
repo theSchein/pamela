@@ -208,7 +208,7 @@ export class MarketSyncService extends Service {
 
     if (gammaMarkets.length > 0) {
       logger.info(
-        `Gamma API provided ${gammaMarkets.length} liquid markets with $10k+ liquidity`,
+        `Gamma API provided ${gammaMarkets.length} liquid markets`,
       );
       return gammaMarkets;
     }
@@ -220,66 +220,75 @@ export class MarketSyncService extends Service {
   }
 
   /**
-   * Fetch markets from Gamma API with liquidity filtering
+   * Fetch markets from Gamma API with liquidity filtering and pagination
    */
   private async fetchFromGammaApi(searchTerm?: string): Promise<Market[]> {
     try {
-      logger.info("Attempting to fetch from Gamma API...");
+      logger.info("Attempting to fetch from Gamma API with pagination...");
 
       const gammaUrl = "https://gamma-api.polymarket.com/markets";
+      const allMarkets: Market[] = [];
+      const pageSize = 500; // API limit per request
+      let offset = 0;
+      let hasMore = true;
 
-      // Build query parameters for active markets with real volume (indicates actual trading)
-      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
-      const params = new URLSearchParams({
-        limit: String(this.MAX_MARKETS), // Fetch up to 5000 markets
-        active: "true",
-        volume_num_min: "100", // Lower threshold to catch more niche markets like F1
-        closed: "false",
-        end_date_min: today, // Only markets ending today or later
-      });
-
-      // Add search term if provided
-      if (searchTerm) {
-        params.append("search", searchTerm);
-        logger.info(`Adding search term to Gamma API: ${searchTerm}`);
-      }
-
-      logger.info(`Gamma API query: ${gammaUrl}?${params.toString()}`);
-
-      // Note: Gamma API may not support pagination, but we'll try to get as many as possible
-      const response = await fetch(`${gammaUrl}?${params}`);
-
-      if (!response.ok) {
-        throw new Error(
-          `Gamma API returned ${response.status}: ${response.statusText}`,
-        );
-      }
-
-      const data: any = await response.json();
-      // Gamma API returns array directly, not nested in data/markets field
-      const markets = Array.isArray(data)
-        ? data
-        : data.markets || data.data || [];
-
-      logger.info(`Gamma API returned ${markets.length} markets`);
-
-      // Log first market to debug the transformation
-      if (markets.length > 0) {
-        const firstMarket = markets[0];
-        logger.info(`Debug: First raw market from Gamma API:`, {
-          conditionId: firstMarket.conditionId,
-          question: firstMarket.question?.substring(0, 50),
-          endDate: firstMarket.endDate,
-          endDateIso: firstMarket.endDateIso,
-          liquidity: firstMarket.liquidity,
-          liquidityNum: firstMarket.liquidityNum,
-          active: firstMarket.active,
-          closed: firstMarket.closed,
+      // Build base query parameters
+      const today = new Date().toISOString().split("T")[0];
+      
+      while (hasMore && allMarkets.length < this.MAX_MARKETS) {
+        const params = new URLSearchParams({
+          limit: String(pageSize),
+          offset: String(offset),
+          active: "true",
+          liquidity_num_min: "1000", // $1000 minimum liquidity
+          closed: "false",
+          end_date_min: today,
+          order: "liquidity", // Order by liquidity to get most liquid markets first
+          ascending: "false", // Descending order (highest liquidity first)
         });
+
+        // Add search term if provided
+        if (searchTerm) {
+          params.append("search", searchTerm);
+        }
+
+        logger.info(`Fetching page ${Math.floor(offset / pageSize) + 1} (offset: ${offset})`);
+
+        const response = await fetch(`${gammaUrl}?${params}`);
+
+        if (!response.ok) {
+          throw new Error(
+            `Gamma API returned ${response.status}: ${response.statusText}`,
+          );
+        }
+
+        const data: any = await response.json();
+        const markets = Array.isArray(data)
+          ? data
+          : data.markets || data.data || [];
+
+        logger.info(`Page returned ${markets.length} markets`);
+        
+        if (markets.length === 0) {
+          hasMore = false;
+        } else {
+          allMarkets.push(...markets);
+          offset += pageSize;
+          
+          // Stop if we've reached our target or if we got less than a full page
+          if (allMarkets.length >= this.MAX_MARKETS || markets.length < pageSize) {
+            hasMore = false;
+          }
+        }
       }
+
+      // Trim to MAX_MARKETS if we fetched more
+      const finalMarkets = allMarkets.slice(0, this.MAX_MARKETS);
+      
+      logger.info(`Gamma API: Fetched total of ${finalMarkets.length} markets across ${Math.ceil(offset / pageSize)} pages`);
 
       // Transform Gamma API format to match expected Market interface
-      const transformedMarkets = markets.map((market: any) => {
+      const transformedMarkets = finalMarkets.map((market: any) => {
         const transformed = {
           condition_id: market.conditionId,
           question_id: market.questionID || market.id,
@@ -290,13 +299,13 @@ export class MarketSyncService extends Service {
           game_start_time: market.startDate || market.startDateIso,
           active: market.active,
           closed: market.closed,
-          minimum_order_size: market.orderMinSize || null,
-          minimum_tick_size: market.orderPriceMinTickSize || null,
-          min_incentive_size: market.rewardsMinSize || null,
-          max_incentive_spread: market.rewardsMaxSpread || null,
+          minimum_order_size: market.orderMinSize || "0",
+          minimum_tick_size: market.orderPriceMinTickSize || "0.01",
+          min_incentive_size: market.rewardsMinSize || "0",
+          max_incentive_spread: market.rewardsMaxSpread || "0",
           seconds_delay: 0,
-          icon: market.icon || market.image,
-          fpmm: market.marketMakerAddress || null,
+          icon: market.icon || market.image || "",
+          fpmm: market.marketMakerAddress || "",
           tokens: market.clobTokenIds
             ? JSON.parse(market.clobTokenIds).map(
                 (tokenId: string, index: number) => ({
@@ -306,13 +315,18 @@ export class MarketSyncService extends Service {
                     : `Outcome ${index + 1}`,
                 }),
               )
-            : [],
-          rewards: market.rewardsMinSize
-            ? {
-                min_size: market.rewardsMinSize,
-                max_spread: market.rewardsMaxSpread,
-              }
-            : null,
+            : [
+                { token_id: "0", outcome: "YES" },
+                { token_id: "1", outcome: "NO" }
+              ],
+          rewards: {
+            min_size: parseFloat(market.rewardsMinSize || "0"),
+            max_spread: parseFloat(market.rewardsMaxSpread || "0"),
+            event_start_date: market.eventStartDate || "",
+            event_end_date: market.eventEndDate || "",
+            in_game_multiplier: parseFloat(market.inGameMultiplier || "1"),
+            reward_epoch: parseInt(market.rewardEpoch || "0"),
+          },
           // Add Gamma API specific fields
           liquidityNum: parseFloat(
             market.liquidity || market.liquidityNum || "0",
@@ -321,7 +335,7 @@ export class MarketSyncService extends Service {
         };
 
         // Log first transformed market for debugging
-        if (market === markets[0]) {
+        if (market === finalMarkets[0]) {
           logger.info(`Debug: First transformed market:`, {
             condition_id: transformed.condition_id,
             question: transformed.question?.substring(0, 50),
@@ -425,33 +439,7 @@ export class MarketSyncService extends Service {
       logger.info("Database tables created successfully");
     }
 
-    try {
-      // Test database connection and table existence after initialization
-      logger.info("Testing database connection and table existence...");
-      const testResult = await db
-        .select()
-        .from(polymarketMarketsTable)
-        .limit(1);
-      logger.info(
-        `Database test successful, found ${testResult.length} existing markets`,
-      );
-    } catch (dbTestError) {
-      logger.error(
-        "Database connection or table test failed after initialization:",
-        dbTestError,
-      );
-
-      // Log more specific error info for database errors
-      if (dbTestError instanceof Error) {
-        logger.error("Database test error details:", {
-          message: dbTestError.message,
-          name: dbTestError.name,
-        });
-      }
-
-      logger.warn("Database not ready for sync, skipping market sync");
-      return; // Don't throw error, just skip sync
-    }
+    // Skip verbose testing logs for every market
 
     try {
       await db.transaction(async (tx: any) => {
@@ -516,9 +504,7 @@ export class MarketSyncService extends Service {
               (endDate.getTime() - currentDate.getTime()) /
                 (24 * 60 * 60 * 1000),
             );
-            logger.info(
-              `✅ ALLOWING CURRENT MARKET: "${market.question?.substring(0, 50)}..." (ends ${daysFromNow} days from now)`,
-            );
+            // Remove verbose logging for each market
           }
         } else {
           // Market has no end date - log this case for debugging
@@ -556,9 +542,7 @@ export class MarketSyncService extends Service {
 
         // Try to insert market with better error handling
         try {
-          logger.info(
-            `Attempting to insert market: ${marketData.conditionId} - "${marketData.question}"`,
-          );
+          // Remove verbose logging for each market insert
 
           // Generate UUID explicitly to avoid default value issues
           const marketUuid = randomUUID();
@@ -610,9 +594,7 @@ export class MarketSyncService extends Service {
               },
             });
 
-          logger.info(
-            `Successfully inserted/updated market: ${marketData.conditionId}`,
-          );
+          // Remove verbose logging for successful inserts
         } catch (insertError) {
           logger.error(
             `Database insertion failed for market ${marketData.conditionId}:`,
