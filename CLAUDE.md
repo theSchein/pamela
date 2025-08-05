@@ -6,12 +6,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Pamela** is an autonomous prediction market trading agent built on ElizaOS that can execute trades on Polymarket using its own Polygon wallet. The project integrates with Polymarket's CLOB (Central Limit Order Book) API for real-time market data and trading operations.
 
+## Project Structure
+
+This is a monorepo with the following structure:
+- **Root**: Contains Docker configurations and scripts for development/testing
+- **apps/agent**: The main ElizaOS backend with Polymarket plugin integration
+- **apps/web**: React frontend (optional, experimental)
+- **packages/shared**: Shared TypeScript types (when needed)
+
 ## Development Commands
 
-### Core Development
-- `bun run dev` - Start development server with hot reload
-- `bun run build` - Build both TypeScript and Vite frontend (`tsc --noEmit && vite build && tsup`)
-- `bun run start` - Start production agent with ElizaOS (`elizaos start`)
+### Monorepo Commands (from root)
+- `npm run dev` - Navigate to apps/agent and run development server
+- `npm run build` - Build the agent application
+- `npm start` - Start production agent (runs `cd apps/agent && npm start`)
+- `npm test` - Run agent tests
+- `npm run format` - Format all code in the monorepo
+- `npm run format:check` - Check code formatting
+- `npm run clean` - Remove all node_modules and dist directories
+
+### Agent Commands (in apps/agent/)
+- `npm start` - Start production with custom wrapper (`node src/start-production.mjs`)
+- `elizaos start` or `bun run start:eliza` - Start with ElizaOS directly  
+- `elizaos dev` or `bun run dev` - Development mode with hot reload
+- `bun run build` - Build TypeScript and bundle (`tsc --noEmit && tsup`)
 
 ### Code Quality
 - `bun run lint` - Format source code with Prettier (`prettier --write ./src`)
@@ -22,18 +40,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `bun run check-all` - Run type-check, format:check, and tests
 
 ### Testing
-- `bun run test` - Run full test suite (component + e2e)
-- `bun run test:component` - Run component tests only
-- `bun run test:e2e` - Run end-to-end tests only
+- `bun run test` - Run full test suite
 - `bun run test:coverage` - Run tests with coverage report
 - `bun run test:watch` - Run tests in watch mode
+- `npm run check-all` - Run type-check, format:check, and tests
 
-### Cypress Testing
-- `bun run cy:open` - Open Cypress test runner
-- `bun run cypress:component` - Run component tests headless
-- `bun run cypress:e2e` - Run e2e tests headless
+### Docker-Based Development (Recommended)
+- `./scripts/test-local.sh` - Start full local environment with Docker
+- `./scripts/test-production.sh` - Test production build locally
+- `./scripts/test-simple.sh` - Run simplified Docker setup
+- `docker-compose up` - Start all services
+- `docker-compose down` - Stop all services
+- `docker-compose logs -f [service]` - View logs (agent, web, etc.)
 
-**Important**: Tests require `bun run test:install` to set up dependencies first.
+### Telegram Bot Development
+- `./start-telegram.sh` - Quick start Telegram bot
+- `docker-compose -f docker-compose.telegram.yml up` - Start Telegram bot with Docker
 
 ## Architecture
 
@@ -93,6 +115,32 @@ MIN_CONFIDENCE_THRESHOLD=0.7
 
 Use Node.js runtime for production deployment.
 
+## Quick Start Guide
+
+1. **Local Development with Docker** (Recommended):
+   ```bash
+   cp .env.local.example .env.local
+   # Edit .env.local with your API keys
+   ./scripts/test-local.sh
+   ```
+
+2. **Manual Development**:
+   ```bash
+   cd apps/agent
+   cp .env.example .env
+   # Edit .env with your API keys
+   npm install
+   npm start
+   ```
+
+3. **Running Tests**:
+   ```bash
+   # From root
+   npm test
+   # Or from apps/agent
+   bun run test
+   ```
+
 ## Plugin Compatibility Notes
 
 The Polymarket plugin required significant compatibility updates for current ElizaOS:
@@ -140,3 +188,27 @@ See `SOCKETIO_INTEGRATION.md` for detailed implementation guide.
 - **Cypress**: Component and user workflow testing
 
 The project includes comprehensive test coverage for all trading operations and market data handling.
+
+## Common Development Workflows
+
+### Adding New Trading Actions
+1. Create action file in `plugin-polymarket/src/actions/`
+2. Follow existing action patterns (see `placeOrder.ts` as reference)
+3. Update `plugin-polymarket/src/index.ts` to export the action
+4. Add tests in `plugin-polymarket/__tests__/`
+
+### Testing Trading Operations
+```bash
+# Test specific functionality
+cd apps/agent
+bun test plugin-polymarket/__tests__/direct-trading.test.ts
+
+# Run integration tests
+bun test plugin-polymarket/__tests__/integration.test.ts
+```
+
+### Debugging Tips
+- Check logs: `docker-compose logs -f agent`
+- Verify environment variables are loaded: Check `.env` in `apps/agent/`
+- For WebSocket issues: Ensure port 3001 is available
+- For database issues: Delete `.eliza/.elizadb` and restart

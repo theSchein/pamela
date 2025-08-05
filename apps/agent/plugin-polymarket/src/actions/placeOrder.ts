@@ -147,11 +147,12 @@ export const placeOrderAction: Action = {
       if (orderType === "limit") {
         orderType = "GTC"; // Good Till Cancelled
       } else if (orderType === "market") {
-        orderType = "FOK"; // Fill Or Kill (market order)
+        orderType = "GTC"; // Use GTC for better market order execution
         // For market orders, we need to get the current market price
         if (price <= 0) {
           // We'll set a reasonable price for market orders - this will be updated later
-          price = side === "BUY" ? 0.99 : 0.01; // Market order pricing with 2 decimal precision
+          // Use slightly more aggressive pricing to ensure execution
+          price = side === "BUY" ? 0.995 : 0.005; // Market order pricing with buffer
         }
       }
 
@@ -508,15 +509,15 @@ Please try:
       if (orderTypeMatch) {
         const matched = orderTypeMatch[1].toUpperCase();
         orderType =
-          matched === "LIMIT" ? "GTC" : matched === "MARKET" ? "FOK" : matched;
+          matched === "LIMIT" ? "GTC" : matched === "MARKET" ? "GTC" : matched;
       } else {
         // Default to market order if no price specified
-        orderType = price > 0 ? "GTC" : "FOK";
+        orderType = "GTC"; // Always use GTC for better execution
       }
 
       // Set market order pricing if no price given
-      if (orderType === "FOK" && price <= 0) {
-        price = side === "BUY" ? 0.99 : 0.01; // Market order pricing with 2 decimal precision
+      if (orderType === "GTC" && price <= 0) {
+        price = side === "BUY" ? 0.995 : 0.005; // Market order pricing with buffer
       }
 
       if (!tokenId || size <= 0 || (orderType === "GTC" && price <= 0)) {
@@ -568,15 +569,30 @@ Please provide order details in your request. Examples:
     // Calculate total order value
     const totalValue = price * size;
 
+    // Enforce minimum order requirements: $1 minimum or 5 tokens minimum
+    // If order value is less than $1, adjust size to meet minimum
+    if (totalValue < 1.0) {
+      // Calculate size needed for $1 minimum
+      const minSizeForDollar = Math.ceil(1.0 / price);
+      // Use the larger of 5 tokens or tokens needed for $1
+      size = Math.max(5, minSizeForDollar);
+      logger.info(
+        `[placeOrderAction] Order below minimum. Adjusting size from ${totalValue.toFixed(2)} to ${size} tokens (min $1 or 5 tokens)`
+      );
+    }
+
+    // Recalculate total value with adjusted size
+    const finalTotalValue = price * size;
+
     // Check Polymarket trading balance before placing order
     logger.info(
-      `[placeOrderAction] Checking Polymarket trading balance for order value: $${totalValue.toFixed(2)}`,
+      `[placeOrderAction] Checking Polymarket trading balance for order value: $${finalTotalValue.toFixed(2)}`,
     );
 
     try {
       const balanceInfo = await checkPolymarketBalance(
         runtime,
-        totalValue.toString(),
+        finalTotalValue.toString(),
       );
 
       if (!balanceInfo.hasEnoughBalance) {
@@ -589,14 +605,14 @@ Please provide order details in your request. Examples:
 • **Side**: ${side}
 • **Price**: $${price.toFixed(4)} (${(price * 100).toFixed(2)}%)
 • **Size**: ${size} shares
-• **Total Value**: $${totalValue.toFixed(2)}
+• **Total Value**: $${finalTotalValue.toFixed(2)}
 
 Please add more USDC to your wallet and try again.`,
           actions: [],
           data: {
             error: "Insufficient USDC balance",
             balanceInfo,
-            orderDetails: { tokenId, side, price, size, totalValue },
+            orderDetails: { tokenId, side, price, size, totalValue: finalTotalValue },
           },
         };
 
@@ -608,14 +624,14 @@ Please add more USDC to your wallet and try again.`,
 
       // Check position size limits
       const maxPositionSize = await getMaxPositionSize(runtime);
-      if (totalValue > maxPositionSize) {
+      if (finalTotalValue > maxPositionSize) {
         const errorContent: Content = {
           text: `❌ **Order Exceeds Position Limit**
 
 **Position Limit Check:**
 • **Max Position Size**: $${maxPositionSize.toFixed(2)}
-• **Requested Order**: $${totalValue.toFixed(2)}
-• **Excess Amount**: $${(totalValue - maxPositionSize).toFixed(2)}
+• **Requested Order**: $${finalTotalValue.toFixed(2)}
+• **Excess Amount**: $${(finalTotalValue - maxPositionSize).toFixed(2)}
 
 **Order Details:**
 • **Token ID**: ${tokenId}
@@ -628,7 +644,7 @@ Please reduce your order size to stay within the configured limit.`,
           data: {
             error: "Order exceeds position limit",
             maxPositionSize,
-            requestedAmount: totalValue,
+            requestedAmount: finalTotalValue,
             orderDetails: { tokenId, side, price, size },
           },
         };
@@ -654,13 +670,13 @@ Please reduce your order size to stay within the configured limit.`,
 • **Side**: ${side}
 • **Price**: $${price.toFixed(4)} (${(price * 100).toFixed(2)}%)
 • **Size**: ${size} shares
-• **Total Value**: $${totalValue.toFixed(2)}
+• **Total Value**: $${finalTotalValue.toFixed(2)}
 
 Creating order...`,
           actions: [],
           data: {
             balanceInfo,
-            orderDetails: { tokenId, side, price, size, totalValue },
+            orderDetails: { tokenId, side, price, size, totalValue: finalTotalValue },
           },
         };
         await callback(balanceContent);
@@ -680,7 +696,7 @@ Unable to verify wallet balance before placing order. This could be due to:
 • **Side**: ${side}
 • **Price**: $${price.toFixed(4)}
 • **Size**: ${size} shares
-• **Total Value**: $${totalValue.toFixed(2)}
+• **Total Value**: $${finalTotalValue.toFixed(2)}
 
 Please check your wallet configuration and try again.`,
         actions: [],
@@ -861,13 +877,11 @@ Please ensure your wallet is properly configured and try again.`,
 
       if (orderResponse.success) {
         const sideText = side.toLowerCase();
-        const orderTypeText =
-          orderType === "GTC"
-            ? "limit"
-            : orderType === "FOK"
-              ? "market"
-              : orderType.toLowerCase();
-        const totalValue = (price * size).toFixed(4);
+        const orderTypeText = 
+          price >= 0.995 || price <= 0.005
+            ? "market"
+            : "limit";
+        const totalValueDisplay = (price * size).toFixed(4);
 
         responseText = `✅ **Order Placed Successfully**
 
@@ -877,7 +891,7 @@ Please ensure your wallet is properly configured and try again.`,
 • **Side**: ${sideText.toUpperCase()}
 • **Price**: $${price.toFixed(4)} (${(price * 100).toFixed(2)}%)
 • **Size**: ${size} shares
-• **Total Value**: $${totalValue}
+• **Total Value**: $${totalValueDisplay}
 • **Fee Rate**: ${feeRateBps} bps
 
 **Order Response:**
@@ -906,7 +920,7 @@ ${
             size,
             orderType,
             feeRateBps,
-            totalValue,
+            totalValue: totalValueDisplay,
           },
           orderResponse,
           timestamp: new Date().toISOString(),
