@@ -304,6 +304,15 @@ npm run dev
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+## 📚 Documentation
+
+- [Deployment Guide](docs/DEPLOYMENT.md) - Deploy to Railway and VPS
+- [Discord Bot Setup](docs/DISCORD_BOT_README.md) - Discord integration
+- [Railway Deployment](docs/RAILWAY_DEPLOYMENT.md) - 24/7 operation
+- [Development Guide](docs/CLAUDE.md) - Technical documentation
+- [Contributing](docs/CONTRIBUTING.md) - How to contribute
+- [Security](docs/SECURITY.md) - Security policies
+
 ## 📝 Development Status
 
 ### ✅ Completed Features

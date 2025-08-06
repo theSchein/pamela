@@ -448,7 +448,7 @@ Please ensure your wallet is properly configured and try again.`,
       const client = await initializeClobClient(runtime);
 
       // Check if we need to get the actual position size
-      const needsPositionFetch = size <= 0 || llmResult?.amount === -1 || message.content?.text?.toLowerCase().includes("all");
+      const needsPositionFetch = size <= 0 || size === -1 || message.content?.text?.toLowerCase().includes("all");
       logger.info(`[sellOrderAction] Needs position fetch: ${needsPositionFetch} (size=${size}, includes 'all'=${message.content?.text?.toLowerCase().includes("all")})`);
       
       if (needsPositionFetch) {

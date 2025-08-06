@@ -2,6 +2,9 @@
 
 import { spawn } from 'child_process';
 import { createServer } from 'http';
+import { existsSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 
 // Start health check server
 const healthServer = createServer((req, res) => {
@@ -30,8 +33,24 @@ console.log('Starting Pamela agent with ElizaOS...');
 // Set NODE_ENV to avoid Bun check
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 
+// Ensure Bun is in PATH - add all possible locations
+const currentPath = process.env.PATH || '';
+const bunPaths = ['/usr/local/bin', join(homedir(), '.bun', 'bin')];
+const pathsToAdd = bunPaths.filter(p => existsSync(p) && !currentPath.includes(p));
+if (pathsToAdd.length > 0) {
+  process.env.PATH = `${pathsToAdd.join(':')}:${currentPath}`;
+}
+
+// Also set BUN_INSTALL for ElizaOS
+if (existsSync('/usr/local/bin/bun')) {
+  process.env.BUN_INSTALL = '/usr/local';
+}
+
+// Set process.argv to include the 'start' command
+process.argv = [process.argv[0], process.argv[1], 'start'];
+
 // Use dynamic import to load ElizaOS
-import('../../node_modules/@elizaos/cli/dist/index.js').then(() => {
+import('../node_modules/@elizaos/cli/dist/index.js').then(() => {
   console.log('ElizaOS started successfully');
 }).catch((error) => {
   console.error('Failed to start ElizaOS:', error);

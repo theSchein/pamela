@@ -13,8 +13,9 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
-.env.telegram
-.env.telegram.local
+.env.discord
+.env.production
+apps/agent/.env
 
 # Database
 .eliza/
