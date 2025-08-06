@@ -2,19 +2,23 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "Dockerfile"
+    "dockerfilePath": "Dockerfile.railway",
+    "buildCommand": "echo 'Using Dockerfile.railway for build'"
   },
   "deploy": {
     "numReplicas": 1,
-    "startCommand": "bun run start:eliza",
+    "startCommand": "/app/start-railway.sh",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
     "healthcheckPath": "/health",
-    "healthcheckTimeout": 30
+    "healthcheckTimeout": 30,
+    "region": "us-west1"
   },
   "envVars": {
     "NODE_ENV": "production",
     "PORT": "3000",
-    "HEALTH_CHECK_PORT": "3001"
+    "HEALTH_CHECK_PORT": "3001",
+    "BUN_INSTALL": "/usr/local",
+    "PATH": "/usr/local/bin:$PATH"
   }
 }

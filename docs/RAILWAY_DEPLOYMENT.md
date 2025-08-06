@@ -1,6 +1,6 @@
-# Railway Deployment Guide for Discord Bot
+# Railway Deployment Guide for Pamela Agent
 
-Deploy your Pamela Discord bot to Railway for 24/7 operation.
+Deploy your Pamela Discord bot with Polymarket trading capabilities to Railway for 24/7 operation.
 
 ## Prerequisites
 
@@ -10,11 +10,27 @@ Deploy your Pamela Discord bot to Railway for 24/7 operation.
 - OpenAI API key
 - Polymarket wallet private key (optional for trading)
 
-## Step 1: Push to GitHub
+## Quick Start
+
+### Using the Deployment Script
 
 ```bash
+# Run the interactive deployment helper
+./scripts/deploy-railway.sh
+```
+
+This script will guide you through:
+- Setting environment variables from your .env file
+- Deploying to Railway
+- Checking deployment status
+- Viewing logs
+
+## Step 1: Prepare Your Code
+
+```bash
+# Ensure all changes are committed
 git add .
-git commit -m "Add Railway deployment configuration for Discord bot"
+git commit -m "Prepare for Railway deployment"
 git push origin master
 ```
 
@@ -26,7 +42,7 @@ git push origin master
 2. Click **"New Project"**
 3. Select **"Deploy from GitHub repo"**
 4. Connect your GitHub account and select your repository
-5. Railway will auto-detect the configuration
+5. Railway will automatically detect the `railway.json` and `Dockerfile.railway` configuration
 
 ### Option B: Deploy via CLI
 
@@ -61,14 +77,22 @@ POLYMARKET_PRIVATE_KEY=0xxxxxxxxxxxxxxxxxxx
 
 ### Configuration Variables
 ```env
+# API Configuration
 CLOB_API_URL=https://clob.polymarket.com/
+CLOB_API_KEY=optional_api_key_for_higher_limits
+
+# Trading Settings
 TRADING_ENABLED=true
 MAX_POSITION_SIZE=100
 MIN_CONFIDENCE_THRESHOLD=0.7
-PGLITE_DATA_DIR=/app/.eliza/.elizadb
+SLIPPAGE_TOLERANCE=0.02
+
+# System Configuration
 NODE_ENV=production
+BUN_INSTALL=/usr/local
+PATH=/usr/local/bin:$PATH
+PGLITE_DATA_DIR=/app/.eliza/.elizadb
 LOG_LEVEL=info
-DISABLE_WEB_UI=true
 ```
 
 ### Optional Variables
@@ -135,19 +159,47 @@ Railway provides:
 ## Troubleshooting
 
 ### Bot Not Responding
-1. Check Railway logs for errors
+1. Check Railway logs for errors:
+   ```bash
+   railway logs --tail 100
+   ```
 2. Verify DISCORD_API_TOKEN is correct
-3. Ensure bot has proper permissions in Discord server
+3. Ensure "Message Content Intent" is enabled in Discord Developer Portal
+4. Check bot has proper permissions in Discord server
+
+### Bun Installation Issues
+The Railway deployment uses `Dockerfile.railway` which automatically installs Bun. If you see Bun-related errors:
+1. The bot will automatically attempt to use Bun from `/usr/local/bin/bun`
+2. As a fallback, it will use Node.js to run ElizaOS
+3. Check that Railway is using `Dockerfile.railway` (not the standard Dockerfile)
 
 ### Trading Not Working
-1. Verify POLYMARKET_PRIVATE_KEY is set
-2. Check wallet has MATIC for gas fees
+1. Verify POLYMARKET_PRIVATE_KEY is set correctly
+2. Check wallet has MATIC for gas fees on Polygon network
 3. Ensure TRADING_ENABLED=true
+4. Verify wallet has USDC for trading
+5. Check logs for specific error messages:
+   ```bash
+   railway logs --tail 50 | grep -i error
+   ```
 
 ### High Memory Usage
-1. Reduce market sync frequency
-2. Adjust MAX_POSITION_SIZE
-3. Consider upgrading Railway plan
+1. Set memory limits in environment:
+   ```env
+   NODE_OPTIONS=--max-old-space-size=512
+   ```
+2. Reduce market sync frequency
+3. Adjust MAX_POSITION_SIZE
+4. Consider upgrading Railway plan
+
+### Health Check Failures
+If Railway reports health check failures:
+1. Verify the health endpoint is responding:
+   ```bash
+   curl https://your-app.railway.app/health
+   ```
+2. Check that port 3001 is configured correctly
+3. Review logs for startup errors
 
 ## Cost Estimation
 
@@ -186,12 +238,41 @@ If something goes wrong:
 - Regularly rotate API keys
 - Monitor wallet balance for trading
 
+## Advanced Configuration
+
+### Using Railway's PostgreSQL (Optional)
+By default, the bot uses PGLite (embedded database). For production scale, you can use Railway's PostgreSQL:
+
+1. Add PostgreSQL to your Railway project:
+   - Click "New" → "Database" → "PostgreSQL"
+   - Railway automatically sets `DATABASE_URL`
+
+2. The bot will automatically detect and use the PostgreSQL database
+
+### Custom Domain
+1. Go to Settings → Domains in Railway dashboard
+2. Add your custom domain
+3. Configure DNS as instructed by Railway
+
+### Monitoring & Alerts
+1. Set up health check alerts in project settings
+2. Configure Discord webhook for deployment notifications
+3. Use Railway's metrics dashboard to monitor resource usage
+
+## Important Files
+
+- `railway.json` - Railway configuration
+- `Dockerfile.railway` - Optimized Docker configuration for Railway
+- `src/start-railway.mjs` - Railway-specific startup script
+- `scripts/deploy-railway.sh` - Interactive deployment helper
+
 ## Support
 
 - Railway Documentation: [docs.railway.app](https://docs.railway.app)
 - Railway Discord: [discord.gg/railway](https://discord.gg/railway)
 - ElizaOS Documentation: [elizaos.github.io](https://elizaos.github.io)
+- GitHub Issues: Report bugs in this repository
 
 ---
 
-Your bot is now ready for 24/7 deployment on Railway! 🚀
+Your Pamela agent is now ready for 24/7 deployment on Railway! 🚀
