@@ -28,19 +28,21 @@ Pamela is an autonomous prediction market trading agent that can independently e
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 20+ (required)
+- Node.js 20+ and Bun runtime (required)
 - Docker & Docker Compose (for containerized testing)
 - Polygon wallet with USDC for trading
-- OpenAI API key for language model
-- Telegram Bot Token (for Telegram deployment)
+- LLM API key (Anthropic, OpenAI, or others)
+- Discord Bot Token (for Discord deployment)
+- Railway account with Hobby plan (for cloud deployment)
 
 ### Deployment Options
 
 Pamela can be deployed as:
-1. **Telegram Bot** (Recommended) - Stable, production-ready
-2. **Web Interface** - Custom React frontend (experimental)
-3. **Discord Bot** - Using Discord plugin
-4. **API Service** - Direct HTTP/WebSocket access
+1. **Railway** (Recommended for 24/7) - Cloud deployment with auto-scaling
+2. **Discord Bot** - Using Discord plugin for community trading
+3. **Telegram Bot** - Stable, production-ready
+4. **Web Interface** - Custom React frontend (experimental)
+5. **API Service** - Direct HTTP/WebSocket access
 
 ### Monorepo Structure
 
@@ -108,12 +110,23 @@ See [TELEGRAM_SETUP.md](TELEGRAM_SETUP.md) for detailed setup instructions.
 Edit `.env` with your credentials:
 
 ```env
-# Required: Polymarket Trading
+# Required: Polymarket Trading (all three must be the same key)
+WALLET_PRIVATE_KEY=your_polygon_private_key
+PRIVATE_KEY=your_polygon_private_key
 POLYMARKET_PRIVATE_KEY=your_polygon_private_key
 CLOB_API_URL=https://clob.polymarket.com/
 
-# Required: AI Model
+# Required: AI Model (at least one)
+ANTHROPIC_API_KEY=your_anthropic_api_key
+# OR
 OPENAI_API_KEY=your_openai_api_key
+
+# Discord Bot (if using Discord)
+DISCORD_API_TOKEN=your_discord_bot_token
+DISCORD_APPLICATION_ID=your_discord_app_id
+
+# Memory Optimization (important for production)
+NODE_OPTIONS=--max-old-space-size=4096
 
 # Trading Configuration
 TRADING_ENABLED=true
@@ -127,18 +140,43 @@ PGLITE_DATA_DIR=./.eliza/.elizadb
 ### Running Pamela
 
 ```bash
-# Development with Docker (recommended)
-./scripts/test-local.sh
-
-# Development without Docker
+# Development (local)
 npm run dev
 
-# Test production build locally
-./scripts/test-production.sh
+# Production (Railway deployment)
+railway up --detach
+
+# Docker testing
+docker-compose up
 
 # Run tests
 npm test
+
+# Deploy to Railway (24/7 operation)
+./scripts/deploy-railway.sh
 ```
+
+### Cloud Deployment (Railway)
+
+For 24/7 operation, deploy to Railway:
+
+```bash
+# Install Railway CLI
+npm install -g @railway/cli
+
+# Login and initialize
+railway login
+railway init
+
+# Set environment variables
+railway variables --set WALLET_PRIVATE_KEY=your_key
+railway variables --set NODE_OPTIONS=--max-old-space-size=6144
+
+# Deploy
+railway up --detach
+```
+
+See [docs/railway.md](docs/railway.md) for detailed Railway deployment guide.
 
 ### Local Testing
 
@@ -183,16 +221,23 @@ placeOrder({
 - **Core Plugin**: Basic conversational capabilities
 - **Polymarket Plugin**: Trading and market analysis
 - **Bootstrap Plugin**: Message handling and routing
+- **Discord Plugin**: Discord bot integration (optional)
 
 ### Services
-- **Market Sync Service**: Maintains local market database
+- **Market Sync Service**: Syncs 3700+ markets every 12 hours
 - **Market Detail Service**: Provides real-time market information
 - **WebSocket Provider**: Live price updates and order status
 
 ### Database Schema
-- Market data synchronization with PostgreSQL/PGLite
+- Market data synchronization with PGLite embedded database
 - Trade history and position tracking
 - Performance analytics and metrics
+- Automatic cleanup of markets older than 30 days
+
+### Memory Requirements
+- **Development**: 2GB RAM minimum
+- **Production**: 6GB RAM recommended (for 3700+ markets)
+- **Railway Hobby Plan**: 8GB RAM available
 
 ## 🛡️ Security & Risk Management
 
@@ -234,24 +279,37 @@ elizaos dev --character ./src/character.ts
 
 ## 🚀 Deployment
 
-### Railway (Recommended)
+### Railway (Recommended for 24/7 Operation)
 
-Deploy as two separate services:
+**Important**: Requires Railway Hobby Plan ($5/month) for sufficient memory (8GB RAM).
 
 ```bash
-# Deploy Agent Backend
-cd apps/agent
-railway login
-railway link  # Link to agent service
-railway up
+# Install Railway CLI
+npm install -g @railway/cli
 
-# Deploy Web Frontend (in new terminal)
-cd apps/web
-railway link  # Link to web service
-railway up
+# Login and initialize
+railway login
+railway init
+
+# Configure region (optional)
+echo '{"deploy": {"region": "europe-west1"}}' > railway.json
+
+# Set all required environment variables
+railway variables --set WALLET_PRIVATE_KEY=your_key
+railway variables --set PRIVATE_KEY=your_key  # Same as above
+railway variables --set POLYMARKET_PRIVATE_KEY=your_key  # Same as above
+railway variables --set DISCORD_API_TOKEN=your_discord_token
+railway variables --set ANTHROPIC_API_KEY=your_api_key
+railway variables --set NODE_OPTIONS=--max-old-space-size=6144
+
+# Deploy
+railway up --detach
+
+# Monitor logs
+railway logs
 ```
 
-Configure environment variables in Railway dashboard for each service.
+See [docs/railway.md](docs/railway.md) for detailed setup and troubleshooting.
 
 ### Docker
 ```bash
@@ -265,9 +323,13 @@ docker run -p 3000:3000 --env-file .env pamela
 ### Environment Variables for Production
 ```env
 NODE_ENV=production
-POLYMARKET_PRIVATE_KEY=...
-OPENAI_API_KEY=...
-DATABASE_URL=postgresql://...
+WALLET_PRIVATE_KEY=0x...
+PRIVATE_KEY=0x...  # Same as WALLET_PRIVATE_KEY
+POLYMARKET_PRIVATE_KEY=0x...  # Same as WALLET_PRIVATE_KEY
+ANTHROPIC_API_KEY=sk-ant-...
+DISCORD_API_TOKEN=your_discord_token
+DISCORD_APPLICATION_ID=your_app_id
+NODE_OPTIONS=--max-old-space-size=6144  # Critical for production
 ```
 
 ## 🤝 Contributing

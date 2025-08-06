@@ -22,9 +22,10 @@ const healthServer = createServer((req, res) => {
   }
 });
 
-const healthPort = process.env.HEALTH_CHECK_PORT || 3001;
-healthServer.listen(healthPort, () => {
-  console.log(`Health check server running on port ${healthPort}`);
+// Use PORT from Railway or fallback to 3001
+const healthPort = process.env.PORT || process.env.HEALTH_CHECK_PORT || 3001;
+healthServer.listen(healthPort, '0.0.0.0', () => {
+  console.log(`Health check server running on port ${healthPort} (all interfaces)`);
 });
 
 // Start ElizaOS directly
@@ -55,10 +56,13 @@ if (bunPath) {
   console.log(`Found Bun at: ${bunPath}`);
   console.log('Starting ElizaOS with Bun...');
   
-  // Start ElizaOS using Bun directly
-  const elizaProcess = spawn(bunPath, ['node_modules/@elizaos/cli/dist/index.js', 'start'], {
+  // Start ElizaOS using Bun directly with increased memory
+  const elizaProcess = spawn(bunPath, ['--max-old-space-size=6144', 'node_modules/@elizaos/cli/dist/index.js', 'start'], {
     stdio: 'inherit',
-    env: process.env,
+    env: {
+      ...process.env,
+      NODE_OPTIONS: '--max-old-space-size=6144'
+    },
     cwd: process.cwd()
   });
 
@@ -77,10 +81,16 @@ if (bunPath) {
     });
   });
 
-  elizaProcess.on('exit', (code) => {
-    console.log(`ElizaOS exited with code ${code}`);
+  elizaProcess.on('exit', (code, signal) => {
+    console.error(`ElizaOS exited with code ${code} and signal ${signal}`);
+    if (code === null && signal) {
+      console.error(`Process was killed by signal: ${signal}`);
+    }
     healthServer.close();
-    process.exit(code || 0);
+    // Don't exit immediately - let Railway restart it
+    setTimeout(() => {
+      process.exit(code || 1);
+    }, 1000);
   });
 } else {
   console.log('Bun not found, using Node.js to start ElizaOS...');

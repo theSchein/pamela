@@ -12,7 +12,7 @@
     "restartPolicyMaxRetries": 10,
     "healthcheckPath": "/health",
     "healthcheckTimeout": 30,
-    "region": "us-west1"
+    "region": "europe-west1"
   },
   "envVars": {
     "NODE_ENV": "production",

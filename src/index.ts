@@ -9,6 +9,17 @@ import starterPlugin from "./plugin.ts";
 import polymarketPlugin from "../plugin-polymarket/src/plugin.ts";
 import { character } from "./character.ts";
 
+// Conditionally import Discord plugin if configured
+let discordPlugin: any = null;
+if (process.env.DISCORD_API_TOKEN) {
+  try {
+    discordPlugin = require("@elizaos/plugin-discord").default;
+    logger.info("Discord plugin loaded successfully");
+  } catch (error) {
+    logger.warn("Failed to load Discord plugin:", error);
+  }
+}
+
 // Additional plugins can be imported here as needed
 // Note: Web search, news, and social plugins will be integrated in Phase 3-4
 
@@ -29,6 +40,9 @@ export const projectAgent: ProjectAgent = {
 
     // Core prediction market trading
     polymarketPlugin,
+
+    // Discord plugin (if configured)
+    ...(discordPlugin ? [discordPlugin] : []),
 
     // Future plugins will be added here:
     // - Web search for market research

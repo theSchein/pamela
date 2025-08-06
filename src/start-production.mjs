@@ -23,8 +23,8 @@ const healthServer = createServer((req, res) => {
 });
 
 const healthPort = process.env.HEALTH_CHECK_PORT || 3001;
-healthServer.listen(healthPort, () => {
-  console.log(`Health check server running on port ${healthPort}`);
+healthServer.listen(healthPort, '0.0.0.0', () => {
+  console.log(`Health check server running on port ${healthPort} (all interfaces)`);
 });
 
 // Start ElizaOS directly using node

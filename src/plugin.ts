@@ -18,23 +18,10 @@ import {
 import { z } from "zod";
 
 /**
- * Define the configuration schema for the plugin with the following properties:
- *
- * @param {string} EXAMPLE_PLUGIN_VARIABLE - The name of the plugin (min length of 1, optional)
- * @returns {object} - The configured schema object
+ * Define the configuration schema for the plugin
+ * Currently empty as this starter plugin doesn't require configuration
  */
-const configSchema = z.object({
-  EXAMPLE_PLUGIN_VARIABLE: z
-    .string()
-    .min(1, "Example plugin variable is not provided")
-    .optional()
-    .transform((val) => {
-      if (!val) {
-        console.warn("Warning: Example plugin variable is not provided");
-      }
-      return val;
-    }),
-});
+const configSchema = z.object({});
 
 /**
  * Example HelloWorld action
@@ -257,26 +244,10 @@ const plugin: Plugin = {
   description: "A starter plugin for Eliza",
   // Higher priority to ensure conversation action runs
   priority: 200,
-  config: {
-    EXAMPLE_PLUGIN_VARIABLE: process.env.EXAMPLE_PLUGIN_VARIABLE,
-  },
-  async init(config: Record<string, string>) {
+  config: {},
+  async init(_config: Record<string, string>) {
     logger.info("*** Initializing starter plugin ***");
-    try {
-      const validatedConfig = await configSchema.parseAsync(config);
-
-      // Set all environment variables at once
-      for (const [key, value] of Object.entries(validatedConfig)) {
-        if (value) process.env[key] = value;
-      }
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new Error(
-          `Invalid plugin configuration: ${error.errors.map((e) => e.message).join(", ")}`,
-        );
-      }
-      throw error;
-    }
+    // No configuration needed for this starter plugin
   },
   // Removed test models to allow proper LLM providers to work
   models: {},
