@@ -553,10 +553,81 @@ Please ensure your wallet is properly configured and try again.`,
             const bestBid = parseFloat(sortedBids[0].price);
             const bidLiquidity = parseFloat(sortedBids[0].size);
             
+            // Calculate total liquidity across multiple price levels
+            let totalLiquidity = 0;
+            let depthInfo = [];
+            let liquidityAtPrices = [];
+            for (let i = 0; i < Math.min(5, sortedBids.length); i++) {
+              const bid = sortedBids[i];
+              const bidPrice = parseFloat(bid.price);
+              const bidSize = parseFloat(bid.size);
+              totalLiquidity += bidSize;
+              depthInfo.push(`  ${i+1}. $${bidPrice.toFixed(4)} (${(bidPrice * 100).toFixed(2)}%) - ${bidSize.toFixed(0)} shares`);
+              liquidityAtPrices.push({ price: bidPrice, size: bidSize, cumulative: totalLiquidity });
+            }
+            
+            // Check if we have enough liquidity for FOK order
+            const hasGoodLiquidity = bidLiquidity >= size;
+            const hasAnyLiquidity = totalLiquidity >= size;
+            
+            // For FOK orders with insufficient liquidity, warn the user
+            if (orderType === "FOK" && !hasGoodLiquidity) {
+              logger.warn(
+                `[sellOrderAction] Insufficient liquidity for FOK order - Need: ${size}, Available at best bid: ${bidLiquidity}, Total top 5: ${totalLiquidity}`,
+              );
+              
+              const liquidityContent: Content = {
+                text: `⚠️ **Insufficient Liquidity for Market Order (FOK)**
+
+**Your Order**: Sell ${size} shares
+**Order Type**: Fill-or-Kill (FOK) - Must execute completely or not at all
+
+**Current Order Book (Buy Side)**:
+${depthInfo.join('\n')}
+
+**Liquidity Analysis**:
+• **Available at Best Bid**: ${bidLiquidity.toFixed(0)} shares at $${bestBid.toFixed(4)}
+• **Your Order Size**: ${size} shares
+• **Shortfall**: ${(size - bidLiquidity).toFixed(0)} shares
+• **Total Available (top 5 levels)**: ${totalLiquidity.toFixed(0)} shares
+
+**Why FOK Failed**: FOK orders must be completely filled at a single price level. There are only ${bidLiquidity.toFixed(0)} shares available at the best bid of $${bestBid.toFixed(4)}, but you're trying to sell ${size} shares.
+
+**Recommended Actions**:
+1. **Use a Limit Order (GTC)**: "Sell ${size} shares at $${bestBid.toFixed(4)} limit"
+   - Will wait for buyers to appear
+   
+2. **Reduce Size to Available**: "Sell ${Math.floor(bidLiquidity)} shares at market"
+   - Will execute immediately
+   
+3. **Split Your Order**: 
+   - "Sell ${Math.floor(bidLiquidity)} shares at market" (immediate)
+   - "Sell ${(size - Math.floor(bidLiquidity)).toFixed(0)} shares at $${bestBid.toFixed(4)} limit" (wait for buyers)
+
+Would you like to proceed with one of these alternatives?`,
+                actions: ["SELL_ORDER"],
+                data: { 
+                  insufficientLiquidity: true,
+                  orderSize: size,
+                  availableLiquidity: bidLiquidity,
+                  totalLiquidity,
+                  bestBid,
+                  orderBook: liquidityAtPrices
+                },
+              };
+              
+              if (callback) {
+                await callback(liquidityContent);
+              }
+              
+              return createErrorResult(
+                `Insufficient liquidity: Only ${bidLiquidity.toFixed(0)} shares available at best bid, but you're trying to sell ${size} shares with FOK order. Try a limit order or reduce size.`
+              );
+            }
+            
             // Set price for immediate execution
             // FOK orders should match the best bid when there's sufficient liquidity
             // Only apply discount if liquidity is low or for GTC orders
-            const hasGoodLiquidity = bidLiquidity >= size; // Check if there's enough liquidity at best bid
             const marketDiscount = orderType === "FOK" && hasGoodLiquidity ? 1.0 : (orderType === "FOK" ? 0.995 : 0.98);
             price = Math.max(0.01, Math.min(0.99, bestBid * marketDiscount));
             
@@ -567,17 +638,28 @@ Please ensure your wallet is properly configured and try again.`,
             if (callback) {
               const discountPercent = ((1 - marketDiscount) * 100).toFixed(1);
               const priceContent: Content = {
-                text: `📊 **Market Price Fetched**
-• **Current Market Price**: $${currentSellPrice.toFixed(4)} (${(currentSellPrice * 100).toFixed(2)}%)
-• **Best Bid (buyers pay)**: $${bestBid.toFixed(4)} (${(bestBid * 100).toFixed(2)}%)
-• **Available Liquidity**: ${bidLiquidity.toFixed(0)} shares at best bid
+                text: `📊 **Market Price & Liquidity Check**
+
+**Order Book Analysis**:
+${depthInfo.slice(0, 3).join('\n')}
+
+**Your Order**:
+• **Size**: ${size} shares to sell
+• **Type**: ${orderType === "FOK" ? "Market (Fill-Or-Kill)" : "Limit (GTC)"}
+• **Liquidity Check**: ${hasGoodLiquidity ? "✅ Sufficient" : "⚠️ Limited"} (${bidLiquidity.toFixed(0)} shares available at best bid)
+
+**Execution Price**:
+• **Best Bid**: $${bestBid.toFixed(4)} (${(bestBid * 100).toFixed(2)}%)
 • **Your Sell Price**: $${price.toFixed(4)} (${(price * 100).toFixed(2)}%)
 ${marketDiscount === 1.0 
-  ? `• **No Discount**: Selling at exact bid price (sufficient liquidity)`
+  ? `• **Status**: ✅ Selling at exact bid price (sufficient liquidity)`
   : `• **Discount**: ${discountPercent}% for ${orderType === "FOK" ? "immediate market execution" : "quick execution"}`}
-• **Spread**: Market at ${(currentSellPrice * 100).toFixed(1)}% vs bid at ${(bestBid * 100).toFixed(1)}%`,
+
+**Expected Proceeds**: $${(price * size).toFixed(2)}
+
+Submitting order...`,
                 actions: ["SELL_ORDER"],
-                data: { currentSellPrice, bestBid, sellPrice: price, orderType, bidLiquidity, hasGoodLiquidity },
+                data: { currentSellPrice, bestBid, sellPrice: price, orderType, bidLiquidity, hasGoodLiquidity, orderBook: liquidityAtPrices },
               };
               await callback(priceContent);
             }

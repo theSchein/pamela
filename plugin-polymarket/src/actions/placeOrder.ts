@@ -866,9 +866,96 @@ Please ensure your wallet is properly configured and try again.`,
         logger.info(`[placeOrderAction] Order posted successfully`);
       } catch (postError) {
         logger.error(`[placeOrderAction] Error posting order:`, postError);
-        return createErrorResult(
-          `Failed to submit order: ${postError instanceof Error ? postError.message : "Unknown error"}`,
-        );
+        
+        // Check if error is due to missing approvals
+        const errorMessage = postError instanceof Error ? postError.message : String(postError);
+        if (errorMessage.includes("not enough balance / allowance") || 
+            errorMessage.includes("allowance") || 
+            errorMessage.includes("approve")) {
+          
+          logger.info(`[placeOrderAction] Detected approval issue, attempting to set approvals...`);
+          
+          if (callback) {
+            const approvalContent: Content = {
+              text: `⚠️ **Approval Required**
+
+The order failed because USDC spending approvals are not set.
+
+**Setting up required approvals:**
+• Approving USDC for Conditional Tokens Framework
+• Approving USDC for CTF Exchange
+• Setting CTF approvals for trading
+
+This is a one-time setup that will enable all future trades.
+
+Setting approvals now...`,
+              actions: [],
+              data: { requiresApproval: true }
+            };
+            await callback(approvalContent);
+          }
+          
+          // Import and run the approval action
+          const { approveUSDCAction } = await import("./approveUSDC");
+          
+          try {
+            // Run the approval action
+            const approvalResult = await approveUSDCAction.handler(
+              runtime,
+              message,
+              state,
+              options,
+              callback
+            );
+            
+            // Check if approval was successful
+            if (approvalResult.success) {
+              logger.info(`[placeOrderAction] Approvals set successfully, retrying order...`);
+              
+              if (callback) {
+                const retryContent: Content = {
+                  text: `✅ **Approvals Set Successfully**
+
+Now retrying your order with the proper approvals in place...`,
+                  actions: [],
+                  data: { approvalsSet: true, retrying: true }
+                };
+                await callback(retryContent);
+              }
+              
+              // Retry the order now that approvals are set
+              try {
+                // Need to recreate the signed order after approval
+                const newSignedOrder = await client.createOrder(orderArgs);
+                orderResponse = await client.postOrder(
+                  newSignedOrder,
+                  orderType as OrderType,
+                );
+                logger.info(`[placeOrderAction] Order retry successful after approval`);
+              } catch (retryError) {
+                logger.error(`[placeOrderAction] Order retry failed after approval:`, retryError);
+                return createErrorResult(
+                  `Order failed even after setting approvals: ${retryError instanceof Error ? retryError.message : "Unknown error"}. Please check your USDC balance.`,
+                );
+              }
+            } else {
+              logger.error(`[placeOrderAction] Failed to set approvals`);
+              return createErrorResult(
+                `Failed to set USDC approvals. Please run "approve USDC" manually and ensure you have MATIC for gas fees.`,
+              );
+            }
+          } catch (approvalError) {
+            logger.error(`[placeOrderAction] Error setting approvals:`, approvalError);
+            return createErrorResult(
+              `Failed to set approvals: ${approvalError instanceof Error ? approvalError.message : "Unknown error"}. Please ensure you have MATIC for gas fees.`,
+            );
+          }
+        } else {
+          // Other types of errors
+          return createErrorResult(
+            `Failed to submit order: ${errorMessage}`,
+          );
+        }
       }
 
       // Format response based on success
