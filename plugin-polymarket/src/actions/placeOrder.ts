@@ -909,7 +909,7 @@ Setting approvals now...`,
             );
             
             // Check if approval was successful
-            if (approvalResult.success) {
+            if (approvalResult && approvalResult.success) {
               logger.info(`[placeOrderAction] Approvals set successfully, retrying order...`);
               
               if (callback) {
