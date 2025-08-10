@@ -10,46 +10,37 @@ import polymarketPlugin from "./plugin.ts";
 // Export the plugin directly for use in other configurations
 export { default as polymarketPlugin } from "./plugin.ts";
 
-// === CORE ACTIONS - SIMPLIFIED PLUGIN ===
+// === ACTIVE ACTIONS - USED IN PLUGIN ===
 
-// Market Discovery
-export { getPopularMarketsAction } from "./actions/getPopularMarkets";
-export { getSamplingMarkets } from "./actions/getSamplingMarkets";
+// Setup & Management
+export { setupTradingAction } from "./actions/setupTrading";
+export { approveUSDCAction } from "./actions/approveUSDC";
+export { getWalletBalanceAction } from "./actions/getWalletBalance";
+export { getPortfolioPositionsAction } from "./actions/getPortfolioPositions";
 
-// Market Details
-export { getEnhancedMarketInfoAction } from "./actions/getEnhancedMarketInfo";
-export { getMarketDetailBySearchAction } from "./actions/getMarketDetailBySearch";
-
-// Market Data
-export { getOrderBookSummaryAction } from "./actions/getOrderBookSummary";
-
-// Trading
+// Core Trading
 export { placeOrderAction } from "./actions/placeOrder";
+export { sellOrderAction } from "./actions/sellOrder";
 export { redeemWinningsAction } from "./actions/redeemWinnings";
 
-// Additional functionality
+// Market Discovery & Data
+export { explainMarketAction } from "./actions/explainMarket";
+export { getMarketDataAction } from "./actions/getMarketData";
+export { showFavoriteMarketsAction } from "./actions/showFavoriteMarkets";
+export { searchMarketsAction } from "./actions/searchMarkets";
+export { syncMarketsAction } from "./actions/syncMarkets";
+export { getSamplingMarkets } from "./actions/getSamplingMarkets";
+export { getOrderBookSummaryAction } from "./actions/getOrderBookSummary";
+export { getMarketPriceAction } from "./actions/getMarketPrice";
 export { getPriceHistory } from "./actions/getPriceHistory";
 
-// Account management
-export { createApiKeyAction } from "./actions/createApiKey";
-export { revokeApiKeyAction } from "./actions/revokeApiKey";
-export { getAllApiKeysAction } from "./actions/getAllApiKeys";
+// Account Management
+export { getAccountAccessStatusAction } from "./actions/getAccountAccessStatus";
 
-// === COMMENTED OUT - REDUNDANT EXPORTS ===
+// Advanced Features
+export { depositUSDCAction } from "./actions/depositUSDC";
+export { getDepositAddressAction } from "./actions/getDepositAddress";
 
-// REDUNDANT: Market retrieval overlap
-// export { retrieveAllMarketsAction } from './actions/retrieveAllMarkets';
-// export { getSimplifiedMarketsAction } from './actions/getSimplifiedMarkets';
-// export { getClobMarkets } from './actions/getClobMarkets';
-// export { getOpenMarkets } from './actions/getOpenMarkets';
-// export { getMarketDetailsAction } from './actions/getMarketDetails';
-// export { showPredictionMarketAction } from './actions/showPredictionMarket';
-
-// REDUNDANT: Order book and pricing overlap
-// export { getOrderBookDepthAction } from './actions/getOrderBookDepth';
-// export { getBestPriceAction } from './actions/getBestPrice';
-// export { getMidpointPriceAction } from './actions/getMidpointPrice';
-// export { getSpreadAction } from './actions/getSpread';
 
 // Export utilities and services for advanced use cases
 export { initializeClobClient } from "./utils/clobClient";
@@ -94,7 +85,7 @@ export const character: Character = {
     "@elizaos/plugin-sql",
     ...(process.env.ANTHROPIC_API_KEY ? ["@elizaos/plugin-anthropic"] : []),
     ...(process.env.OPENAI_API_KEY ? ["@elizaos/plugin-openai"] : []),
-    ...(!process.env.OPENAI_API_KEY ? ["@elizaos/plugin-local-ai"] : []),
+    ...(!process.env.LOCALAI_API_KEY ? ["@elizaos/plugin-local-ai"] : []),
     ...(process.env.DISCORD_API_TOKEN ? ["@elizaos/plugin-discord"] : []),
     ...(process.env.TWITTER_USERNAME ? ["@elizaos/plugin-twitter"] : []),
     ...(process.env.TELEGRAM_BOT_TOKEN ? ["@elizaos/plugin-telegram"] : []),
