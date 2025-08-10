@@ -29,15 +29,16 @@ import type { Market, MarketsResponse } from "../types";
 export class MarketSyncService extends Service {
   static serviceType = "polymarket-sync";
   capabilityDescription =
-    "Syncs Polymarket market data to local database on a 12-hour schedule";
+    "Syncs Polymarket market data to local database on a daily (24-hour) schedule";
 
   private clobClient: ClobClient | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
-  private readonly SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+  private readonly SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds (daily sync)
   private readonly MAX_PAGES = 10; // Fetch up to 10 pages if needed for pagination
   private readonly PAGE_SIZE = 500; // Markets per page (Gamma API default)
   private readonly MAX_MARKETS = 5000; // Maximum markets to sync in one run
   private isRunning = false;
+  private lastSyncTime: Date | null = null;
 
   constructor(runtime: IAgentRuntime) {
     super(runtime);
@@ -56,7 +57,7 @@ export class MarketSyncService extends Service {
       service.clobClient = await initializeClobClient(runtime);
       logger.info("Market sync service: CLOB client initialized");
 
-      // Set up recurring sync every 12 hours (will handle database availability internally)
+      // Set up recurring sync every 24 hours (daily)
       service.setupRecurringSync();
 
       // Schedule initial sync after a delay to allow database initialization
@@ -109,17 +110,18 @@ export class MarketSyncService extends Service {
   }
 
   /**
-   * Set up recurring sync every 12 hours
+   * Set up recurring sync every 24 hours (daily)
    */
   private setupRecurringSync(): void {
     this.syncInterval = setInterval(async () => {
       if (!this.isRunning) {
+        logger.info("Daily market sync triggered");
         await this.performSync("scheduled");
       }
     }, this.SYNC_INTERVAL_MS);
 
     logger.info(
-      `Recurring market sync scheduled every ${this.SYNC_INTERVAL_MS / 1000 / 60 / 60} hours`,
+      `Recurring market sync scheduled every ${this.SYNC_INTERVAL_MS / 1000 / 60 / 60} hours (daily)`,
     );
   }
 
@@ -150,12 +152,20 @@ export class MarketSyncService extends Service {
 
     try {
       logger.info(`Starting ${syncType} market sync...`);
+      
+      // Track sync time
+      this.lastSyncTime = new Date();
 
       // Fetch active markets from Polymarket API
       const markets = searchTerm 
         ? await this.fetchFromGammaApi(searchTerm)
         : await this.fetchActiveMarkets();
       logger.info(`Fetched ${markets.length} active markets from API${searchTerm ? ` for search term: ${searchTerm}` : ''}`);
+
+      // First, mark all existing markets as potentially inactive (will be updated if still active)
+      if (!searchTerm) {
+        await this.markAllMarketsForReview();
+      }
 
       // Sync markets to database
       let syncedCount = 0;
@@ -179,6 +189,12 @@ export class MarketSyncService extends Service {
       }
 
       const duration = Date.now() - startTime;
+      
+      // Handle markets that are no longer active
+      if (!searchTerm) {
+        await this.handleInactiveMarkets();
+      }
+      
       // Clean up old/expired markets from database
       try {
         await this.cleanupOldMarkets();
@@ -500,10 +516,7 @@ export class MarketSyncService extends Service {
             );
             return;
           } else {
-            const daysFromNow = Math.floor(
-              (endDate.getTime() - currentDate.getTime()) /
-                (24 * 60 * 60 * 1000),
-            );
+            // Market is still future - keep it
             // Remove verbose logging for each market
           }
         } else {
@@ -726,6 +739,68 @@ export class MarketSyncService extends Service {
   }
 
   /**
+   * Mark all markets for review (to detect which ones are no longer active)
+   */
+  private async markAllMarketsForReview(): Promise<void> {
+    const db = (this.runtime as any).db;
+    if (!db) {
+      return;
+    }
+
+    try {
+      // Add a temporary flag to track which markets were present in the last sync
+      // This is done by setting lastSyncedAt to a timestamp before the current sync
+      const reviewTimestamp = new Date(Date.now() - 1000); // 1 second before current sync
+      
+      await db
+        .update(polymarketMarketsTable)
+        .set({
+          lastSyncedAt: reviewTimestamp,
+        })
+        .where(eq(polymarketMarketsTable.active, true));
+        
+      logger.info("Marked all active markets for review");
+    } catch (error) {
+      logger.error("Error marking markets for review:", error);
+    }
+  }
+
+  /**
+   * Handle markets that are no longer in the active list
+   */
+  private async handleInactiveMarkets(): Promise<void> {
+    const db = (this.runtime as any).db;
+    if (!db || !this.lastSyncTime) {
+      return;
+    }
+
+    try {
+      // Find markets that weren't updated in this sync (still have old lastSyncedAt)
+      const inactiveThreshold = new Date(this.lastSyncTime.getTime() - 2000); // 2 seconds before sync started
+      
+      const result = await db
+        .update(polymarketMarketsTable)
+        .set({
+          active: false,
+          closed: true,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(polymarketMarketsTable.active, true),
+            lt(polymarketMarketsTable.lastSyncedAt, inactiveThreshold)
+          )
+        );
+
+      if (result && result.rowCount > 0) {
+        logger.info(`Marked ${result.rowCount} markets as inactive (no longer in active API results)`);
+      }
+    } catch (error) {
+      logger.error("Error handling inactive markets:", error);
+    }
+  }
+
+  /**
    * Clean up old/expired markets from the database
    */
   private async cleanupOldMarkets(): Promise<void> {
@@ -761,75 +836,6 @@ export class MarketSyncService extends Service {
     }
   }
 
-  /**
-   * Create a sync status record
-   */
-  private async createSyncStatus(syncType: string): Promise<string> {
-    const db = (this.runtime as any).db;
-    if (!db) {
-      throw new Error("Database not available");
-    }
-
-    try {
-      // First create with minimal data
-      const result = await db
-        .insert(polymarketSyncStatusTable)
-        .values({
-          syncType: `markets_${syncType}`,
-        })
-        .returning({ id: polymarketSyncStatusTable.id });
-
-      const syncId = result[0].id;
-
-      // Then update to set status to running
-      await db
-        .update(polymarketSyncStatusTable)
-        .set({
-          syncStatus: "running",
-          metadata: {
-            startTime: new Date().toISOString(),
-            maxPages: this.MAX_PAGES,
-          },
-        })
-        .where(eq(polymarketSyncStatusTable.id, syncId));
-
-      return syncId;
-    } catch (error) {
-      logger.error("Failed to create sync status record:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update sync status record
-   */
-  private async updateSyncStatus(
-    id: string,
-    status: "success" | "error",
-    errorMessage: string | null,
-    recordsProcessed: number,
-  ): Promise<void> {
-    const db = (this.runtime as any).db;
-    if (!db) {
-      throw new Error("Database not available");
-    }
-
-    await db
-      .update(polymarketSyncStatusTable)
-      .set({
-        syncStatus: status,
-        errorMessage,
-        recordsProcessed,
-        lastSyncAt: new Date(),
-        metadata: {
-          endTime: new Date().toISOString(),
-          status,
-          recordsProcessed,
-        },
-        updatedAt: new Date(),
-      })
-      .where(eq(polymarketSyncStatusTable.id, id));
-  }
 
   /**
    * Get the last successful sync information
@@ -874,27 +880,26 @@ export class MarketSyncService extends Service {
   }
 
   /**
-   * Wait for database to become available
+   * Get the sync status information
    */
-  private async waitForDatabase(): Promise<void> {
-    const maxRetries = 10;
-    const retryDelay = 1000; // 1 second
-
-    for (let i = 0; i < maxRetries; i++) {
-      const db = (this.runtime as any).db;
-      if (db) {
-        logger.info("Database is available for market sync service");
-        return;
-      }
-
-      logger.info(
-        `Waiting for database to become available (attempt ${i + 1}/${maxRetries})...`,
-      );
-      await new Promise((resolve) => setTimeout(resolve, retryDelay));
-    }
-
-    throw new Error("Database did not become available within timeout");
+  async getSyncStatus(): Promise<{
+    lastSyncTime: Date | null;
+    nextSyncTime: Date | null;
+    isRunning: boolean;
+    syncInterval: number;
+  }> {
+    const nextSyncTime = this.lastSyncTime 
+      ? new Date(this.lastSyncTime.getTime() + this.SYNC_INTERVAL_MS)
+      : null;
+      
+    return {
+      lastSyncTime: this.lastSyncTime,
+      nextSyncTime,
+      isRunning: this.isRunning,
+      syncInterval: this.SYNC_INTERVAL_MS / 1000 / 60 / 60, // in hours
+    };
   }
+
 
   /**
    * Test database connection and log available properties

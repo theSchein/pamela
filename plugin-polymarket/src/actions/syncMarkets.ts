@@ -91,14 +91,20 @@ export const syncMarketsAction: Action = {
       // Trigger sync
       await syncService.performSync("manual", searchTerm);
       
+      // Get sync status for the response
+      const syncStatus = await syncService.getSyncStatus();
+      
       const successContent: Content = {
         text: searchTerm
           ? `✅ Successfully synced ${searchTerm.toUpperCase()} markets! Try searching again.`
-          : `✅ Market database sync completed! Fresh markets are now available.`,
+          : `✅ Market database sync completed! Fresh markets are now available.\n\n📊 Sync Status:\n• Last sync: Just now\n• Next automatic sync: ${syncStatus.nextSyncTime ? syncStatus.nextSyncTime.toLocaleString() : 'In 24 hours'}\n• Sync interval: Daily (24 hours)`,
         action: "SYNC_POLYMARKET_MARKETS",
         data: {
           searchTerm,
           status: "completed",
+          lastSyncTime: syncStatus.lastSyncTime,
+          nextSyncTime: syncStatus.nextSyncTime,
+          syncInterval: syncStatus.syncInterval,
         },
       };
       
