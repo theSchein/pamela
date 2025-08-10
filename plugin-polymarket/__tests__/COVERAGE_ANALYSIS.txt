@@ -1,71 +1,88 @@
 # Test Coverage Analysis - Polymarket Plugin
-# Generated: 2025-07-30
+# Generated: 2025-08-10
 # Current Coverage: ~28% line coverage
+# Target Coverage: 75-80% overall, >90% for critical paths
 
-## MISSING TEST COVERAGE ANALYSIS
+## CORE REQUIREMENTS
+Agent must be able to:
+1. Read polymarkets and understand them
+2. Read portfolio and positions
+3. Place buy and sell orders
+4. Redeem winning orders for USDC
 
-### STATUS OVERVIEW
-✅ WORKING: Core trading functionality (direct orders, portfolio, approvals)
-🔴 MISSING: Many actions, services, and error handling paths
-🟡 PARTIAL: Some actions have basic coverage but need error/edge cases
+## TESTING PRIORITY BASED ON REQUIREMENTS
 
-### 1. UNTESTED ACTIONS (0% coverage)
-These core actions have NO test coverage:
+### 🔴 PRIORITY 1: CRITICAL ACTIONS (Target: >90% coverage)
+These directly handle money and MUST be thoroughly tested:
 
-- cancelOrder.ts (0% coverage)
-  - Order cancellation workflow
-  - Active order management
-  - Cancellation error handling
+#### Trading Actions
+- placeOrder.ts (10.86% → 90%+) - Buying with real money
+- sellOrder.ts (9.63% → 90%+) - Selling positions
+- redeemWinnings.ts (0% → 90%+) - Claiming USDC from wins
 
-- createApiKey.ts (0% coverage)  
-  - API key generation
-  - Credential derivation
-  - Key management workflows
+#### Portfolio Management  
+- getPortfolioPositions.ts (16.88% → 90%+) - Reading holdings
+- getWalletBalance.ts (0% → 90%+) - Checking USDC balance
 
-- depositUSDC.ts (0% coverage)
-  - USDC deposit functionality
-  - Deposit address management
-  - Transaction monitoring
+#### Market Discovery
+- searchMarkets.ts (0% → 90%+) - Finding markets to trade
+- explainMarket.ts (0% → 90%+) - Understanding markets
 
-- revokeApiKey.ts (0% coverage)
-  - API key revocation
-  - Security management
-  - Key cleanup processes
+### 🟡 PRIORITY 2: SUPPORTING ACTIONS (Target: 70-80% coverage)
+Important but not critical path:
 
-- sellOrder.ts (0% coverage)
-  - LLM-based sell orders
-  - Sell parameter extraction
-  - Sell order validation
+#### Market Data
+- getMarketPrice.ts (0% → 80%) - Current prices
+- getOrderBookSummary.ts (partial → 80%) - Market depth
+- getPriceHistory.ts (partial → 70%) - Historical data
 
-- handleAuthentication.ts (0% coverage)
-  - Authentication workflows
-  - Credential validation
-  - Auth error handling
+#### Setup/Configuration
+- approveUSDC.ts (45.08% → 80%) - One-time setup
+- setupTrading.ts (0% → 70%) - Initial configuration
 
-- handleRealtimeUpdates.ts (0% coverage)
-  - WebSocket data processing
-  - Real-time market updates
-  - Event handling
+### 🟢 PRIORITY 3: NICE-TO-HAVE (Target: 50-60% coverage)
+Low priority, minimal testing needed:
+- showFavoriteMarkets.ts - UI convenience
+- syncMarkets.ts - Background process
+- getDepositAddress.ts - Rarely used
+- depositUSDC.ts - Manual process
+- getAccountAccessStatus.ts - Informational
+- getSamplingMarkets.ts - Alternative to search
+- getMarketData.ts - Raw data access
 
-- setupWebsocket.ts (0% coverage)
-  - WebSocket connection setup
-  - Connection management
-  - Reconnection logic
+### TEST COVERAGE BY PRIORITY
 
-- getMarketPrice.ts (0% coverage)
-  - Price discovery
-  - Market price calculations
-  - Price recommendation logic
+#### CRITICAL GAPS (Must fix immediately)
+- redeemWinnings.ts (0% coverage) ⚠️ HANDLES MONEY
+  - Redeeming winnings from resolved markets
+  - Transaction success/failure handling
+  - Multi-position redemption
+  
+- getWalletBalance.ts (0% coverage) ⚠️ SHOWS FUNDS
+  - USDC balance reading
+  - Zero balance handling
+  - Network error resilience
+  
+- searchMarkets.ts (0% coverage) ⚠️ CORE DISCOVERY
+  - Market search by keywords
+  - Empty results handling
+  - Search relevance
 
-- getMarketDetails.ts (0% coverage)
-  - Market information retrieval
-  - Market metadata processing
-  - Detail formatting
-
-- retrieveAllMarkets.ts (0% coverage)
-  - Market listing functionality
-  - Market filtering
-  - Pagination handling
+#### UNDER-TESTED CRITICAL ACTIONS (Need enhancement)
+- placeOrder.ts (10.86% coverage) ⚠️ HANDLES MONEY
+  - Missing: Order rejection, insufficient funds, network failures
+  - Missing: Slippage handling, price validation
+  - Missing: Edge cases (zero amount, invalid market)
+  
+- sellOrder.ts (9.63% coverage) ⚠️ HANDLES MONEY  
+  - Missing: Partial sells, position validation
+  - Missing: Market closed scenarios
+  - Missing: Insufficient position handling
+  
+- getPortfolioPositions.ts (16.88% coverage)
+  - Missing: Empty portfolio, P&L calculations
+  - Missing: Multiple positions handling
+  - Missing: API failure scenarios
 
 ### 2. PARTIALLY TESTED ACTIONS (need more coverage)
 These actions have basic coverage but need comprehensive testing:
@@ -152,115 +169,152 @@ Important boundary conditions not tested:
 - Concurrent operation handling
 - Rate limiting scenarios
 
-## TO ACHIEVE 90%+ COVERAGE
+## TESTING IMPLEMENTATION PLAN
 
-### HIGH PRIORITY (Core Trading) - Target: 60% total coverage
-1. **Error handling in trading actions**
-   - API failures, network timeouts
-   - Insufficient funds scenarios
-   - Invalid parameter handling
+### PHASE 1: CRITICAL PATH (Week 1) - Target: >90% on money-handling
+1. **Create missing critical tests**
+   - redeemWinnings.test.ts - Full redemption workflow
+   - getWalletBalance.test.ts - Balance checking with edge cases
+   - searchMarkets.test.ts - Market discovery and filtering
 
-2. **Sell order functionality**
-   - Complete testing of sellOrder.ts
-   - Enhanced directSellOrder.ts coverage
-   - Sell parameter validation
+2. **Enhance existing trading tests**
+   - placeOrder.test.ts - Add error scenarios, edge cases
+   - sellOrder.test.ts - Add validation, partial sells
+   - getPortfolioPositions.test.ts - Add P&L, empty states
 
-3. **Order management**
-   - Order cancellation workflows
-   - Active order monitoring
-   - Order status tracking
+3. **Critical error scenarios**
+   - Insufficient funds for orders
+   - Network failures during transactions
+   - Invalid market/token IDs
+   - Transaction reverts and gas failures
 
-4. **Market data retrieval**
-   - Market listing and filtering
-   - Market detail processing
-   - Price discovery testing
+### PHASE 2: SUPPORTING FEATURES (Week 2) - Target: 70-80%
+1. **Market data actions**
+   - getMarketPrice.test.ts - Price fetching and caching
+   - explainMarket.test.ts - Market explanation generation
+   - Enhanced getOrderBookSummary.test.ts
 
-### MEDIUM PRIORITY (Management Features) - Target: 75% total coverage
-1. **API key management**
-   - Key creation and derivation
-   - Key revocation and cleanup
-   - Security validation
+2. **Setup and configuration**
+   - setupTrading.test.ts - Complete setup flow
+   - Enhanced approveUSDC.test.ts - Approval edge cases
 
-2. **WebSocket functionality**
-   - Connection setup and management
-   - Real-time data processing
-   - Event handling and reconnection
+### PHASE 3: E2E & INTEGRATION (Week 3) - Target: Full workflows
+1. **End-to-end workflows**
+   - Complete trading cycle (search → buy → sell → redeem)
+   - Portfolio management workflow
+   - Market discovery and analysis flow
 
-3. **USDC deposit flows**
-   - Deposit address generation
-   - Transaction monitoring
-   - Deposit confirmation
+2. **Integration tests**
+   - Plugin initialization with ElizaOS
+   - Action registration and validation
+   - Error propagation and handling
 
-### LOW PRIORITY (Infrastructure) - Target: 90% total coverage
-1. **Service layer testing**
-   - Database services
-   - Sync services
-   - Background processes
+### PHASE 4: POLISH (If time permits)
+1. **Nice-to-have coverage**
+   - Background services
+   - Helper utilities
+   - Alternative market discovery methods
 
-2. **Helper utilities**
-   - LLM integration helpers
-   - Balance checking utilities
-   - Market lookup functions
+## IMPLEMENTATION METRICS
 
-3. **Configuration validation**
-   - Schema validation
-   - Plugin initialization
-   - Environment setup
+### Test Files Status:
+#### Existing (After Reorganization):
+- ✅ placeOrder.test.ts (needs enhancement)
+- ✅ sellOrder.test.ts (needs enhancement) 
+- ✅ getPortfolioPositions.test.ts (needs enhancement)
+- ✅ approveUSDC.test.ts (adequate coverage)
+- ✅ getOrderBookSummary.test.ts (adequate)
+- ✅ getPriceHistory.test.ts (adequate)
+- ✅ getSamplingMarkets.test.ts (low priority)
+- ✅ syncMarkets.test.ts (low priority)
+- ✅ explainMarket.test.ts (needs enhancement)
 
-## ESTIMATED IMPLEMENTATION EFFORT
-
-### Test Files Needed:
-- **6-8 action test files** for untested actions
-- **3-4 error scenario test files** for comprehensive error handling
-- **2-3 utility/service test files** for infrastructure coverage
-- **2-3 integration test files** for end-to-end workflows
-
-**Total: ~12-15 additional test files**
+#### Must Create (Priority Order):
+1. ❌ redeemWinnings.test.ts (CRITICAL)
+2. ❌ getWalletBalance.test.ts (CRITICAL)
+3. ❌ searchMarkets.test.ts (CRITICAL)
+4. ❌ getMarketPrice.test.ts (IMPORTANT)
+5. ❌ setupTrading.test.ts (IMPORTANT)
+6. ❌ e2e/trading-workflow.test.ts (CRITICAL)
+7. ❌ integration/error-handling.test.ts (CRITICAL)
 
 ### Development Time Estimate:
-- High Priority: 2-3 days (core trading coverage)
-- Medium Priority: 1-2 days (management features)
-- Low Priority: 1-2 days (infrastructure/utilities)
+- Phase 1 (Critical): 2-3 days
+- Phase 2 (Supporting): 1-2 days
+- Phase 3 (E2E): 1 day
+- Phase 4 (Polish): Optional
 
-**Total: 4-7 days for comprehensive coverage**
+**Total: 4-6 days for 75-80% coverage**
 
-### Coverage Targets:
-- Current: ~28% line coverage
-- High Priority Complete: ~60% coverage
-- Medium Priority Complete: ~75% coverage  
-- Full Implementation: ~90-95% coverage
+### Coverage Projections:
+- Current: ~28% overall (Critical actions <20%)
+- After Phase 1: ~55% overall (Critical actions >90%)
+- After Phase 2: ~70% overall (Supporting actions >70%)
+- After Phase 3: ~75-80% overall (Full workflows tested)
+- Maximum practical: ~85% (Diminishing returns beyond)
 
-## RECOMMENDED NEXT STEPS
+## IMMEDIATE NEXT STEPS (PRIORITIZED)
 
-1. **Immediate (High ROI):**
-   - Add error handling tests to existing actions
-   - Test sell order functionality
-   - Add order cancellation tests
+1. **TODAY - Critical Missing Tests:**
+   - Create redeemWinnings.test.ts (handles money)
+   - Create getWalletBalance.test.ts (shows funds)
+   - Create searchMarkets.test.ts (finds markets)
 
-2. **Short-term (Complete Core):**
-   - Test market data retrieval actions
-   - Add API key management tests
-   - Test WebSocket functionality
+2. **TOMORROW - Enhance Money-Handling Tests:**
+   - Enhance placeOrder.test.ts to >90% coverage
+   - Enhance sellOrder.test.ts to >90% coverage
+   - Add error scenarios for all trading actions
 
-3. **Long-term (Full Coverage):**
-   - Service layer comprehensive testing
-   - Utility function coverage
-   - Edge case and boundary testing
+3. **THIS WEEK - Complete Critical Path:**
+   - Create e2e trading workflow test
+   - Add integration error handling tests
+   - Ensure all money-touching code is tested
 
-## NOTES
+4. **NEXT WEEK - Supporting Features:**
+   - Add market data action tests
+   - Complete setup/config tests
+   - Polish existing test coverage
 
-- Current live integration approach is excellent for production confidence
-- Focus on error paths will provide highest coverage gains
-- Many utilities can be tested with unit tests (faster execution)
-- Consider mock testing for some service layer components to avoid API limits
-- Prioritize based on business-critical functionality first
+## KEY TESTING PRINCIPLES
+
+### What Makes a Good Test for Trading Actions:
+1. **Test the money path**: Every cent must be accounted for
+2. **Test failure modes**: Network errors, insufficient funds, invalid inputs
+3. **Test edge cases**: Zero amounts, maximum values, boundary conditions
+4. **Test state changes**: Portfolio before/after, balance changes
+5. **Test idempotency**: Repeated calls shouldn't duplicate transactions
+
+### Testing Strategy:
+- **Critical actions**: Use both mocked unit tests AND live integration tests
+- **Read-only actions**: Mocked tests are sufficient
+- **E2E tests**: Use testnet or small real transactions
+- **Error paths**: Must test more than happy paths
+
+### Coverage Goals by Category:
+- **Money-handling actions**: >90% (non-negotiable)
+- **Portfolio/balance reads**: >90% (users need accurate info)
+- **Market discovery**: >85% (core functionality)
+- **Market data**: 70-80% (acceptable)
+- **Setup/config**: 70% (one-time actions)
+- **Utilities/helpers**: 60% (lower priority)
 
 ## FILES TO REFERENCE WHEN IMPLEMENTING
 
-Existing working test patterns:
-- plugin-polymarket/__tests__/direct-trading.test.ts (live API integration)
-- plugin-polymarket/__tests__/portfolio-positions.test.ts (workflow testing)
-- plugin-polymarket/__tests__/test-approvals-and-trading.test.ts (error scenarios)
-- plugin-polymarket/__tests__/test-utils.ts (test infrastructure)
+After reorganization, reference these patterns:
+- __tests__/unit/actions/trading/placeOrder.test.ts (action testing pattern)
+- __tests__/unit/actions/setup/approveUSDC.test.ts (transaction testing)
+- __tests__/e2e/trading-workflow.test.ts (end-to-end pattern)
+- __tests__/utils/test-helpers.ts (shared utilities)
 
-Coverage can be checked with: `bun test --coverage`
+### Running Coverage:
+```bash
+npm run test:coverage       # Full coverage report
+vitest run --coverage       # Same thing
+vitest --coverage --ui      # Interactive coverage browser
+```
+
+### Focus Areas for Coverage:
+1. **Always test**: Error paths, edge cases, validation
+2. **Skip testing**: Console.logs, simple getters, framework boilerplate
+3. **Mock carefully**: External APIs, blockchain calls, time-dependent code
+4. **Test real when possible**: Critical calculations, business logic
