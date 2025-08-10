@@ -25,6 +25,7 @@ export { getOrderBookSummaryAction } from "./actions/getOrderBookSummary";
 
 // Trading
 export { placeOrderAction } from "./actions/placeOrder";
+export { redeemWinningsAction } from "./actions/redeemWinnings";
 
 // Additional functionality
 export { getPriceHistory } from "./actions/getPriceHistory";

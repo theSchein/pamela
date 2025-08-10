@@ -50,6 +50,7 @@ import { getMarketPriceAction } from "./actions/getMarketPrice";
 import { directPlaceOrderAction } from "./actions/directPlaceOrder";
 import { directSellOrderAction } from "./actions/directSellOrder";
 import { getPortfolioPositionsAction } from "./actions/getPortfolioPositions";
+import { redeemWinningsAction } from "./actions/redeemWinnings";
 import { polymarketSchema } from "./schema";
 import { MarketSyncService } from "./services/MarketSyncService";
 import { MarketDetailService } from "./services/MarketDetailService";
@@ -241,6 +242,7 @@ const plugin: Plugin = {
     // Core Trading
     placeOrderAction, // Buy orders (enhanced with market lookup)
     sellOrderAction, // Sell orders (now works with derived L2 credentials)
+    redeemWinningsAction, // Redeem winnings from resolved markets
     // sellInfoAction, // No longer needed - sell works now
     // cancelOrderAction, // Cancel orders - REQUIRES L2
     
