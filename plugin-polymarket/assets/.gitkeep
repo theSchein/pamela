@@ -1,0 +1,9 @@
+# Assets Directory
+
+This directory contains branding assets for the ElizaOS Plugin Registry:
+
+- `logo.png` - 400x400px logo image
+- `banner.png` - 1280x640px banner image  
+- `screenshots/` - Screenshots demonstrating plugin functionality
+
+These files will be added when submitting to the registry.

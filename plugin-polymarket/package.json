@@ -10,12 +10,47 @@
     "polymarket",
     "prediction-markets",
     "elizaos",
+    "elizaos-plugin",
+    "agent",
+    "trading",
+    "defi",
+    "web3",
     "plugin"
   ],
+  "agentConfig": {
+    "pluginType": "elizaos:plugin:1.0.0",
+    "pluginParameters": {
+      "WALLET_PRIVATE_KEY": {
+        "type": "string",
+        "description": "Private key for the wallet to use for trading",
+        "required": false
+      },
+      "CLOB_API_URL": {
+        "type": "string",
+        "description": "Polymarket CLOB API URL (defaults to https://clob.polymarket.com)",
+        "required": false,
+        "default": "https://clob.polymarket.com"
+      },
+      "CLOB_API_KEY": {
+        "type": "string",
+        "description": "Optional API key for L2 operations",
+        "required": false
+      }
+    }
+  },
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/yourusername/elizaos-plugin-polymarket"
   },
+  "homepage": "https://github.com/yourusername/elizaos-plugin-polymarket#readme",
+  "bugs": {
+    "url": "https://github.com/yourusername/elizaos-plugin-polymarket/issues"
+  },
+  "author": {
+    "name": "Benjamin Scheinberg",
+    "email": "ben@spmc.dev"
+  },
+  "license": "MIT",
   "exports": {
     "./package.json": "./package.json",
     ".": {
