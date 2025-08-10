@@ -15,7 +15,8 @@ Agent must be able to:
 ### 🔴 PRIORITY 1: CRITICAL ACTIONS (Target: >90% coverage)
 These directly handle money and MUST be thoroughly tested:
 
-#### Trading Actions
+#### Trading Ac
+tions
 - placeOrder.ts (10.86% → 90%+) - Buying with real money
 - sellOrder.ts (9.63% → 90%+) - Selling positions
 - redeemWinnings.ts (0% → 90%+) - Claiming USDC from wins

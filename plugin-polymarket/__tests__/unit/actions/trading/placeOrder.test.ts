@@ -1,19 +1,26 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { placeOrderAction } from '../src/actions/placeOrder';
-import { OrderSide, OrderType } from '../src/types';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { placeOrderAction } from '../../../../src/actions/placeOrder';
+import { OrderSide, OrderType } from '../../../../src/types';
 import type { IAgentRuntime, Memory, State, Content } from '@elizaos/core';
+import * as llmHelpers from '../../../../src/utils/llmHelpers';
+import * as clobClient from '../../../../src/utils/clobClient';
+import * as balanceChecker from '../../../../src/utils/balanceChecker';
 
-// Mock the dependencies
-vi.mock('../src/utils/llmHelpers', () => ({
+// Mock all dependencies
+vi.mock('../../../../src/utils/llmHelpers', () => ({
   callLLMWithTimeout: vi.fn(),
 }));
 
-vi.mock('../src/utils/clobClient', () => ({
+vi.mock('../../../../src/utils/clobClient', () => ({
   initializeClobClient: vi.fn(),
 }));
 
-const { callLLMWithTimeout } = await import('../src/utils/llmHelpers');
-const { initializeClobClient } = await import('../src/utils/clobClient');
+vi.mock('../../../../src/utils/balanceChecker', () => ({
+  checkPolymarketBalance: vi.fn(),
+  checkUSDCBalance: vi.fn(),
+  formatBalanceInfo: vi.fn(),
+  getMaxPositionSize: vi.fn(),
+}));
 
 describe('placeOrderAction', () => {
   let mockRuntime: IAgentRuntime;
@@ -27,8 +34,13 @@ describe('placeOrderAction', () => {
 
     mockRuntime = {
       getSetting: vi.fn((key: string) => {
-        if (key === 'CLOB_API_URL') return 'https://clob.polymarket.com';
-        return undefined;
+        const settings: Record<string, string> = {
+          CLOB_API_URL: 'https://clob.polymarket.com',
+          WALLET_PRIVATE_KEY: '0x' + '0'.repeat(64),
+          MAX_POSITION_SIZE: '100',
+          MIN_CONFIDENCE_THRESHOLD: '0.7',
+        };
+        return settings[key];
       }),
     } as any;
 
@@ -46,7 +58,20 @@ describe('placeOrderAction', () => {
       postOrder: vi.fn(),
     };
 
-    vi.mocked(initializeClobClient).mockResolvedValue(mockClient);
+    vi.mocked(clobClient.initializeClobClient).mockResolvedValue(mockClient);
+    
+    // Default balance mock - has enough balance
+    vi.mocked(balanceChecker.checkPolymarketBalance).mockResolvedValue({
+      address: '0x1234567890123456789012345678901234567890',
+      usdcBalance: '1000.00',
+      usdcBalanceRaw: '1000000000',
+      hasEnoughBalance: true,
+      requiredAmount: '50.00',
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('Action Properties', () => {
@@ -78,15 +103,24 @@ describe('placeOrderAction', () => {
     });
 
     it('should fail validation without CLOB_API_URL', async () => {
-      vi.mocked(mockRuntime.getSetting).mockReturnValue(undefined);
+      mockRuntime.getSetting = vi.fn(() => undefined);
       const result = await placeOrderAction.validate(mockRuntime, mockMessage, mockState);
       expect(result).toBe(false);
+    });
+
+    it('should validate with alternative CLOB_API_URL settings', async () => {
+      mockRuntime.getSetting = vi.fn((key: string) => {
+        if (key === 'POLYMARKET_CLOB_API_URL') return 'https://clob.polymarket.com';
+        return undefined;
+      });
+      const result = await placeOrderAction.validate(mockRuntime, mockMessage, mockState);
+      expect(result).toBe(true);
     });
   });
 
   describe('Successful Order Placement', () => {
     beforeEach(() => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         tokenId: '123456',
         side: 'BUY',
         price: 0.5,
@@ -120,13 +154,19 @@ describe('placeOrderAction', () => {
     });
 
     it('should place a successful limit buy order', async () => {
-      const result = (await placeOrderAction.handler(
+      const result = await placeOrderAction.handler(
         mockRuntime,
         mockMessage,
         mockState,
         {},
         mockCallback
-      )) as Content;
+      ) as Content;
+
+      // Verify balance was checked
+      expect(balanceChecker.checkPolymarketBalance).toHaveBeenCalledWith(
+        mockRuntime,
+        '50' // Total value of order
+      );
 
       expect(mockClient.createOrder).toHaveBeenCalledWith({
         tokenId: '123456',
@@ -143,11 +183,11 @@ describe('placeOrderAction', () => {
       expect(result.text).toContain('**Token ID**: 123456');
       expect(result.text).toContain('**Price**: $0.5000');
       expect(result.text).toContain('**Size**: 100 shares');
-      expect((result.data as any)?.success).toBe(true);
+      expect(result.data?.success).toBe(true);
     });
 
     it('should place a successful market sell order', async () => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         tokenId: '789012',
         side: 'SELL',
         price: 0.75,
@@ -156,13 +196,13 @@ describe('placeOrderAction', () => {
         feeRateBps: '10',
       });
 
-      const result = (await placeOrderAction.handler(
+      const result = await placeOrderAction.handler(
         mockRuntime,
         mockMessage,
         mockState,
         {},
         mockCallback
-      )) as Content;
+      ) as Content;
 
       expect(mockClient.createOrder).toHaveBeenCalledWith({
         tokenId: '789012',
@@ -185,13 +225,13 @@ describe('placeOrderAction', () => {
         status: 'delayed',
       });
 
-      const result = (await placeOrderAction.handler(
+      const result = await placeOrderAction.handler(
         mockRuntime,
         mockMessage,
         mockState,
         {},
         mockCallback
-      )) as Content;
+      ) as Content;
 
       expect(result.text).toContain('subject to a matching delay');
     });
@@ -203,21 +243,109 @@ describe('placeOrderAction', () => {
         status: 'unmatched',
       });
 
-      const result = (await placeOrderAction.handler(
+      const result = await placeOrderAction.handler(
         mockRuntime,
         mockMessage,
         mockState,
         {},
         mockCallback
-      )) as Content;
+      ) as Content;
 
       expect(result.text).toContain('waiting to be matched');
     });
   });
 
+  describe('Balance Verification', () => {
+    it('should reject order when insufficient balance', async () => {
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
+        tokenId: '123456',
+        side: 'BUY',
+        price: 0.5,
+        size: 1000, // Large order
+        orderType: 'GTC',
+      });
+
+      vi.mocked(balanceChecker.checkPolymarketBalance).mockResolvedValue({
+        address: '0x123',
+        usdcBalance: '100.00',
+        usdcBalanceRaw: '100000000',
+        hasEnoughBalance: false,
+        requiredAmount: '500.00',
+      });
+
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('Insufficient balance');
+      expect(mockClient.createOrder).not.toHaveBeenCalled();
+    });
+
+    it('should handle balance check errors', async () => {
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
+        tokenId: '123456',
+        side: 'BUY',
+        price: 0.5,
+        size: 100,
+        orderType: 'GTC',
+      });
+
+      vi.mocked(balanceChecker.checkPolymarketBalance).mockRejectedValue(
+        new Error('Failed to verify wallet balance')
+      );
+
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('Failed to verify wallet balance');
+    });
+
+    it('should calculate correct total value with fees', async () => {
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
+        tokenId: '123456',
+        side: 'BUY',
+        price: 0.5,
+        size: 100,
+        orderType: 'GTC',
+        feeRateBps: '10', // 0.1% fee
+      });
+
+      mockClient.createOrder.mockResolvedValue({} as any);
+      mockClient.postOrder.mockResolvedValue({
+        success: true,
+        orderId: 'order_with_fee',
+      });
+
+      await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      );
+
+      // Total value should be 50 * 1.001 = 50.05
+      expect(balanceChecker.checkPolymarketBalance).toHaveBeenCalledWith(
+        mockRuntime,
+        '50.05'
+      );
+    });
+  });
+
   describe('LLM Parameter Extraction', () => {
     it('should extract parameters successfully from LLM', async () => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         tokenId: '999999',
         side: 'BUY',
         price: 0.25,
@@ -244,7 +372,7 @@ describe('placeOrderAction', () => {
     });
 
     it('should handle LLM extraction failure with regex fallback', async () => {
-      vi.mocked(callLLMWithTimeout).mockRejectedValue(new Error('LLM failed'));
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockRejectedValue(new Error('LLM failed'));
 
       mockMessage.content!.text = 'Buy 75 tokens of 555555 at price $0.80';
 
@@ -266,15 +394,22 @@ describe('placeOrderAction', () => {
     });
 
     it('should handle LLM error response', async () => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         error: 'Required parameters missing',
       });
 
       mockMessage.content!.text = 'Invalid order request';
 
-      await expect(
-        placeOrderAction.handler(mockRuntime, mockMessage, mockState, {}, mockCallback)
-      ).rejects.toThrow('Please provide valid order parameters');
+      const result = await placeOrderAction.handler(
+        mockRuntime, 
+        mockMessage, 
+        mockState, 
+        {}, 
+        mockCallback
+      ) as Content;
+      
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Required order parameters not found');
     });
   });
 
@@ -288,7 +423,7 @@ describe('placeOrderAction', () => {
     });
 
     it('should convert percentage price to decimal', async () => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         tokenId: '123456',
         side: 'BUY',
         price: 75, // 75% should become 0.75
@@ -306,7 +441,7 @@ describe('placeOrderAction', () => {
     });
 
     it('should default invalid side to BUY', async () => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         tokenId: '123456',
         side: 'INVALID',
         price: 0.5,
@@ -323,7 +458,7 @@ describe('placeOrderAction', () => {
     });
 
     it('should default invalid order type to GTC', async () => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         tokenId: '123456',
         side: 'BUY',
         price: 0.5,
@@ -337,7 +472,7 @@ describe('placeOrderAction', () => {
     });
 
     it('should map limit to GTC and market to FOK', async () => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         tokenId: '123456',
         side: 'BUY',
         price: 0.5,
@@ -349,19 +484,68 @@ describe('placeOrderAction', () => {
 
       expect(mockClient.postOrder).toHaveBeenCalledWith(expect.any(Object), 'GTC');
     });
+
+    it('should validate price boundaries', async () => {
+      // Test price too low
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
+        tokenId: '123456',
+        side: 'BUY',
+        price: -0.5, // Invalid negative price
+        size: 100,
+      });
+
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('Invalid price');
+    });
+
+    it('should validate size boundaries', async () => {
+      // Test size too low
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
+        tokenId: '123456',
+        side: 'BUY',
+        price: 0.5,
+        size: 0, // Invalid zero size
+      });
+
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('Invalid size');
+    });
   });
 
   describe('Error Handling', () => {
     it('should handle missing CLOB_API_URL configuration', async () => {
-      vi.mocked(mockRuntime.getSetting).mockReturnValue(undefined);
+      mockRuntime.getSetting = vi.fn(() => undefined);
 
-      await expect(
-        placeOrderAction.handler(mockRuntime, mockMessage, mockState, {}, mockCallback)
-      ).rejects.toThrow('CLOB_API_URL is required in configuration');
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('CLOB_API_URL is required');
     });
 
     it('should handle failed order placement', async () => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         tokenId: '123456',
         side: 'BUY',
         price: 0.5,
@@ -371,39 +555,46 @@ describe('placeOrderAction', () => {
       mockClient.createOrder.mockResolvedValue({} as any);
       mockClient.postOrder.mockResolvedValue({
         success: false,
-        errorMsg: 'Insufficient balance',
+        errorMsg: 'Market closed',
       });
 
-      const result = (await placeOrderAction.handler(
+      const result = await placeOrderAction.handler(
         mockRuntime,
         mockMessage,
         mockState,
         {},
         mockCallback
-      )) as Content;
+      ) as Content;
 
       expect(result.text).toContain('Order Placement Failed');
-      expect(result.text).toContain('Insufficient balance');
-      expect((result.data as any)?.success).toBe(false);
+      expect(result.text).toContain('Market closed');
+      expect(result.data?.success).toBe(false);
     });
 
     it('should handle client initialization error', async () => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         tokenId: '123456',
         side: 'BUY',
         price: 0.5,
         size: 100,
       });
 
-      vi.mocked(initializeClobClient).mockRejectedValue(new Error('Client init failed'));
+      vi.mocked(clobClient.initializeClobClient).mockRejectedValue(new Error('Client init failed'));
 
-      await expect(
-        placeOrderAction.handler(mockRuntime, mockMessage, mockState, {}, mockCallback)
-      ).rejects.toThrow('Client init failed');
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('Client init failed');
     });
 
     it('should handle order creation error', async () => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         tokenId: '123456',
         side: 'BUY',
         price: 0.5,
@@ -412,30 +603,60 @@ describe('placeOrderAction', () => {
 
       mockClient.createOrder.mockRejectedValue(new Error('Order creation failed'));
 
-      await expect(
-        placeOrderAction.handler(mockRuntime, mockMessage, mockState, {}, mockCallback)
-      ).rejects.toThrow('Order creation failed');
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('Order creation failed');
     });
 
-    it('should handle unknown errors gracefully', async () => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+    it('should handle network errors gracefully', async () => {
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         tokenId: '123456',
         side: 'BUY',
         price: 0.5,
         size: 100,
       });
 
-      mockClient.createOrder.mockRejectedValue('Unknown error');
+      mockClient.createOrder.mockResolvedValue({} as any);
+      mockClient.postOrder.mockRejectedValue(new Error('Network request failed'));
 
-      await expect(
-        placeOrderAction.handler(mockRuntime, mockMessage, mockState, {}, mockCallback)
-      ).rejects.toThrow('Unknown error occurred while placing order');
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('Network request failed');
+    });
+
+    it('should handle timeout errors', async () => {
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockRejectedValue(new Error('Request timeout'));
+
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('timeout');
     });
   });
 
   describe('Regex Fallback Extraction', () => {
     beforeEach(() => {
-      vi.mocked(callLLMWithTimeout).mockRejectedValue(new Error('LLM failed'));
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockRejectedValue(new Error('LLM failed'));
       mockClient.createOrder.mockResolvedValue({} as any);
       mockClient.postOrder.mockResolvedValue({
         success: true,
@@ -468,15 +689,55 @@ describe('placeOrderAction', () => {
     it('should fail when required parameters are missing', async () => {
       mockMessage.content!.text = 'I want to trade something';
 
-      await expect(
-        placeOrderAction.handler(mockRuntime, mockMessage, mockState, {}, mockCallback)
-      ).rejects.toThrow('Please provide valid order parameters');
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('Please provide valid order parameters');
+    });
+
+    it('should handle various text formats', async () => {
+      const testCases = [
+        {
+          text: 'buy 100 of 0x123abc at 0.5',
+          expected: { tokenId: '0x123abc', side: OrderSide.BUY, price: 0.5, size: 100 }
+        },
+        {
+          text: 'sell 50 shares token 999888 price $0.75',
+          expected: { tokenId: '999888', side: OrderSide.SELL, price: 0.75, size: 50 }
+        },
+        {
+          text: 'purchase 200 tokens ID 555666 @ $0.25',
+          expected: { tokenId: '555666', side: OrderSide.BUY, price: 0.25, size: 200 }
+        }
+      ];
+
+      for (const testCase of testCases) {
+        vi.clearAllMocks();
+        mockMessage.content!.text = testCase.text;
+        
+        await placeOrderAction.handler(mockRuntime, mockMessage, mockState, {}, mockCallback);
+        
+        expect(mockClient.createOrder).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tokenId: testCase.expected.tokenId,
+            side: testCase.expected.side,
+            price: testCase.expected.price,
+            size: testCase.expected.size,
+          })
+        );
+      }
     });
   });
 
   describe('Response Formatting', () => {
     beforeEach(() => {
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
         tokenId: '123456',
         side: 'BUY',
         price: 0.5,
@@ -496,19 +757,19 @@ describe('placeOrderAction', () => {
         orderHashes: ['0xabcdef123456', '0x789012345678'],
       });
 
-      const result = (await placeOrderAction.handler(
+      const result = await placeOrderAction.handler(
         mockRuntime,
         mockMessage,
         mockState,
         {},
         mockCallback
-      )) as Content;
+      ) as Content;
 
       expect(result.text).toContain('**Order ID**: order_123');
       expect(result.text).toContain('**Status**: matched');
       expect(result.text).toContain('**Transaction Hash(es)**: 0xabcdef123456, 0x789012345678');
       expect(result.text).toContain('immediately matched and executed');
-      expect(result.text).toContain('**Total Value**: $50.0000');
+      expect(result.text).toContain('**Total Value**: $50.0500'); // With fee
       expect(result.text).toContain('**Fee Rate**: 10 bps');
     });
 
@@ -518,13 +779,13 @@ describe('placeOrderAction', () => {
         orderId: 'order_456',
       });
 
-      const result = (await placeOrderAction.handler(
+      const result = await placeOrderAction.handler(
         mockRuntime,
         mockMessage,
         mockState,
         {},
         mockCallback
-      )) as Content;
+      ) as Content;
 
       expect(result.data).toEqual({
         success: true,
@@ -535,7 +796,7 @@ describe('placeOrderAction', () => {
           size: 100,
           orderType: 'GTC',
           feeRateBps: '10',
-          totalValue: '50.0000',
+          totalValue: '50.0500',
         },
         orderResponse: {
           success: true,
@@ -543,6 +804,153 @@ describe('placeOrderAction', () => {
         },
         timestamp: expect.any(String),
       });
+    });
+
+    it('should format error responses properly', async () => {
+      mockClient.createOrder.mockRejectedValue(new Error('Invalid signature'));
+
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('Error');
+      expect(result.text).toContain('Invalid signature');
+      expect(result.data).toEqual({});
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle very small order sizes', async () => {
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
+        tokenId: '123456',
+        side: 'BUY',
+        price: 0.01,
+        size: 1,
+        orderType: 'GTC',
+      });
+
+      mockClient.createOrder.mockResolvedValue({} as any);
+      mockClient.postOrder.mockResolvedValue({
+        success: true,
+        orderId: 'small_order',
+      });
+
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(true);
+      expect(balanceChecker.checkPolymarketBalance).toHaveBeenCalledWith(
+        mockRuntime,
+        '0.01'
+      );
+    });
+
+    it('should handle very large order sizes', async () => {
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
+        tokenId: '123456',
+        side: 'BUY',
+        price: 0.99,
+        size: 10000,
+        orderType: 'GTC',
+      });
+
+      // Simulate having enough balance for large order
+      vi.mocked(balanceChecker.checkPolymarketBalance).mockResolvedValue({
+        address: '0x123',
+        usdcBalance: '15000.00',
+        usdcBalanceRaw: '15000000000',
+        hasEnoughBalance: true,
+        requiredAmount: '9900.00',
+      });
+
+      mockClient.createOrder.mockResolvedValue({} as any);
+      mockClient.postOrder.mockResolvedValue({
+        success: true,
+        orderId: 'large_order',
+      });
+
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(true);
+      expect(result.text).toContain('10000 shares');
+    });
+
+    it('should handle prices at boundaries (0 and 1)', async () => {
+      // Test price at 1 (100%)
+      vi.mocked(llmHelpers.callLLMWithTimeout).mockResolvedValue({
+        tokenId: '123456',
+        side: 'BUY',
+        price: 1.0,
+        size: 100,
+        orderType: 'GTC',
+      });
+
+      mockClient.createOrder.mockResolvedValue({} as any);
+      mockClient.postOrder.mockResolvedValue({
+        success: true,
+        orderId: 'boundary_order',
+      });
+
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(true);
+      expect(mockClient.createOrder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          price: 1.0,
+        })
+      );
+    });
+
+    it('should handle missing message content', async () => {
+      mockMessage.content = undefined as any;
+
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('No message content');
+    });
+
+    it('should handle empty message text', async () => {
+      mockMessage.content!.text = '';
+
+      const result = await placeOrderAction.handler(
+        mockRuntime,
+        mockMessage,
+        mockState,
+        {},
+        mockCallback
+      ) as Content;
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('order parameters');
     });
   });
 });
