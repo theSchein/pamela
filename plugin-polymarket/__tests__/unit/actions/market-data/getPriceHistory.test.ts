@@ -1,30 +1,31 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, mock, beforeEach } from 'bun:test';
 import type { IAgentRuntime, Memory, State } from '@elizaos/core';
-import { getPriceHistory } from '../src/actions/getPriceHistory';
-import { initializeClobClient, type PricePoint } from '../src/utils/clobClient';
-import { callLLMWithTimeout } from '../src/utils/llmHelpers';
+import type { PricePoint } from '../../../../src/utils/clobClient';
+
+// Import after mocks
+import { getPriceHistory } from '../../../../src/actions/getPriceHistory';
+import { initializeClobClient } from '../../../../src/utils/clobClient';
+import { callLLMWithTimeout } from '../../../../src/utils/llmHelpers';
 
 // Mock the dependencies
-vi.mock('../src/utils/clobClient');
-vi.mock('../src/utils/llmHelpers');
-
-const mockInitializeClobClient = vi.mocked(initializeClobClient);
-const mockCallLLMWithTimeout = vi.mocked(callLLMWithTimeout);
+mock.module('../../../../src/utils/clobClient', () => ({
+  initializeClobClient: mock(),
+}));
+mock.module('../../../../src/utils/llmHelpers', () => ({
+  callLLMWithTimeout: mock(),
+}));
 
 describe('getPriceHistory Action', () => {
   let mockRuntime: IAgentRuntime;
   let mockMessage: Memory;
   let mockState: State;
-  let mockCallback: vi.Mock;
+  let mockCallback: any;
   let mockClobClient: any;
 
   beforeEach(() => {
-    // Reset mocks
-    vi.clearAllMocks();
-
     // Mock runtime
     mockRuntime = {
-      getSetting: vi.fn(),
+      getSetting: mock(),
       agentId: 'test-agent',
       serverUrl: 'http://localhost:3000',
       token: 'test-token',
@@ -44,14 +45,14 @@ describe('getPriceHistory Action', () => {
     mockState = {} as State;
 
     // Mock callback
-    mockCallback = vi.fn();
+    mockCallback = mock();
 
     // Mock CLOB client
     mockClobClient = {
-      getPricesHistory: vi.fn(),
+      getPricesHistory: mock(),
     };
 
-    mockInitializeClobClient.mockResolvedValue(mockClobClient);
+    (initializeClobClient as any).mockResolvedValue(mockClobClient);
   });
 
   describe('Action Properties', () => {
@@ -81,7 +82,7 @@ describe('getPriceHistory Action', () => {
       ];
 
       mockClobClient.getPricesHistory.mockResolvedValue(mockPriceHistory);
-      mockCallLLMWithTimeout.mockResolvedValue({
+      (callLLMWithTimeout as any).mockResolvedValue({
         tokenId: '123456',
         interval: '1d',
       });
@@ -109,7 +110,7 @@ describe('getPriceHistory Action', () => {
 
     it('should handle empty price history', async () => {
       mockClobClient.getPricesHistory.mockResolvedValue([]);
-      mockCallLLMWithTimeout.mockResolvedValue({
+      (callLLMWithTimeout as any).mockResolvedValue({
         tokenId: '123456',
         interval: '1d',
       });
@@ -132,7 +133,7 @@ describe('getPriceHistory Action', () => {
       const mockPriceHistory: PricePoint[] = [{ t: 1640995200, p: 0.6523 }];
 
       mockClobClient.getPricesHistory.mockResolvedValue(mockPriceHistory);
-      mockCallLLMWithTimeout.mockResolvedValue({
+      (callLLMWithTimeout as any).mockResolvedValue({
         tokenId: '123456',
         // No interval specified
       });
@@ -155,7 +156,7 @@ describe('getPriceHistory Action', () => {
 
   describe('LLM Parameter Extraction', () => {
     it('should handle LLM extraction returning error', async () => {
-      mockCallLLMWithTimeout.mockResolvedValue({
+      (callLLMWithTimeout as any).mockResolvedValue({
         error: 'Token ID is required for price history',
       });
 
@@ -191,7 +192,7 @@ describe('getPriceHistory Action', () => {
     });
 
     it('should handle missing tokenId after extraction', async () => {
-      mockCallLLMWithTimeout.mockResolvedValue({
+      (callLLMWithTimeout as any).mockResolvedValue({
         interval: '1d',
         // No tokenId
       });
@@ -213,7 +214,7 @@ describe('getPriceHistory Action', () => {
 
   describe('Error Handling', () => {
     it('should handle CLOB client initialization failure', async () => {
-      mockInitializeClobClient.mockRejectedValue(new Error('CLOB client init failed'));
+      (initializeClobClient as any).mockRejectedValue(new Error('CLOB client init failed'));
 
       const result = await getPriceHistory.handler(
         mockRuntime,
@@ -231,7 +232,7 @@ describe('getPriceHistory Action', () => {
     });
 
     it('should handle API errors gracefully', async () => {
-      mockCallLLMWithTimeout.mockResolvedValue({
+      (callLLMWithTimeout as any).mockResolvedValue({
         tokenId: '123456',
         interval: '1d',
       });
@@ -254,7 +255,7 @@ describe('getPriceHistory Action', () => {
     });
 
     it('should handle unknown errors', async () => {
-      mockCallLLMWithTimeout.mockResolvedValue({
+      (callLLMWithTimeout as any).mockResolvedValue({
         tokenId: '123456',
         interval: '1d',
       });
@@ -278,7 +279,7 @@ describe('getPriceHistory Action', () => {
 
   describe('Edge Cases', () => {
     it('should handle null/undefined price history response', async () => {
-      mockCallLLMWithTimeout.mockResolvedValue({
+      (callLLMWithTimeout as any).mockResolvedValue({
         tokenId: '123456',
         interval: '1d',
       });
@@ -301,7 +302,7 @@ describe('getPriceHistory Action', () => {
       const mockPriceHistory: PricePoint[] = [{ t: 1640995200, p: 0.6523 }];
 
       mockClobClient.getPricesHistory.mockResolvedValue(mockPriceHistory);
-      mockCallLLMWithTimeout.mockResolvedValue({
+      (callLLMWithTimeout as any).mockResolvedValue({
         tokenId: '123456',
         interval: '1d',
       });

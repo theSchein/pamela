@@ -1,30 +1,30 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, mock, beforeEach } from 'bun:test';
 import type { IAgentRuntime, Memory, State } from '@elizaos/core';
-import { getSamplingMarkets } from '../src/actions/getSamplingMarkets';
-import { initializeClobClient } from '../src/utils/clobClient';
-import { callLLMWithTimeout } from '../src/utils/llmHelpers';
+
+// Import after mocks
+import { getSamplingMarkets } from '../../../../src/actions/getSamplingMarkets';
+import { initializeClobClient } from '../../../../src/utils/clobClient';
+import { callLLMWithTimeout } from '../../../../src/utils/llmHelpers';
 
 // Mock the dependencies
-vi.mock('../src/utils/clobClient');
-vi.mock('../src/utils/llmHelpers');
-
-const mockInitializeClobClient = vi.mocked(initializeClobClient);
-const mockCallLLMWithTimeout = vi.mocked(callLLMWithTimeout);
+mock.module('../../../../src/utils/clobClient', () => ({
+  initializeClobClient: mock(),
+}));
+mock.module('../../../../src/utils/llmHelpers', () => ({
+  callLLMWithTimeout: mock(),
+}));
 
 describe('getSamplingMarkets Action', () => {
   let mockRuntime: IAgentRuntime;
   let mockMessage: Memory;
   let mockState: State;
-  let mockCallback: vi.Mock;
+  let mockCallback: any;
   let mockClobClient: any;
 
   beforeEach(() => {
-    // Reset all mocks
-    vi.clearAllMocks();
-
     // Mock runtime
     mockRuntime = {
-      getSetting: vi.fn().mockReturnValue('https://clob.polymarket.com'),
+      getSetting: mock().mockReturnValue('https://clob.polymarket.com'),
     } as any;
 
     // Mock message
@@ -42,14 +42,14 @@ describe('getSamplingMarkets Action', () => {
     mockState = {} as State;
 
     // Mock callback
-    mockCallback = vi.fn();
+    mockCallback = mock();
 
     // Mock CLOB client
     mockClobClient = {
-      getSamplingMarkets: vi.fn(),
+      getSamplingMarkets: mock(),
     };
 
-    mockInitializeClobClient.mockResolvedValue(mockClobClient);
+    (initializeClobClient as any).mockResolvedValue(mockClobClient);
   });
 
   describe('Action Properties', () => {
@@ -140,7 +140,7 @@ describe('getSamplingMarkets Action', () => {
       };
 
       mockClobClient.getSamplingMarkets.mockResolvedValue(mockMarketsResponse);
-      mockCallLLMWithTimeout.mockResolvedValue({});
+      (callLLMWithTimeout as any).mockResolvedValue({});
 
       const result = await getSamplingMarkets.handler(
         mockRuntime,
@@ -181,7 +181,7 @@ describe('getSamplingMarkets Action', () => {
       };
 
       mockClobClient.getSamplingMarkets.mockResolvedValue(mockMarketsResponse);
-      mockCallLLMWithTimeout.mockResolvedValue({ next_cursor: 'XYZ789' });
+      (callLLMWithTimeout as any).mockResolvedValue({ next_cursor: 'XYZ789' });
 
       const result = await getSamplingMarkets.handler(
         mockRuntime,
@@ -210,7 +210,7 @@ describe('getSamplingMarkets Action', () => {
       };
 
       mockClobClient.getSamplingMarkets.mockResolvedValue(mockMarketsResponse);
-      mockCallLLMWithTimeout.mockResolvedValue({});
+      (callLLMWithTimeout as any).mockResolvedValue({});
 
       const result = await getSamplingMarkets.handler(
         mockRuntime,
@@ -248,7 +248,7 @@ describe('getSamplingMarkets Action', () => {
       };
 
       mockClobClient.getSamplingMarkets.mockResolvedValue(mockMarketsResponse);
-      mockCallLLMWithTimeout.mockResolvedValue({});
+      (callLLMWithTimeout as any).mockResolvedValue({});
 
       const result = await getSamplingMarkets.handler(
         mockRuntime,
@@ -277,7 +277,7 @@ describe('getSamplingMarkets Action', () => {
       };
 
       mockClobClient.getSamplingMarkets.mockResolvedValue(mockMarketsResponse);
-      mockCallLLMWithTimeout.mockResolvedValue({ next_cursor: 'CURSOR123' });
+      (callLLMWithTimeout as any).mockResolvedValue({ next_cursor: 'CURSOR123' });
 
       await getSamplingMarkets.handler(mockRuntime, mockMessage, mockState, {}, mockCallback);
 
@@ -321,7 +321,7 @@ describe('getSamplingMarkets Action', () => {
       };
 
       mockClobClient.getSamplingMarkets.mockResolvedValue(mockMarketsResponse);
-      mockCallLLMWithTimeout.mockResolvedValue({ error: 'No cursor found' });
+      (callLLMWithTimeout as any).mockResolvedValue({ error: 'No cursor found' });
 
       const result = await getSamplingMarkets.handler(
         mockRuntime,
@@ -338,7 +338,7 @@ describe('getSamplingMarkets Action', () => {
 
   describe('Error Handling', () => {
     it('should handle CLOB client initialization failure', async () => {
-      mockInitializeClobClient.mockRejectedValue(new Error('Client init failed'));
+      (initializeClobClient as any).mockRejectedValue(new Error('Client init failed'));
 
       const result = await getSamplingMarkets.handler(
         mockRuntime,
@@ -361,7 +361,7 @@ describe('getSamplingMarkets Action', () => {
 
     it('should handle API call failure', async () => {
       mockClobClient.getSamplingMarkets.mockRejectedValue(new Error('API error'));
-      mockCallLLMWithTimeout.mockResolvedValue({});
+      (callLLMWithTimeout as any).mockResolvedValue({});
 
       const result = await getSamplingMarkets.handler(
         mockRuntime,
@@ -384,7 +384,7 @@ describe('getSamplingMarkets Action', () => {
 
     it('should handle unknown error types', async () => {
       mockClobClient.getSamplingMarkets.mockRejectedValue('String error');
-      mockCallLLMWithTimeout.mockResolvedValue({});
+      (callLLMWithTimeout as any).mockResolvedValue({});
 
       const result = await getSamplingMarkets.handler(
         mockRuntime,
@@ -413,7 +413,7 @@ describe('getSamplingMarkets Action', () => {
       };
 
       mockClobClient.getSamplingMarkets.mockResolvedValue(mockMarketsResponse);
-      mockCallLLMWithTimeout.mockResolvedValue({});
+      (callLLMWithTimeout as any).mockResolvedValue({});
 
       const result = await getSamplingMarkets.handler(
         mockRuntime,
@@ -452,7 +452,7 @@ describe('getSamplingMarkets Action', () => {
       };
 
       mockClobClient.getSamplingMarkets.mockResolvedValue(mockMarketsResponse);
-      mockCallLLMWithTimeout.mockResolvedValue({});
+      (callLLMWithTimeout as any).mockResolvedValue({});
 
       await getSamplingMarkets.handler(mockRuntime, mockMessage, mockState, {}, mockCallback);
 
@@ -481,7 +481,7 @@ describe('getSamplingMarkets Action', () => {
       };
 
       mockClobClient.getSamplingMarkets.mockResolvedValue(mockMarketsResponse);
-      mockCallLLMWithTimeout.mockResolvedValue({});
+      (callLLMWithTimeout as any).mockResolvedValue({});
 
       await getSamplingMarkets.handler(mockRuntime, mockMessage, mockState, {}, mockCallback);
 
@@ -506,7 +506,7 @@ describe('getSamplingMarkets Action', () => {
       };
 
       mockClobClient.getSamplingMarkets.mockResolvedValue(mockMarketsResponse);
-      mockCallLLMWithTimeout.mockResolvedValue({});
+      (callLLMWithTimeout as any).mockResolvedValue({});
 
       await getSamplingMarkets.handler(mockRuntime, mockMessage, mockState, {}, mockCallback);
 
@@ -530,7 +530,7 @@ describe('getSamplingMarkets Action', () => {
       };
 
       mockClobClient.getSamplingMarkets.mockResolvedValue(mockMarketsResponse);
-      mockCallLLMWithTimeout.mockResolvedValue({});
+      (callLLMWithTimeout as any).mockResolvedValue({});
 
       const result = await getSamplingMarkets.handler(
         mockRuntime,
@@ -552,7 +552,7 @@ describe('getSamplingMarkets Action', () => {
       };
 
       mockClobClient.getSamplingMarkets.mockResolvedValue(mockMarketsResponse);
-      mockCallLLMWithTimeout.mockResolvedValue({});
+      (callLLMWithTimeout as any).mockResolvedValue({});
 
       const result = await getSamplingMarkets.handler(
         mockRuntime,

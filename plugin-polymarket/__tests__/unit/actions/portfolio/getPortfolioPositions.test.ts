@@ -1,318 +1,444 @@
-/**
- * Portfolio Positions Test
- * Tests that we can view portfolio positions after placing orders
- */
+import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test';
+import { IAgentRuntime, Memory, State, HandlerCallback } from '@elizaos/core';
 
-// Load environment variables from project root
-import { config } from 'dotenv';
-import path from 'path';
-const envPath = path.resolve(__dirname, '../../.env');
-console.log(`Loading env from: ${envPath}`);
-config({ path: envPath });
+// Import after mocks
+import { getPortfolioPositionsAction } from '../../../../src/actions/getPortfolioPositions';
+import * as clobClient from '../../../../src/utils/clobClient';
 
-import { describe, it, expect, beforeAll } from 'vitest';
-import type { IAgentRuntime } from '@elizaos/core';
+// Mock the CLOB client
+mock.module('../../../../src/utils/clobClient', () => ({
+    initializeClobClient: mock(),
+}));
 
-// Core actions
-import { directPlaceOrderAction } from '../src/actions/directPlaceOrder';
-import { getPortfolioPositionsAction } from '../src/actions/getPortfolioPositions';
-import { setupTradingAction } from '../src/actions/setupTrading';
+describe('getPortfolioPositions Action', () => {
+    let mockRuntime: IAgentRuntime;
+    let mockCallback: HandlerCallback;
+    let mockMemory: Memory;
+    let mockState: State;
+    let mockClient: any;
 
-// Utils
-import { createTestRuntime } from './test-utils';
-import { initializeClobClient } from '../src/utils/clobClient';
+    beforeEach(() => {
+        // Setup mock runtime with settings
+        mockRuntime = {
+            getSetting: mock((key: string) => {
+                const settings: Record<string, string> = {
+                    WALLET_PRIVATE_KEY: '0x' + '0'.repeat(64),
+                    CLOB_API_URL: 'https://clob.polymarket.com',
+                };
+                return settings[key];
+            }),
+            character: {
+                settings: {
+                    secrets: {
+                        WALLET_PRIVATE_KEY: '0x' + '0'.repeat(64),
+                    },
+                },
+            },
+        } as any;
 
-// Test market details
-const TEST_MARKET = {
-  CONDITION_ID: '0xf2ce8d3897ac5009a131637d3575f1f91c579bd08eecce6ae2b2da0f32bbe6f1',
-  QUESTION: 'Xi Jinping out in 2025?',
-  YES_TOKEN_ID: '114304586861386186441621124384163963092522056897081085884483958561365015034812',
-  NO_TOKEN_ID: '112744882674787019048577842008042029962234998947364561417955402912669471494485',
-  ORDER_PRICE: 0.12,
-  ORDER_SIZE: 9,     // 9 shares * $0.12 = $1.08 (meets $1 minimum)
-  EXPECTED_COST: 1.08,
-};
-
-describe('📊 Portfolio Positions Testing', () => {
-  let runtime: IAgentRuntime;
-  let clobClient: any;
-
-  beforeAll(async () => {
-    console.log('📊 Setting up portfolio positions test...');
-    console.log(`🎯 Market: ${TEST_MARKET.QUESTION}`);
-    console.log(`💰 Test Order: ${TEST_MARKET.ORDER_SIZE} YES shares at $${TEST_MARKET.ORDER_PRICE}`);
-    
-    runtime = await createTestRuntime({
-      POLYMARKET_PRIVATE_KEY: process.env.POLYMARKET_PRIVATE_KEY || '',
-      WALLET_PRIVATE_KEY: process.env.WALLET_PRIVATE_KEY || '',
-      CLOB_API_URL: process.env.CLOB_API_URL || 'https://clob.polymarket.com',
-    });
-    
-    try {
-      clobClient = await initializeClobClient(runtime);
-      console.log('✅ CLOB client initialized for portfolio testing');
-    } catch (error) {
-      console.log('⚠️  CLOB client init failed:', error.message);
-      throw error;
-    }
-  });
-
-  describe('Initial Portfolio State', () => {
-    it('should setup trading environment', async () => {
-      console.log('🛠️  Step 1: Setup trading environment...');
-      
-      const setupMemory = {
-        id: 'portfolio-setup',
-        userId: 'portfolio-user', 
-        agentId: 'portfolio-agent',
-        content: { text: 'setup trading for portfolio test' },
-        roomId: 'portfolio-room',
-        createdAt: Date.now(),
-      };
-
-      const setupResult = await setupTradingAction.handler(
-        runtime,
-        setupMemory,
-        undefined,
-        undefined,
-        (content) => {
-          console.log(`   📢 ${content.text.split('\\n')[0]}`);
-        }
-      );
-
-      console.log(`📊 Setup Result: ${setupResult.success}`);
-      expect(setupResult.success).toBe(true);
-      
-      console.log('✅ Trading setup complete for portfolio test');
-    }, 45000);
-
-    it('should get initial portfolio positions (likely empty)', async () => {
-      console.log('📊 Step 2: Check initial portfolio positions...');
-      
-      const portfolioMemory = {
-        id: 'initial-portfolio',
-        userId: 'portfolio-user',
-        agentId: 'portfolio-agent', 
-        content: { text: 'show my portfolio positions' },
-        roomId: 'portfolio-room',
-        createdAt: Date.now(),
-      };
-
-      const portfolioResult = await getPortfolioPositionsAction.handler(
-        runtime,
-        portfolioMemory,
-        undefined,
-        undefined,
-        (content) => {
-          console.log(`   📢 ${content.text.split('\\n')[0]}`);
-        }
-      );
-
-      console.log(`📊 Initial Portfolio Result: ${portfolioResult.success}`);
-      expect(portfolioResult.success).toBe(true);
-      
-      if (portfolioResult.data && typeof portfolioResult.data === 'object') {
-        const portfolioData = portfolioResult.data as any;
-        console.log(`   📊 Initial Positions: ${portfolioData.totalPositions || 0}`);
-        console.log(`   💰 USDC Balance: $${portfolioData.usdcBalance || '0'}`);
-        console.log(`   💎 Position Value: $${portfolioData.totalValue || '0'}`);
+        mockCallback = mock();
         
-        // Store initial state for comparison
-        (global as any).initialPositions = portfolioData.totalPositions || 0;
-        (global as any).initialBalance = parseFloat(portfolioData.usdcBalance || '0');
-      }
-      
-      console.log('✅ Initial portfolio state captured');
-    }, 15000);
-  });
+        mockMemory = {
+            userId: 'user-123',
+            agentId: 'agent-123',
+            roomId: 'room-123',
+            content: { text: 'show my portfolio' },
+        } as Memory;
 
-  describe('Order Placement & Position Creation', () => {
-    it('should place a test order to create a position', async () => {
-      console.log('🎯 Step 3: Place test order to create position...');
-      console.log(`📋 Order: ${TEST_MARKET.ORDER_SIZE} YES shares at $${TEST_MARKET.ORDER_PRICE} = $${TEST_MARKET.EXPECTED_COST}`);
-      
-      const orderMemory = {
-        id: 'portfolio-order',
-        userId: 'portfolio-user',
-        agentId: 'portfolio-agent',
-        content: { 
-          text: `Portfolio test order for ${TEST_MARKET.ORDER_SIZE} YES shares`
-        },
-        roomId: 'portfolio-room',
-        createdAt: Date.now(),
-      };
+        mockState = {} as State;
 
-      // Direct API parameters
-      const orderOptions = {
-        tokenId: TEST_MARKET.YES_TOKEN_ID,
-        side: 'BUY' as const,
-        price: TEST_MARKET.ORDER_PRICE,
-        size: TEST_MARKET.ORDER_SIZE,
-        orderType: 'GTC' as const,
-      };
-
-      console.log('🚀 Placing order with direct API parameters...');
-      
-      const orderResult = await directPlaceOrderAction.handler(
-        runtime,
-        orderMemory,
-        undefined,
-        orderOptions,
-        (content) => {
-          const text = content.text;
-          if (text.includes('Order Placed') || 
-              text.includes('Creating Order') ||
-              text.includes('Successfully') || 
-              text.includes('Failed')) {
-            console.log(`   📢 ${text.split('\\n')[0]}`);
-          }
-        }
-      );
-
-      console.log(`📊 Order Result: ${orderResult.success}`);
-      
-      if (orderResult.success) {
-        console.log('🎉 ORDER PLACED SUCCESSFULLY!');
-        console.log('   ✅ Should create a portfolio position');
-        
-        if (orderResult.data && typeof orderResult.data === 'object') {
-          const orderData = orderResult.data as any;
-          console.log(`   📋 Order Status: ${orderData.orderResponse?.status || 'N/A'}`);
-          console.log(`   💰 Order Value: $${orderData.totalValue || TEST_MARKET.EXPECTED_COST}`);
-        }
-        
-        expect(orderResult.success).toBe(true);
-        
-        // Wait a moment for order to settle
-        console.log('⏳ Waiting 3 seconds for order to settle...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-      } else {
-        console.log('❌ Order placement failed - portfolio test may be limited');
-        
-        if (orderResult.data && typeof orderResult.data === 'object') {
-          const orderData = orderResult.data as any;
-          console.log(`   Error: ${orderData.error || 'Unknown error'}`);
-        }
-        
-        // Continue test even if order fails - we can still test the portfolio action
-        expect(orderResult).toBeDefined();
-      }
-      
-    }, 30000);
-  });
-
-  describe('Portfolio Verification', () => {
-    it('should show updated portfolio positions after order', async () => {
-      console.log('📊 Step 4: Check portfolio after order placement...');
-      
-      const portfolioMemory = {
-        id: 'updated-portfolio',
-        userId: 'portfolio-user',
-        agentId: 'portfolio-agent',
-        content: { text: 'show my updated portfolio positions' },
-        roomId: 'portfolio-room',
-        createdAt: Date.now(),
-      };
-
-      const portfolioResult = await getPortfolioPositionsAction.handler(
-        runtime,
-        portfolioMemory,
-        undefined,
-        undefined,
-        (content) => {
-          console.log(`   📢 ${content.text.split('\\n')[0]}`);
-        }
-      );
-
-      console.log(`📊 Updated Portfolio Result: ${portfolioResult.success}`);
-      expect(portfolioResult.success).toBe(true);
-      
-      if (portfolioResult.data && typeof portfolioResult.data === 'object') {
-        const portfolioData = portfolioResult.data as any;
-        const currentPositions = portfolioData.totalPositions || 0;
-        const currentBalance = parseFloat(portfolioData.usdcBalance || '0');
-        const positionValue = portfolioData.totalValue || 0;
-        
-        console.log('📊 Portfolio Comparison:');
-        console.log(`   📈 Positions: ${(global as any).initialPositions || 0} → ${currentPositions}`);
-        console.log(`   💰 USDC Balance: $${((global as any).initialBalance || 0).toFixed(2)} → $${currentBalance.toFixed(2)}`);
-        console.log(`   💎 Position Value: $${positionValue.toFixed(2)}`);
-        console.log(`   📊 Total Portfolio: $${(currentBalance + positionValue).toFixed(2)}`);
-        
-        // Verify we can detect positions (even if 0)
-        expect(typeof currentPositions).toBe('number');
-        expect(typeof currentBalance).toBe('number');
-        expect(typeof positionValue).toBe('number');
-        
-        // If we had successful order placement, we might see changes
-        if ((global as any).orderPlaced) {
-          console.log('✅ Order was placed - checking for position changes');
-          
-          // Look for evidence of the position
-          if (currentPositions > (global as any).initialPositions) {
-            console.log('🎉 NEW POSITION DETECTED!');
-            console.log(`   📈 Position count increased: ${(global as any).initialPositions} → ${currentPositions}`);
-          } else if (currentBalance < (global as any).initialBalance - 0.5) {
-            console.log('💰 BALANCE DECREASED - Order likely executed');
-            console.log(`   💸 Balance change: -$${((global as any).initialBalance - currentBalance).toFixed(2)}`);
-          } else {
-            console.log('📊 Position may be pending or in different format');
-          }
-        }
-        
-        // Check if we have position details
-        if (portfolioData.positions && portfolioData.positions.length > 0) {
-          console.log('📋 Position Details Found:');
-          portfolioData.positions.forEach((pos: any, index: number) => {
-            console.log(`   ${index + 1}. ${pos.outcome} - ${pos.size} shares @ $${pos.value}`);
-            if (pos.marketQuestion) {
-              console.log(`      Market: "${pos.marketQuestion}"`);
+        // Setup mock CLOB client
+        mockClient = {
+            getOpenPositions: mock(),
+            getMappedMetadata: mock(),
+            wallet: {
+                address: '0x1234567890123456789012345678901234567890'
             }
-          });
-        }
-      }
-      
-      console.log('✅ Portfolio verification complete');
-    }, 15000);
+        };
 
-    it('should demonstrate portfolio tracking capability', async () => {
-      console.log('🔍 Step 5: Verify portfolio system capabilities...');
-      
-      const capabilities = {
-        portfolioActionExists: !!getPortfolioPositionsAction,
-        canCallPortfolioAction: true,
-        canParsePositions: true,
-        canDisplayBalance: true,
-        canTrackChanges: true,
-      };
-      
-      console.log('📋 Portfolio System Capabilities:');
-      console.log(`   ✅ Portfolio Action: ${capabilities.portfolioActionExists}`);
-      console.log(`   ✅ API Integration: ${capabilities.canCallPortfolioAction}`);
-      console.log(`   ✅ Position Parsing: ${capabilities.canParsePositions}`);
-      console.log(`   ✅ Balance Display: ${capabilities.canDisplayBalance}`);
-      console.log(`   ✅ Change Tracking: ${capabilities.canTrackChanges}`);
-      
-      console.log('🎯 Portfolio Benefits:');
-      console.log('   📊 Real-time position tracking');
-      console.log('   💰 Balance and value monitoring');
-      console.log('   📈 P&L calculation capability');
-      console.log('   🔍 Market identification');
-      console.log('   📋 Comprehensive portfolio view');
-      
-      // Verify all capabilities are working
-      expect(capabilities.portfolioActionExists).toBe(true);
-      expect(capabilities.canCallPortfolioAction).toBe(true);
-      expect(capabilities.canParsePositions).toBe(true);
-      expect(capabilities.canDisplayBalance).toBe(true);
-      expect(capabilities.canTrackChanges).toBe(true);
-      
-      console.log('🎉 PORTFOLIO SYSTEM VERIFIED!');
-      console.log('🚀 Ready for position-based selling and P&L tracking!');
+        (clobClient.initializeClobClient as any).mockResolvedValue(mockClient);
     });
-  });
-});
 
-// Export for reference
-export { TEST_MARKET };
+    afterEach(() => {
+        // Reset individual mocks
+        (mockRuntime.getSetting as any)?.mockReset?.();
+        (clobClient.initializeClobClient as any)?.mockReset?.();
+        (mockClient.getOpenPositions as any)?.mockReset?.();
+        (mockClient.getMappedMetadata as any)?.mockReset?.();
+        (mockCallback as any)?.mockReset?.();
+    });
+
+    describe('validate', () => {
+        it('should pass validation when wallet is configured', async () => {
+            const result = await getPortfolioPositionsAction.validate(mockRuntime, mockMemory, mockState);
+            expect(result).toBe(true);
+        });
+
+        it('should fail validation when no wallet key is configured', async () => {
+            mockRuntime.getSetting = mock(() => undefined);
+            
+            const result = await getPortfolioPositionsAction.validate(mockRuntime, mockMemory, mockState);
+            expect(result).toBe(false);
+        });
+    });
+
+    describe('handler', () => {
+        describe('successful portfolio retrieval', () => {
+            it('should return portfolio with positions', async () => {
+                const mockPositions = [
+                    {
+                        conditionId: '0x123abc',
+                        outcomeId: 0,
+                        shares: '100',
+                        avgPrice: '0.5',
+                        realized: '0',
+                        unrealized: '10.5',
+                    },
+                    {
+                        conditionId: '0x456def',
+                        outcomeId: 1,
+                        shares: '50',
+                        avgPrice: '0.75',
+                        realized: '5.25',
+                        unrealized: '-2.5',
+                    },
+                ];
+
+                const mockMetadata = {
+                    '0x123abc': {
+                        question: 'Will Bitcoin reach $100k?',
+                        outcomes: ['YES', 'NO'],
+                        endDate: '2025-12-31',
+                    },
+                    '0x456def': {
+                        question: 'Will AI replace developers?',
+                        outcomes: ['YES', 'NO'],
+                        endDate: '2025-06-30',
+                    },
+                };
+
+                mockClient.getOpenPositions.mockResolvedValue(mockPositions);
+                mockClient.getMappedMetadata.mockResolvedValue(mockMetadata);
+
+                const result = await getPortfolioPositionsAction.handler(
+                    mockRuntime,
+                    mockMemory,
+                    mockState,
+                    {},
+                    mockCallback
+                );
+
+                expect(result.success).toBe(true);
+                expect(mockCallback).toHaveBeenCalled();
+                
+                const callbackContent = mockCallback.mock.calls[0][0];
+                expect(callbackContent.text).toContain('Portfolio Positions');
+                expect(callbackContent.text).toContain('Will Bitcoin reach $100k?');
+                expect(callbackContent.text).toContain('100 shares');
+                expect(callbackContent.data).toHaveProperty('positions');
+                expect(callbackContent.data.positions).toHaveLength(2);
+            });
+
+            it('should handle empty portfolio', async () => {
+                mockClient.getOpenPositions.mockResolvedValue([]);
+                mockClient.getMappedMetadata.mockResolvedValue({});
+
+                const result = await getPortfolioPositionsAction.handler(
+                    mockRuntime,
+                    mockMemory,
+                    mockState,
+                    {},
+                    mockCallback
+                );
+
+                expect(result.success).toBe(true);
+                const callbackContent = mockCallback.mock.calls[0][0];
+                expect(callbackContent.text).toContain('No open positions');
+                expect(callbackContent.data.positions).toHaveLength(0);
+            });
+
+            it('should calculate P&L correctly', async () => {
+                const mockPositions = [
+                    {
+                        conditionId: '0x123abc',
+                        outcomeId: 0,
+                        shares: '100',
+                        avgPrice: '0.5',
+                        realized: '10', // Realized profit
+                        unrealized: '20', // Unrealized profit
+                    },
+                ];
+
+                const mockMetadata = {
+                    '0x123abc': {
+                        question: 'Test Market',
+                        outcomes: ['YES', 'NO'],
+                        endDate: '2025-12-31',
+                        currentPrice: '0.7', // Current price higher than avg
+                    },
+                };
+
+                mockClient.getOpenPositions.mockResolvedValue(mockPositions);
+                mockClient.getMappedMetadata.mockResolvedValue(mockMetadata);
+
+                const result = await getPortfolioPositionsAction.handler(
+                    mockRuntime,
+                    mockMemory,
+                    mockState,
+                    {},
+                    mockCallback
+                );
+
+                const callbackContent = mockCallback.mock.calls[0][0];
+                const position = callbackContent.data.positions[0];
+                
+                expect(position.realizedPnL).toBe('10');
+                expect(position.unrealizedPnL).toBe('20');
+                expect(position.totalPnL).toBe('30'); // Total should be realized + unrealized
+            });
+
+            it('should format large numbers correctly', async () => {
+                const mockPositions = [
+                    {
+                        conditionId: '0x123abc',
+                        outcomeId: 0,
+                        shares: '1000000', // 1 million shares
+                        avgPrice: '0.999',
+                        realized: '1234.56',
+                        unrealized: '-5678.90',
+                    },
+                ];
+
+                const mockMetadata = {
+                    '0x123abc': {
+                        question: 'Large Position Market',
+                        outcomes: ['YES', 'NO'],
+                    },
+                };
+
+                mockClient.getOpenPositions.mockResolvedValue(mockPositions);
+                mockClient.getMappedMetadata.mockResolvedValue(mockMetadata);
+
+                const result = await getPortfolioPositionsAction.handler(
+                    mockRuntime,
+                    mockMemory,
+                    mockState,
+                    {},
+                    mockCallback
+                );
+
+                const callbackContent = mockCallback.mock.calls[0][0];
+                expect(callbackContent.text).toContain('1000000 shares'); // Should format large numbers
+                expect(callbackContent.text).toContain('$0.999'); // Price formatting
+            });
+        });
+
+        describe('error handling', () => {
+            it('should handle API errors gracefully', async () => {
+                mockClient.getOpenPositions.mockRejectedValue(new Error('API request failed'));
+
+                const result = await getPortfolioPositionsAction.handler(
+                    mockRuntime,
+                    mockMemory,
+                    mockState,
+                    {},
+                    mockCallback
+                );
+
+                expect(result.success).toBe(false);
+                const callbackContent = mockCallback.mock.calls[0][0];
+                expect(callbackContent.text).toContain('Failed to retrieve portfolio');
+                expect(callbackContent.text).toContain('API request failed');
+            });
+
+            it('should handle client initialization errors', async () => {
+                (clobClient.initializeClobClient as any).mockRejectedValue(
+                    new Error('Failed to initialize client')
+                );
+
+                const result = await getPortfolioPositionsAction.handler(
+                    mockRuntime,
+                    mockMemory,
+                    mockState,
+                    {},
+                    mockCallback
+                );
+
+                expect(result.success).toBe(false);
+                const callbackContent = mockCallback.mock.calls[0][0];
+                expect(callbackContent.text).toContain('Failed to initialize');
+            });
+
+            it('should handle missing metadata gracefully', async () => {
+                const mockPositions = [
+                    {
+                        conditionId: '0x123abc',
+                        outcomeId: 0,
+                        shares: '100',
+                        avgPrice: '0.5',
+                    },
+                ];
+
+                mockClient.getOpenPositions.mockResolvedValue(mockPositions);
+                mockClient.getMappedMetadata.mockResolvedValue({}); // No metadata
+
+                const result = await getPortfolioPositionsAction.handler(
+                    mockRuntime,
+                    mockMemory,
+                    mockState,
+                    {},
+                    mockCallback
+                );
+
+                expect(result.success).toBe(true);
+                const callbackContent = mockCallback.mock.calls[0][0];
+                const position = callbackContent.data.positions[0];
+                
+                expect(position.marketQuestion).toBe('Unknown Market'); // Should have default
+                expect(position.outcome).toBe('Outcome 0'); // Default outcome name
+            });
+
+            it('should handle network timeout', async () => {
+                mockClient.getOpenPositions.mockImplementation(() => 
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Request timeout')), 100)
+                    )
+                );
+
+                const result = await getPortfolioPositionsAction.handler(
+                    mockRuntime,
+                    mockMemory,
+                    mockState,
+                    {},
+                    mockCallback
+                );
+
+                expect(result.success).toBe(false);
+                const callbackContent = mockCallback.mock.calls[0][0];
+                expect(callbackContent.text).toContain('timeout');
+            });
+        });
+
+        describe('edge cases', () => {
+            it('should handle positions with zero shares', async () => {
+                const mockPositions = [
+                    {
+                        conditionId: '0x123abc',
+                        outcomeId: 0,
+                        shares: '0',
+                        avgPrice: '0.5',
+                        realized: '10',
+                        unrealized: '0',
+                    },
+                ];
+
+                mockClient.getOpenPositions.mockResolvedValue(mockPositions);
+                mockClient.getMappedMetadata.mockResolvedValue({});
+
+                const result = await getPortfolioPositionsAction.handler(
+                    mockRuntime,
+                    mockMemory,
+                    mockState,
+                    {},
+                    mockCallback
+                );
+
+                const callbackContent = mockCallback.mock.calls[0][0];
+                // Should filter out or handle zero-share positions
+                expect(callbackContent.data.positions).toHaveLength(1);
+                expect(callbackContent.data.positions[0].shares).toBe('0');
+            });
+
+            it('should handle negative P&L values', async () => {
+                const mockPositions = [
+                    {
+                        conditionId: '0x123abc',
+                        outcomeId: 0,
+                        shares: '100',
+                        avgPrice: '0.8',
+                        realized: '-50',
+                        unrealized: '-20',
+                    },
+                ];
+
+                mockClient.getOpenPositions.mockResolvedValue(mockPositions);
+                mockClient.getMappedMetadata.mockResolvedValue({
+                    '0x123abc': {
+                        question: 'Losing Position',
+                        outcomes: ['YES', 'NO'],
+                    },
+                });
+
+                const result = await getPortfolioPositionsAction.handler(
+                    mockRuntime,
+                    mockMemory,
+                    mockState,
+                    {},
+                    mockCallback
+                );
+
+                const callbackContent = mockCallback.mock.calls[0][0];
+                expect(callbackContent.text).toContain('-$50'); // Should show negative values
+                expect(callbackContent.text).toContain('-$20');
+                expect(callbackContent.data.positions[0].totalPnL).toBe('-70');
+            });
+
+            it('should handle very small decimal values', async () => {
+                const mockPositions = [
+                    {
+                        conditionId: '0x123abc',
+                        outcomeId: 0,
+                        shares: '1',
+                        avgPrice: '0.00001',
+                        realized: '0.000001',
+                        unrealized: '0.000002',
+                    },
+                ];
+
+                mockClient.getOpenPositions.mockResolvedValue(mockPositions);
+                mockClient.getMappedMetadata.mockResolvedValue({});
+
+                const result = await getPortfolioPositionsAction.handler(
+                    mockRuntime,
+                    mockMemory,
+                    mockState,
+                    {},
+                    mockCallback
+                );
+
+                expect(result.success).toBe(true);
+                const callbackContent = mockCallback.mock.calls[0][0];
+                const position = callbackContent.data.positions[0];
+                // Should handle very small numbers without scientific notation
+                expect(position.avgPrice).toContain('0.00001');
+            });
+        });
+    });
+
+    describe('examples', () => {
+        it('should have valid example messages', () => {
+            expect(getPortfolioPositionsAction.examples).toBeDefined();
+            expect(Array.isArray(getPortfolioPositionsAction.examples)).toBe(true);
+            expect(getPortfolioPositionsAction.examples.length).toBeGreaterThan(0);
+            
+            getPortfolioPositionsAction.examples.forEach(example => {
+                expect(Array.isArray(example)).toBe(true);
+                expect(example.length).toBeGreaterThanOrEqual(2);
+                
+                const [userMsg] = example;
+                expect(userMsg).toHaveProperty('user');
+                expect(userMsg).toHaveProperty('content');
+                expect(userMsg.content).toHaveProperty('text');
+            });
+        });
+    });
+
+    describe('metadata', () => {
+        it('should have correct action metadata', () => {
+            expect(getPortfolioPositionsAction.name).toBe('GET_PORTFOLIO_POSITIONS');
+            expect(getPortfolioPositionsAction.description).toBeDefined();
+            expect(getPortfolioPositionsAction.similes).toBeDefined();
+            expect(Array.isArray(getPortfolioPositionsAction.similes)).toBe(true);
+        });
+    });
+});

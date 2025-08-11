@@ -1,14 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { retrieveAllMarketsAction } from '../src/actions/retrieveAllMarkets';
+import { describe, it, expect, mock, beforeEach } from 'bun:test';
 import type { IAgentRuntime, Memory, State } from '@elizaos/core';
 
+// Import after mocks
+import { retrieveAllMarketsAction } from '../../../../src/actions/retrieveAllMarkets';
+
 // Mock the dependencies
-vi.mock('../src/utils/llmHelpers', () => ({
-  callLLMWithTimeout: vi.fn(),
+mock.module('../../../../src/utils/llmHelpers', () => ({
+  callLLMWithTimeout: mock(),
 }));
 
-vi.mock('../src/utils/clobClient', () => ({
-  initializeClobClient: vi.fn(),
+mock.module('../../../../src/utils/clobClient', () => ({
+  initializeClobClient: mock(),
 }));
 
 describe('retrieveAllMarketsAction', () => {
@@ -19,8 +21,8 @@ describe('retrieveAllMarketsAction', () => {
 
   beforeEach(() => {
     mockRuntime = {
-      getSetting: vi.fn(),
-      useModel: vi.fn(),
+      getSetting: mock(),
+      useModel: mock(),
     } as any;
 
     mockMessage = {
@@ -44,12 +46,12 @@ describe('retrieveAllMarketsAction', () => {
       responseData: {},
     };
 
-    mockCallback = vi.fn();
+    mockCallback = mock();
   });
 
   describe('validate', () => {
     it('should return true when CLOB_API_URL is provided', async () => {
-      vi.mocked(mockRuntime.getSetting).mockReturnValue('https://clob.polymarket.com');
+      (mockRuntime.getSetting as any).mockReturnValue('https://clob.polymarket.com');
 
       const result = await retrieveAllMarketsAction.validate(mockRuntime, mockMessage, mockState);
 
@@ -58,7 +60,7 @@ describe('retrieveAllMarketsAction', () => {
     });
 
     it('should return false when CLOB_API_URL is not provided', async () => {
-      vi.mocked(mockRuntime.getSetting).mockReturnValue(undefined);
+      (mockRuntime.getSetting as any).mockReturnValue(undefined);
 
       const result = await retrieveAllMarketsAction.validate(mockRuntime, mockMessage, mockState);
 
@@ -91,16 +93,16 @@ describe('retrieveAllMarketsAction', () => {
       };
 
       const mockClobClient = {
-        getMarkets: vi.fn().mockResolvedValue(mockResponse),
+        getMarkets: mock().mockResolvedValue(mockResponse),
       };
 
-      vi.mocked(mockRuntime.getSetting).mockReturnValue('https://clob.polymarket.com');
+      (mockRuntime.getSetting as any).mockReturnValue('https://clob.polymarket.com');
 
-      const { callLLMWithTimeout } = await import('../src/utils/llmHelpers');
-      const { initializeClobClient } = await import('../src/utils/clobClient');
+      const { callLLMWithTimeout } = await import('../../../../src/utils/llmHelpers');
+      const { initializeClobClient } = await import('../../../../src/utils/clobClient');
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({});
-      vi.mocked(initializeClobClient).mockResolvedValue(mockClobClient);
+      (callLLMWithTimeout as any).mockResolvedValue({});
+      (initializeClobClient as any).mockResolvedValue(mockClobClient);
 
       const result = await retrieveAllMarketsAction.handler(
         mockRuntime,
@@ -128,16 +130,16 @@ describe('retrieveAllMarketsAction', () => {
       };
 
       const mockClobClient = {
-        getMarkets: vi.fn().mockResolvedValue(mockResponse),
+        getMarkets: mock().mockResolvedValue(mockResponse),
       };
 
-      vi.mocked(mockRuntime.getSetting).mockReturnValue('https://clob.polymarket.com');
+      (mockRuntime.getSetting as any).mockReturnValue('https://clob.polymarket.com');
 
-      const { callLLMWithTimeout } = await import('../src/utils/llmHelpers');
-      const { initializeClobClient } = await import('../src/utils/clobClient');
+      const { callLLMWithTimeout } = await import('../../../../src/utils/llmHelpers');
+      const { initializeClobClient } = await import('../../../../src/utils/clobClient');
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({});
-      vi.mocked(initializeClobClient).mockResolvedValue(mockClobClient);
+      (callLLMWithTimeout as any).mockResolvedValue({});
+      (initializeClobClient as any).mockResolvedValue(mockClobClient);
 
       const result = await retrieveAllMarketsAction.handler(
         mockRuntime,
@@ -159,13 +161,13 @@ describe('retrieveAllMarketsAction', () => {
           .mockRejectedValue(new Error('CLOB API error: 500 Internal Server Error')),
       };
 
-      vi.mocked(mockRuntime.getSetting).mockReturnValue('https://clob.polymarket.com');
+      (mockRuntime.getSetting as any).mockReturnValue('https://clob.polymarket.com');
 
-      const { callLLMWithTimeout } = await import('../src/utils/llmHelpers');
-      const { initializeClobClient } = await import('../src/utils/clobClient');
+      const { callLLMWithTimeout } = await import('../../../../src/utils/llmHelpers');
+      const { initializeClobClient } = await import('../../../../src/utils/clobClient');
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue({});
-      vi.mocked(initializeClobClient).mockResolvedValue(mockClobClient);
+      (callLLMWithTimeout as any).mockResolvedValue({});
+      (initializeClobClient as any).mockResolvedValue(mockClobClient);
 
       await expect(
         retrieveAllMarketsAction.handler(mockRuntime, mockMessage, mockState, {}, mockCallback)
@@ -182,7 +184,7 @@ describe('retrieveAllMarketsAction', () => {
     });
 
     it('should handle missing CLOB_API_URL in handler', async () => {
-      vi.mocked(mockRuntime.getSetting).mockReturnValue(undefined);
+      (mockRuntime.getSetting as any).mockReturnValue(undefined);
 
       await expect(
         retrieveAllMarketsAction.handler(mockRuntime, mockMessage, mockState, {}, mockCallback)

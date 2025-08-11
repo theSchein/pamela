@@ -1,7 +1,9 @@
 # Test Coverage Analysis - Polymarket Plugin
 # Generated: 2025-08-10
+# Updated: 2025-08-11 - Migrated from Vitest to Bun Test Framework
 # Current Coverage: ~28% line coverage
 # Target Coverage: 75-80% overall, >90% for critical paths
+# Test Framework: Bun Test (bun:test)
 
 ## CORE REQUIREMENTS
 Agent must be able to:
@@ -219,16 +221,16 @@ Important boundary conditions not tested:
 ## IMPLEMENTATION METRICS
 
 ### Test Files Status:
-#### Existing (After Reorganization):
-- ✅ placeOrder.test.ts (needs enhancement)
-- ✅ sellOrder.test.ts (needs enhancement) 
-- ✅ getPortfolioPositions.test.ts (needs enhancement)
-- ✅ approveUSDC.test.ts (adequate coverage)
-- ✅ getOrderBookSummary.test.ts (adequate)
-- ✅ getPriceHistory.test.ts (adequate)
-- ✅ getSamplingMarkets.test.ts (low priority)
-- ✅ syncMarkets.test.ts (low priority)
-- ✅ explainMarket.test.ts (needs enhancement)
+#### Existing (Migrated to Bun Test):
+- ✅ placeOrder.test.ts (needs enhancement - currently using Vitest)
+- ✅ sellOrder.test.ts (needs enhancement - currently using Vitest) 
+- ✅ getPortfolioPositions.test.ts (MIGRATED to Bun)
+- ✅ approveUSDC.test.ts (needs migration from Vitest)
+- ✅ getOrderBookSummary.test.ts (MIGRATED to Bun)
+- ✅ getPriceHistory.test.ts (MIGRATED to Bun)
+- ✅ getSamplingMarkets.test.ts (MIGRATED to Bun)
+- ✅ syncMarkets.test.ts (MIGRATED to Bun)
+- ✅ explainMarket.test.ts (MIGRATED to Bun)
 
 #### Must Create (Priority Order):
 1. ❌ redeemWinnings.test.ts (CRITICAL)
@@ -309,9 +311,10 @@ After reorganization, reference these patterns:
 
 ### Running Coverage:
 ```bash
-npm run test:coverage       # Full coverage report
-vitest run --coverage       # Same thing
-vitest --coverage --ui      # Interactive coverage browser
+npm run test:coverage       # Full coverage report with Bun
+npm test                    # Run all tests with Bun
+npm run test:watch         # Watch mode with Bun
+bun test --coverage        # Direct Bun coverage command
 ```
 
 ### Focus Areas for Coverage:

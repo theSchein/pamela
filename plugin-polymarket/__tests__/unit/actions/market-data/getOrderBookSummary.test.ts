@@ -1,26 +1,28 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test';
 import type { IAgentRuntime, Memory, State, Content } from '@elizaos/core';
-import { getOrderBookSummaryAction } from '../src/actions/getOrderBookSummary';
-import { initializeClobClient } from '../src/utils/clobClient';
-import { callLLMWithTimeout } from '../src/utils/llmHelpers';
-import type { OrderBook } from '../src/types';
+import type { OrderBook } from '../../../../src/types';
+
+// Import after mocks
+import { getOrderBookSummaryAction } from '../../../../src/actions/getOrderBookSummary';
+import { initializeClobClient } from '../../../../src/utils/clobClient';
+import { callLLMWithTimeout } from '../../../../src/utils/llmHelpers';
 
 // Mock dependencies
-vi.mock('../src/utils/clobClient');
-vi.mock('../src/utils/llmHelpers');
+mock.module('../../../../src/utils/clobClient', () => ({
+  initializeClobClient: mock(),
+}));
+mock.module('../../../../src/utils/llmHelpers', () => ({
+  callLLMWithTimeout: mock(),
+}));
 
 // Mock logger
-vi.mock('@elizaos/core', async () => {
-  const actual = await vi.importActual('@elizaos/core');
-  return {
-    ...actual,
-    logger: {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    },
-  };
-});
+mock.module('@elizaos/core', () => ({
+  logger: {
+    info: mock(),
+    warn: mock(),
+    error: mock(),
+  },
+}));
 
 describe('getOrderBookSummaryAction', () => {
   let mockRuntime: IAgentRuntime;
@@ -48,11 +50,13 @@ describe('getOrderBookSummaryAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
-
     mockRuntime = {
-      getSetting: vi.fn(),
+      getSetting: mock(),
     } as unknown as IAgentRuntime;
+
+    // Clear individual mocks after setup
+    (initializeClobClient as any)?.mockClear?.();
+    (callLLMWithTimeout as any)?.mockClear?.();
 
     mockMessage = {
       id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' as `${string}-${string}-${string}-${string}-${string}`,
@@ -74,17 +78,35 @@ describe('getOrderBookSummaryAction', () => {
     } as unknown as State;
 
     mockClobClient = {
-      getBook: vi.fn(),
+      getOrderBooks: mock().mockImplementation((orders) => {
+        if (orders[0].side === 'buy') {
+          return [{ 
+            ...mockOrderBook,
+            asks: mockOrderBook.asks, // For buy side, asks are what we're looking for
+            bids: [] 
+          }];
+        } else {
+          return [{ 
+            ...mockOrderBook,
+            bids: mockOrderBook.bids, // For sell side, bids are what we're looking for
+            asks: [] 
+          }];
+        }
+      }),
     };
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    // Reset individual mocks
+    (mockRuntime.getSetting as any)?.mockReset?.();
+    (initializeClobClient as any)?.mockReset?.();
+    (callLLMWithTimeout as any)?.mockReset?.();
+    (mockClobClient.getOrderBooks as any)?.mockReset?.();
   });
 
   describe('validate', () => {
     it('should return true when CLOB_API_URL is provided', async () => {
-      vi.mocked(mockRuntime.getSetting).mockReturnValue('https://clob.polymarket.com');
+      (mockRuntime.getSetting as any).mockReturnValue('https://clob.polymarket.com');
 
       const result = await getOrderBookSummaryAction.validate(mockRuntime, mockMessage, mockState);
 
@@ -93,7 +115,7 @@ describe('getOrderBookSummaryAction', () => {
     });
 
     it('should return false when CLOB_API_URL is not provided', async () => {
-      vi.mocked(mockRuntime.getSetting).mockReturnValue(undefined);
+      (mockRuntime.getSetting as any).mockReturnValue(undefined);
 
       const result = await getOrderBookSummaryAction.validate(mockRuntime, mockMessage, mockState);
 
@@ -104,8 +126,8 @@ describe('getOrderBookSummaryAction', () => {
 
   describe('handler', () => {
     beforeEach(() => {
-      vi.mocked(mockRuntime.getSetting).mockReturnValue('https://clob.polymarket.com');
-      vi.mocked(initializeClobClient).mockResolvedValue(mockClobClient);
+      (mockRuntime.getSetting as any).mockReturnValue('https://clob.polymarket.com');
+      (initializeClobClient as any).mockResolvedValue(mockClobClient);
     });
 
     it('should successfully fetch order book with valid token ID', async () => {
@@ -113,8 +135,8 @@ describe('getOrderBookSummaryAction', () => {
         tokenId: '123456',
       };
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
-      vi.mocked(mockClobClient.getBook).mockResolvedValue(mockOrderBook);
+      (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
+      // Use default implementation that handles both buy/sell calls
 
       const result = (await getOrderBookSummaryAction.handler(
         mockRuntime,
@@ -131,7 +153,7 @@ describe('getOrderBookSummaryAction', () => {
       expect(result.text).toContain('Best Ask: $0.66');
       expect(result.text).toContain('Spread: $0.0100');
       expect((result.data as any)?.orderBook).toEqual(mockOrderBook);
-      expect(result.actions).toContain('GET_ORDER_BOOK');
+      expect(result.actions).toContain('POLYMARKET_GET_ORDER_BOOK');
     });
 
     it('should handle fallback token ID extraction from query field', async () => {
@@ -140,8 +162,8 @@ describe('getOrderBookSummaryAction', () => {
         query: '789012',
       };
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
-      vi.mocked(mockClobClient.getBook).mockResolvedValue(mockOrderBook);
+      (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
+      // Use default implementation that handles both buy/sell calls
 
       const result = (await getOrderBookSummaryAction.handler(
         mockRuntime,
@@ -149,7 +171,8 @@ describe('getOrderBookSummaryAction', () => {
         mockState
       )) as Content;
 
-      expect(mockClobClient.getBook).toHaveBeenCalledWith('789012');
+      expect(mockClobClient.getOrderBooks).toHaveBeenCalledWith([{ token_id: '789012', side: 'buy' }]);
+      expect(mockClobClient.getOrderBooks).toHaveBeenCalledWith([{ token_id: '789012', side: 'sell' }]);
       expect(result.text).toContain('📖 **Order Book Summary**');
     });
 
@@ -158,8 +181,8 @@ describe('getOrderBookSummaryAction', () => {
         tokenId: '123456',
       };
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
-      vi.mocked(mockClobClient.getBook).mockResolvedValue(mockOrderBook);
+      (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
+      // Use default implementation that handles both buy/sell calls
 
       const result = (await getOrderBookSummaryAction.handler(
         mockRuntime,
@@ -187,8 +210,8 @@ describe('getOrderBookSummaryAction', () => {
         tokenId: '123456',
       };
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
-      vi.mocked(mockClobClient.getBook).mockResolvedValue(emptyOrderBook);
+      (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
+      (mockClobClient.getOrderBooks as any).mockImplementation(() => [emptyOrderBook]);
 
       const result = (await getOrderBookSummaryAction.handler(
         mockRuntime,
@@ -218,8 +241,8 @@ describe('getOrderBookSummaryAction', () => {
         tokenId: '123456',
       };
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
-      vi.mocked(mockClobClient.getBook).mockResolvedValue(bidsOnlyOrderBook);
+      (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
+      (mockClobClient.getOrderBooks as any).mockImplementation(() => [bidsOnlyOrderBook]);
 
       const result = (await getOrderBookSummaryAction.handler(
         mockRuntime,
@@ -236,7 +259,7 @@ describe('getOrderBookSummaryAction', () => {
     });
 
     it('should throw error when CLOB_API_URL is not configured', async () => {
-      vi.mocked(mockRuntime.getSetting).mockReturnValue(undefined);
+      (mockRuntime.getSetting as any).mockReturnValue(undefined);
 
       await expect(
         getOrderBookSummaryAction.handler(mockRuntime, mockMessage, mockState)
@@ -248,7 +271,7 @@ describe('getOrderBookSummaryAction', () => {
         error: 'No token ID found',
       };
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
+      (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
 
       await expect(
         getOrderBookSummaryAction.handler(mockRuntime, mockMessage, mockState)
@@ -269,7 +292,7 @@ describe('getOrderBookSummaryAction', () => {
         content: { text: 'Show me an order book without any token' },
       };
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
+      (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
 
       await expect(
         getOrderBookSummaryAction.handler(mockRuntime, mockMessageWithoutToken, mockState)
@@ -285,7 +308,7 @@ describe('getOrderBookSummaryAction', () => {
         content: { text: 'Show me some order book data' },
       };
 
-      vi.mocked(callLLMWithTimeout).mockRejectedValue(new Error('LLM timeout'));
+      (callLLMWithTimeout as any).mockRejectedValue(new Error('LLM timeout'));
 
       await expect(
         getOrderBookSummaryAction.handler(mockRuntime, mockMessageWithoutToken, mockState)
@@ -299,8 +322,8 @@ describe('getOrderBookSummaryAction', () => {
         tokenId: '123456',
       };
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
-      vi.mocked(mockClobClient.getBook).mockResolvedValue(null);
+      (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
+      (mockClobClient.getOrderBooks as any).mockImplementation(() => []);
 
       await expect(
         getOrderBookSummaryAction.handler(mockRuntime, mockMessage, mockState)
@@ -312,8 +335,8 @@ describe('getOrderBookSummaryAction', () => {
         tokenId: '123456',
       };
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
-      vi.mocked(mockClobClient.getBook).mockRejectedValue(new Error('API Error'));
+      (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
+      (mockClobClient.getOrderBooks as any).mockImplementation(() => Promise.reject(new Error('API Error')));
 
       await expect(
         getOrderBookSummaryAction.handler(mockRuntime, mockMessage, mockState)
@@ -321,13 +344,13 @@ describe('getOrderBookSummaryAction', () => {
     });
 
     it('should handle callback function properly on success', async () => {
-      const mockCallback = vi.fn();
+      const mockCallback = mock();
       const mockLLMResult = {
         tokenId: '123456',
       };
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
-      vi.mocked(mockClobClient.getBook).mockResolvedValue(mockOrderBook);
+      (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
+      // Use default implementation that handles both buy/sell calls
 
       const result = await getOrderBookSummaryAction.handler(
         mockRuntime,
@@ -342,12 +365,12 @@ describe('getOrderBookSummaryAction', () => {
     });
 
     it('should handle callback function properly on error', async () => {
-      const mockCallback = vi.fn();
+      const mockCallback = mock();
       const mockLLMResult = {
         error: 'No token ID found',
       };
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
+      (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
 
       await expect(
         getOrderBookSummaryAction.handler(mockRuntime, mockMessage, mockState, {}, mockCallback)
@@ -388,10 +411,10 @@ describe('getOrderBookSummaryAction', () => {
           },
         };
 
-        vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
+        (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
 
         if (testCase.valid) {
-          vi.mocked(mockClobClient.getBook).mockResolvedValue(mockOrderBook);
+          (mockClobClient.getOrderBooks as any).mockResolvedValue([mockOrderBook]);
           const result = (await getOrderBookSummaryAction.handler(
             mockRuntime,
             testMessage,
@@ -411,8 +434,8 @@ describe('getOrderBookSummaryAction', () => {
         tokenId: '123456',
       };
 
-      vi.mocked(callLLMWithTimeout).mockResolvedValue(mockLLMResult);
-      vi.mocked(mockClobClient.getBook).mockResolvedValue(mockOrderBook);
+      (callLLMWithTimeout as any).mockResolvedValue(mockLLMResult);
+      // Use default implementation that handles both buy/sell calls
 
       const result = (await getOrderBookSummaryAction.handler(
         mockRuntime,
@@ -434,7 +457,7 @@ describe('getOrderBookSummaryAction', () => {
 
   describe('action metadata', () => {
     it('should have correct action name', () => {
-      expect(getOrderBookSummaryAction.name).toBe('GET_ORDER_BOOK');
+      expect(getOrderBookSummaryAction.name).toBe('POLYMARKET_GET_ORDER_BOOK');
     });
 
     it('should have appropriate similes', () => {
