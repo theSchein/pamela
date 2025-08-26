@@ -152,3 +152,8 @@ railway.json.backup
 
 # Plugin repositories (maintained separately)
 plugin-polymarket/
+
+# LLMs
+.claude
+CLAUDE.md
+*.md

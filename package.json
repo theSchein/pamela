@@ -33,18 +33,12 @@
   },
   "scripts": {
     "start": "node src/start-production.mjs",
-    "start:eliza": "elizaos start",
     "dev": "elizaos dev",
     "build": "tsc --noEmit && tsup",
-    "lint": "prettier --write ./src",
-    "type-check": "tsc --noEmit",
-    "type-check:watch": "tsc --noEmit --watch",
     "test": "bun test",
     "test:coverage": "bun test --coverage",
-    "test:watch": "bun test --watch",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,md}\"",
-    "check-all": "bun run type-check && bun run format:check && bun run test",
     "clean": "rm -rf node_modules dist .eliza"
   },
   "dependencies": {
