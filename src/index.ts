@@ -13,10 +13,11 @@ import { character } from "./character.ts";
 let discordPlugin: any = null;
 if (process.env.DISCORD_API_TOKEN) {
   try {
-    discordPlugin = require("@elizaos/plugin-discord").default;
+    const discordModule = await import("@elizaos/plugin-discord");
+    discordPlugin = discordModule.default;
     logger.info("Discord plugin loaded successfully");
   } catch (error) {
-    logger.warn("Failed to load Discord plugin:", error);
+    logger.warn("Failed to load Discord plugin - make sure @elizaos/plugin-discord is installed");
   }
 }
 
