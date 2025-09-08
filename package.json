@@ -42,8 +42,8 @@
     "clean": "rm -rf node_modules dist .eliza"
   },
   "dependencies": {
-    "@elizaos/cli": "^1.5.8-alpha.4",
-    "@elizaos/core": "^1.4.2",
+    "@elizaos/cli": "1.5.7",
+    "@elizaos/core": "1.5.7",
     "@elizaos/plugin-bootstrap": "^1.4.2",
     "@elizaos/plugin-browser": "^1.0.3",
     "@elizaos/plugin-discord": "1.2.5",
