@@ -17,7 +17,9 @@ if (process.env.DISCORD_API_TOKEN) {
     discordPlugin = discordModule.default;
     logger.info("Discord plugin loaded successfully");
   } catch (error) {
-    logger.warn("Failed to load Discord plugin - make sure @elizaos/plugin-discord is installed");
+    logger.warn(
+      "Failed to load Discord plugin - make sure @elizaos/plugin-discord is installed",
+    );
   }
 }
 
@@ -56,8 +58,7 @@ const project: Project = {
   agents: [projectAgent],
 };
 
-// Export test suites for the test runner
-export { testSuites } from "./__tests__/e2e";
+// Export character
 export { character } from "./character.ts";
 
 export default project;

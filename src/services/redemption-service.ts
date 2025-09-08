@@ -5,7 +5,10 @@
 
 import { type IAgentRuntime, logger, Service } from "@elizaos/core";
 import { ethers, Wallet, Contract, JsonRpcProvider, ZeroHash } from "ethers";
-import { initializeClobClient, type ClobClient } from "../../plugin-polymarket/src/utils/clobClient";
+import {
+  initializeClobClient,
+  type ClobClient,
+} from "../../plugin-polymarket/src/utils/clobClient";
 
 // Contract addresses (Polygon mainnet)
 const CONDITIONAL_TOKENS_ADDRESS = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045";
@@ -45,7 +48,8 @@ interface RedemptionResult {
 
 export class RedemptionService extends Service {
   static serviceType = "redemption-service";
-  capabilityDescription = "Automatically monitors and redeems winning positions from resolved Polymarket markets";
+  capabilityDescription =
+    "Automatically monitors and redeems winning positions from resolved Polymarket markets";
 
   private checkInterval: NodeJS.Timeout | null = null;
   private readonly CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
@@ -86,10 +90,10 @@ export class RedemptionService extends Service {
    */
   private startAutomaticRedemption(): void {
     logger.info("[RedemptionService] Starting automatic redemption monitoring");
-    
+
     // Check immediately on startup
     this.checkAndRedeemWinnings();
-    
+
     // Then check periodically
     this.checkInterval = setInterval(() => {
       this.checkAndRedeemWinnings();
@@ -124,57 +128,67 @@ export class RedemptionService extends Service {
 
       // Get current positions
       const positions = await this.getPortfolioPositions();
-      
+
       if (!positions || positions.length === 0) {
         logger.info("[RedemptionService] No positions found");
         this.isChecking = false;
         return;
       }
 
-      logger.info(`[RedemptionService] Found ${positions.length} positions to check`);
+      logger.info(
+        `[RedemptionService] Found ${positions.length} positions to check`,
+      );
 
       // Check each position for resolved markets
       const resolvedPositions = await this.checkResolvedMarkets(positions);
-      
+
       if (resolvedPositions.length === 0) {
         logger.info("[RedemptionService] No resolved positions found");
         this.isChecking = false;
         return;
       }
 
-      logger.info(`[RedemptionService] Found ${resolvedPositions.length} resolved positions`);
+      logger.info(
+        `[RedemptionService] Found ${resolvedPositions.length} resolved positions`,
+      );
 
       // Redeem winning positions
       const redemptionResults: RedemptionResult[] = [];
-      
+
       for (const position of resolvedPositions) {
         if (position.winner) {
           const result = await this.redeemPosition(position);
           redemptionResults.push(result);
-          
+
           if (result.success) {
-            logger.info(`[RedemptionService] Successfully redeemed ${result.amountRedeemed} USDC from: ${result.marketQuestion}`);
-            
+            logger.info(
+              `[RedemptionService] Successfully redeemed ${result.amountRedeemed} USDC from: ${result.marketQuestion}`,
+            );
+
             // Notify via Telegram if available
             if (this.telegramBroadcaster) {
               await this.telegramBroadcaster.notifyRedemption(result);
             }
           } else {
-            logger.error(`[RedemptionService] Failed to redeem position: ${result.error}`);
+            logger.error(
+              `[RedemptionService] Failed to redeem position: ${result.error}`,
+            );
           }
         }
       }
 
       // Log summary
-      const successfulRedemptions = redemptionResults.filter(r => r.success);
-      const totalRedeemed = successfulRedemptions.reduce((sum, r) => 
-        sum + parseFloat(r.amountRedeemed || "0"), 0
+      const successfulRedemptions = redemptionResults.filter((r) => r.success);
+      const totalRedeemed = successfulRedemptions.reduce(
+        (sum, r) => sum + parseFloat(r.amountRedeemed || "0"),
+        0,
       );
 
       if (successfulRedemptions.length > 0) {
-        logger.info(`[RedemptionService] Redemption complete: ${successfulRedemptions.length} positions redeemed, total: ${totalRedeemed} USDC`);
+        logger.info(
+          `[RedemptionService] Redemption complete: ${successfulRedemptions.length} positions redeemed, total: ${totalRedeemed} USDC`,
+        );
       }
-
     } catch (error) {
       logger.error("[RedemptionService] Error during redemption check:", error);
     } finally {
@@ -187,9 +201,10 @@ export class RedemptionService extends Service {
    */
   private async getPortfolioPositions(): Promise<Position[]> {
     try {
-      const walletAddress = (this.clobClient as any).wallet?.address || 
-                           (this.clobClient as any).signer?.address;
-      
+      const walletAddress =
+        (this.clobClient as any).wallet?.address ||
+        (this.clobClient as any).signer?.address;
+
       if (!walletAddress) {
         throw new Error("Unable to determine wallet address");
       }
@@ -201,7 +216,7 @@ export class RedemptionService extends Service {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -209,23 +224,26 @@ export class RedemptionService extends Service {
       }
 
       const data: any = await response.json();
-      
+
       // Transform API response to Position format
-      const positions: Position[] = data.positions?.map((p: any) => ({
-        tokenId: p.token_id,
-        marketConditionId: p.condition_id,
-        marketQuestion: p.question || "Unknown market",
-        outcome: p.outcome,
-        size: p.size,
-        value: p.current_value || "0",
-        resolved: false,
-        winner: false,
-      })) || [];
+      const positions: Position[] =
+        data.positions?.map((p: any) => ({
+          tokenId: p.token_id,
+          marketConditionId: p.condition_id,
+          marketQuestion: p.question || "Unknown market",
+          outcome: p.outcome,
+          size: p.size,
+          value: p.current_value || "0",
+          resolved: false,
+          winner: false,
+        })) || [];
 
       return positions;
-
     } catch (error) {
-      logger.error("[RedemptionService] Failed to get portfolio positions:", error);
+      logger.error(
+        "[RedemptionService] Failed to get portfolio positions:",
+        error,
+      );
       return [];
     }
   }
@@ -233,7 +251,9 @@ export class RedemptionService extends Service {
   /**
    * Check which markets have been resolved
    */
-  private async checkResolvedMarkets(positions: Position[]): Promise<Position[]> {
+  private async checkResolvedMarkets(
+    positions: Position[],
+  ): Promise<Position[]> {
     const resolvedPositions: Position[] = [];
 
     for (const position of positions) {
@@ -245,15 +265,15 @@ export class RedemptionService extends Service {
             headers: {
               "Content-Type": "application/json",
             },
-          }
+          },
         );
 
         if (response.ok) {
           const marketData: any = await response.json();
-          
+
           if (marketData.resolved === true) {
             position.resolved = true;
-            
+
             // Check if this position is a winner
             const winningOutcome = marketData.winning_outcome;
             if (winningOutcome && position.outcome === winningOutcome) {
@@ -263,7 +283,10 @@ export class RedemptionService extends Service {
           }
         }
       } catch (error) {
-        logger.error(`[RedemptionService] Error checking market ${position.marketConditionId}:`, error);
+        logger.error(
+          `[RedemptionService] Error checking market ${position.marketConditionId}:`,
+          error,
+        );
       }
     }
 
@@ -276,14 +299,15 @@ export class RedemptionService extends Service {
   private async redeemPosition(position: Position): Promise<RedemptionResult> {
     try {
       const privateKey = this.runtime.getSetting("POLYMARKET_PRIVATE_KEY");
-      const rpcUrl = this.runtime.getSetting("RPC_URL") || "https://polygon-rpc.com";
-      
+      const rpcUrl =
+        this.runtime.getSetting("RPC_URL") || "https://polygon-rpc.com";
+
       const provider = new JsonRpcProvider(rpcUrl);
       const wallet = new Wallet(privateKey, provider);
-      
+
       // Check if this is a neg-risk market (binary markets)
       const isNegRisk = position.tokenId.includes("neg-risk") || false;
-      
+
       let txHash: string;
       let amountRedeemed: string = "0";
 
@@ -292,24 +316,23 @@ export class RedemptionService extends Service {
         const negRiskAdapter = new Contract(
           NEG_RISK_ADAPTER_ADDRESS,
           NEG_RISK_ADAPTER_ABI,
-          wallet
+          wallet,
         );
 
         const tx = await negRiskAdapter.redeemPositions(
           position.marketConditionId,
-          [position.size]
+          [position.size],
         );
-        
+
         const receipt = await tx.wait();
         txHash = receipt.hash;
         amountRedeemed = position.value; // Approximate value
-
       } else {
         // Use ConditionalTokens for regular markets
         const conditionalTokens = new Contract(
           CONDITIONAL_TOKENS_ADDRESS,
           CONDITIONAL_TOKENS_ABI,
-          wallet
+          wallet,
         );
 
         // Calculate index set for the winning outcome
@@ -319,9 +342,9 @@ export class RedemptionService extends Service {
           USDC_ADDRESS,
           ZeroHash, // parentCollectionId
           position.marketConditionId,
-          [indexSet]
+          [indexSet],
         );
-        
+
         const receipt = await tx.wait();
         txHash = receipt.hash;
         amountRedeemed = position.value; // Approximate value
@@ -334,10 +357,12 @@ export class RedemptionService extends Service {
         txHash,
         success: true,
       };
-
     } catch (error: any) {
-      logger.error(`[RedemptionService] Redemption failed for position ${position.marketConditionId}:`, error);
-      
+      logger.error(
+        `[RedemptionService] Redemption failed for position ${position.marketConditionId}:`,
+        error,
+      );
+
       return {
         marketQuestion: position.marketQuestion,
         conditionId: position.marketConditionId,
@@ -367,7 +392,7 @@ export class RedemptionService extends Service {
     return {
       running: this.checkInterval !== null,
       lastCheckTime: this.lastCheckTime,
-      nextCheckTime: this.lastCheckTime 
+      nextCheckTime: this.lastCheckTime
         ? new Date(this.lastCheckTime.getTime() + this.CHECK_INTERVAL_MS)
         : null,
     };

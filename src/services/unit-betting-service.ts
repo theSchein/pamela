@@ -4,7 +4,10 @@
  */
 
 import { type IAgentRuntime, logger } from "@elizaos/core";
-import { initializeClobClient, type ClobClient } from "../../plugin-polymarket/src/utils/clobClient";
+import {
+  initializeClobClient,
+  type ClobClient,
+} from "../../plugin-polymarket/src/utils/clobClient";
 
 export interface PositionSizeResult {
   canTrade: boolean;
@@ -26,9 +29,9 @@ export interface ActivePosition {
 export class UnitBettingService {
   private runtime: IAgentRuntime;
   private clobClient: ClobClient | null = null;
-  
+
   // Configuration
-  private readonly UNIT_PERCENTAGE = 0.10; // 10% per unit
+  private readonly UNIT_PERCENTAGE = 0.1; // 10% per unit
   private readonly MAX_CONCURRENT_POSITIONS = 3; // Maximum 3 positions (30% exposure)
   private readonly MIN_UNIT_SIZE = 5; // Minimum $5 per bet
   private readonly MAX_UNIT_SIZE = 1000; // Maximum $1,000 per bet (safety cap)
@@ -57,7 +60,7 @@ export class UnitBettingService {
     try {
       // Get current portfolio value
       const portfolioValue = await this.getPortfolioValue();
-      
+
       if (portfolioValue <= 0) {
         return {
           canTrade: false,
@@ -72,19 +75,27 @@ export class UnitBettingService {
 
       // Calculate unit size (10% of portfolio)
       let unitSize = portfolioValue * this.UNIT_PERCENTAGE;
-      
+
       // Apply min/max constraints
-      unitSize = Math.max(this.MIN_UNIT_SIZE, Math.min(this.MAX_UNIT_SIZE, unitSize));
-      
+      unitSize = Math.max(
+        this.MIN_UNIT_SIZE,
+        Math.min(this.MAX_UNIT_SIZE, unitSize),
+      );
+
       // Get current active positions
       const activePositions = await this.getActivePositions();
       const currentPositionCount = activePositions.length;
-      const currentExposure = activePositions.reduce((sum, pos) => sum + pos.size, 0);
-      const currentExposurePercentage = (currentExposure / portfolioValue) * 100;
-      
+      const currentExposure = activePositions.reduce(
+        (sum, pos) => sum + pos.size,
+        0,
+      );
+      const currentExposurePercentage =
+        (currentExposure / portfolioValue) * 100;
+
       // Calculate available units
-      const availableUnits = this.MAX_CONCURRENT_POSITIONS - currentPositionCount;
-      
+      const availableUnits =
+        this.MAX_CONCURRENT_POSITIONS - currentPositionCount;
+
       // Check if we can place a new trade
       if (availableUnits <= 0) {
         return {
@@ -92,7 +103,8 @@ export class UnitBettingService {
           unitSize,
           availableUnits: 0,
           currentExposure: currentExposurePercentage,
-          maxExposure: this.MAX_CONCURRENT_POSITIONS * this.UNIT_PERCENTAGE * 100,
+          maxExposure:
+            this.MAX_CONCURRENT_POSITIONS * this.UNIT_PERCENTAGE * 100,
           portfolioValue,
           reason: `Maximum positions reached (${this.MAX_CONCURRENT_POSITIONS})`,
         };
@@ -105,7 +117,8 @@ export class UnitBettingService {
           unitSize,
           availableUnits,
           currentExposure: currentExposurePercentage,
-          maxExposure: this.MAX_CONCURRENT_POSITIONS * this.UNIT_PERCENTAGE * 100,
+          maxExposure:
+            this.MAX_CONCURRENT_POSITIONS * this.UNIT_PERCENTAGE * 100,
           portfolioValue,
           reason: `Unit size too small ($${unitSize.toFixed(2)} < $${this.MIN_UNIT_SIZE})`,
         };
@@ -113,15 +126,17 @@ export class UnitBettingService {
 
       // Check if adding this position would exceed max exposure
       const newExposure = currentExposure + unitSize;
-      const maxAllowedExposure = portfolioValue * (this.MAX_CONCURRENT_POSITIONS * this.UNIT_PERCENTAGE);
-      
+      const maxAllowedExposure =
+        portfolioValue * (this.MAX_CONCURRENT_POSITIONS * this.UNIT_PERCENTAGE);
+
       if (newExposure > maxAllowedExposure) {
         return {
           canTrade: false,
           unitSize,
           availableUnits,
           currentExposure: currentExposurePercentage,
-          maxExposure: this.MAX_CONCURRENT_POSITIONS * this.UNIT_PERCENTAGE * 100,
+          maxExposure:
+            this.MAX_CONCURRENT_POSITIONS * this.UNIT_PERCENTAGE * 100,
           portfolioValue,
           reason: "Would exceed maximum portfolio exposure (30%)",
         };
@@ -136,9 +151,11 @@ export class UnitBettingService {
         maxExposure: this.MAX_CONCURRENT_POSITIONS * this.UNIT_PERCENTAGE * 100,
         portfolioValue,
       };
-
     } catch (error) {
-      logger.error("[UnitBettingService] Error calculating position size:", error);
+      logger.error(
+        "[UnitBettingService] Error calculating position size:",
+        error,
+      );
       return {
         canTrade: false,
         unitSize: 0,
@@ -156,9 +173,10 @@ export class UnitBettingService {
    */
   private async getPortfolioValue(): Promise<number> {
     try {
-      const walletAddress = (this.clobClient as any).wallet?.address || 
-                           (this.clobClient as any).signer?.address;
-      
+      const walletAddress =
+        (this.clobClient as any).wallet?.address ||
+        (this.clobClient as any).signer?.address;
+
       if (!walletAddress) {
         throw new Error("Unable to determine wallet address");
       }
@@ -170,11 +188,13 @@ export class UnitBettingService {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (!balanceResponse.ok) {
-        throw new Error(`Failed to fetch balance: ${balanceResponse.statusText}`);
+        throw new Error(
+          `Failed to fetch balance: ${balanceResponse.statusText}`,
+        );
       }
 
       const balanceData: any = await balanceResponse.json();
@@ -187,28 +207,35 @@ export class UnitBettingService {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (!portfolioResponse.ok) {
         // If portfolio fetch fails, just use USDC balance
-        logger.warn("[UnitBettingService] Failed to fetch portfolio, using USDC balance only");
+        logger.warn(
+          "[UnitBettingService] Failed to fetch portfolio, using USDC balance only",
+        );
         return usdcBalance;
       }
 
       const portfolioData: any = await portfolioResponse.json();
-      const positionsValue = portfolioData.positions?.reduce((sum: number, pos: any) => {
-        return sum + parseFloat(pos.current_value || "0");
-      }, 0) || 0;
+      const positionsValue =
+        portfolioData.positions?.reduce((sum: number, pos: any) => {
+          return sum + parseFloat(pos.current_value || "0");
+        }, 0) || 0;
 
       const totalValue = usdcBalance + positionsValue;
-      
-      logger.info(`[UnitBettingService] Portfolio value: $${totalValue.toFixed(2)} (USDC: $${usdcBalance.toFixed(2)}, Positions: $${positionsValue.toFixed(2)})`);
-      
-      return totalValue;
 
+      logger.info(
+        `[UnitBettingService] Portfolio value: $${totalValue.toFixed(2)} (USDC: $${usdcBalance.toFixed(2)}, Positions: $${positionsValue.toFixed(2)})`,
+      );
+
+      return totalValue;
     } catch (error) {
-      logger.error("[UnitBettingService] Failed to get portfolio value:", error);
+      logger.error(
+        "[UnitBettingService] Failed to get portfolio value:",
+        error,
+      );
       throw error;
     }
   }
@@ -218,9 +245,10 @@ export class UnitBettingService {
    */
   private async getActivePositions(): Promise<ActivePosition[]> {
     try {
-      const walletAddress = (this.clobClient as any).wallet?.address || 
-                           (this.clobClient as any).signer?.address;
-      
+      const walletAddress =
+        (this.clobClient as any).wallet?.address ||
+        (this.clobClient as any).signer?.address;
+
       if (!walletAddress) {
         throw new Error("Unable to determine wallet address");
       }
@@ -232,7 +260,7 @@ export class UnitBettingService {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       const portfolioResponse = await fetch(
@@ -241,7 +269,7 @@ export class UnitBettingService {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       const positions: ActivePosition[] = [];
@@ -276,12 +304,16 @@ export class UnitBettingService {
         });
       }
 
-      logger.info(`[UnitBettingService] Found ${positions.length} active positions`);
-      
-      return positions;
+      logger.info(
+        `[UnitBettingService] Found ${positions.length} active positions`,
+      );
 
+      return positions;
     } catch (error) {
-      logger.error("[UnitBettingService] Failed to get active positions:", error);
+      logger.error(
+        "[UnitBettingService] Failed to get active positions:",
+        error,
+      );
       return [];
     }
   }
@@ -295,7 +327,7 @@ export class UnitBettingService {
     suggestedAmount?: number;
   }> {
     const positionSize = await this.calculatePositionSize();
-    
+
     if (!positionSize.canTrade) {
       return {
         allowed: false,
@@ -348,7 +380,7 @@ export class UnitBettingService {
   }> {
     const positionSize = await this.calculatePositionSize();
     const activePositions = await this.getActivePositions();
-    
+
     return {
       portfolioValue: positionSize.portfolioValue,
       unitSize: positionSize.unitSize,

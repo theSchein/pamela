@@ -32,16 +32,21 @@
     "url": "https://github.com/your-org/pamela/issues"
   },
   "scripts": {
-    "start": "node src/start-production.mjs",
-    "dev": "elizaos dev",
+    "start": "node src/start-with-recovery.mjs",
+    "start:original": "elizaos start",
+    "start:recovery": "node src/start-with-recovery.mjs",
+    "dev": "node src/start-with-recovery.mjs dev",
+    "dev:original": "elizaos dev",
     "build": "tsc --noEmit && tsup",
     "test": "bun test",
     "test:coverage": "bun test --coverage",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,md}\"",
-    "clean": "rm -rf node_modules dist .eliza"
+    "clean": "rm -rf node_modules dist .eliza",
+    "reset:db": "rm -rf .eliza/.elizadb && echo 'Database reset complete'"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.3.8",
     "@elizaos/cli": "1.5.7",
     "@elizaos/core": "1.5.7",
     "@elizaos/plugin-bootstrap": "^1.4.2",

@@ -1,0 +1,29 @@
+[Unit]
+Description=Pamela Trading Agent
+After=network.target
+
+[Service]
+Type=simple
+User=dov
+WorkingDirectory=/home/dov/Documents/okay-bet/ai-trader/pamela
+ExecStart=/usr/bin/npm run start:safe
+Restart=always
+RestartSec=10
+
+# Environment variables (adjust path as needed)
+EnvironmentFile=/home/dov/Documents/okay-bet/ai-trader/pamela/.env
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits
+MemoryLimit=2G
+CPUQuota=80%
+
+# Security
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
