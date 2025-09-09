@@ -5,7 +5,7 @@
  */
 
 import { elizaLogger } from "@elizaos/core";
-import { AutonomousTradingService } from "../src/services/autonomous-trading-service.js";
+import { AutonomousTradingService } from "../src/services/autonomous-trading/index.js";
 import { getSimpleStrategyConfig } from "../src/config/hardcoded-markets.js";
 import dotenv from "dotenv";
 

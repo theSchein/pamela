@@ -1,3 +1,27 @@
+/**
+ * Direct Order Module
+ * 
+ * Provides direct order placement functionality to the CLOB API, bypassing
+ * LLM extraction. This module is used by the autonomous trading service
+ * when all order parameters are already known programmatically.
+ * 
+ * Key features:
+ * - Direct CLOB API integration without LLM parsing
+ * - Client caching to avoid re-deriving API credentials
+ * - Support for both BUY and SELL orders
+ * - Configurable order types (GTC, IOC, etc.)
+ * - Error handling with detailed feedback
+ * 
+ * This module is essential for autonomous trading as it allows the system
+ * to place orders efficiently without the overhead of natural language
+ * processing when we already have structured data.
+ * 
+ * Usage:
+ * - Called by TradeExecutor when executing autonomous trades
+ * - Can accept an existing CLOB client to avoid re-initialization
+ * - Returns success status with order ID or error details
+ */
+
 import {
   elizaLogger,
   IAgentRuntime,
@@ -5,17 +29,10 @@ import {
   Content,
   HandlerCallback,
 } from "@elizaos/core";
-import { initializeClobClient } from "../../plugin-polymarket/src/utils/clobClient.js";
+import { initializeClobClient } from "../../../plugin-polymarket/src/utils/clobClient.js";
 import { Side } from "@polymarket/clob-client";
-import type { ClobClient } from "../../plugin-polymarket/src/utils/clobClient.js";
-
-interface DirectOrderParams {
-  tokenId: string;
-  side: "BUY" | "SELL";
-  price: number;
-  size: number;
-  orderType?: string;
-}
+import type { ClobClient } from "../../../plugin-polymarket/src/utils/clobClient.js";
+import { DirectOrderParams } from "./types.js";
 
 // Cache the CLOB client to avoid re-deriving API credentials on every order
 let cachedClobClient: ClobClient | undefined = undefined;
