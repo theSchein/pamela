@@ -35,9 +35,9 @@ export class OpportunityEvaluator {
     // Final confidence check with risk adjustment
     const finalConfidence = opportunity.confidence * (1 - opportunity.riskScore);
 
-    // Override for simple strategy - always trade if we found an opportunity
+    // Override for simple strategy - use hybrid confidence thresholds
     const shouldTrade = simpleConfig.ENABLED
-      ? adjustedSize > 0 && opportunity.confidence > 0.8
+      ? adjustedSize > 0 && opportunity.confidence >= 0.7  // Lower threshold for hybrid strategy
       : finalConfidence >= this.tradingConfig.minConfidenceThreshold &&
         adjustedSize > 0 &&
         opportunity.expectedValue > 5; // Minimum $5 expected value
@@ -85,28 +85,36 @@ export class OpportunityEvaluator {
 
     if (shouldTrade) {
       reasons.push(
-        `High confidence trade (${(opportunity.confidence * 100).toFixed(1)}%)`
+        `Hybrid confidence: ${(opportunity.confidence * 100).toFixed(1)}%`
       );
       reasons.push(`Expected value: $${opportunity.expectedValue.toFixed(2)}`);
 
+      // Include first news signal which contains our hybrid reasoning
       if (opportunity.newsSignals.length > 0) {
-        reasons.push(
-          `Supported by ${opportunity.newsSignals.length} news signals`
+        const hybridReasoning = opportunity.newsSignals.find(s => 
+          s.includes("Combined confidence") || s.includes("Price edge")
         );
+        if (hybridReasoning) {
+          reasons.push(hybridReasoning);
+        }
+        
+        // Count actual news articles (those starting with 📰)
+        const articleCount = opportunity.newsSignals.filter(s => s.startsWith("📰")).length;
+        if (articleCount > 0) {
+          reasons.push(`Supported by ${articleCount} relevant news articles`);
+        }
       }
 
       reasons.push(
-        `Predicted probability: ${(opportunity.predictedProbability * 100).toFixed(
-          1
-        )}%`
-      );
-      reasons.push(
-        `Current price: ${(opportunity.currentPrice * 100).toFixed(1)}%`
+        `Price: ${(opportunity.currentPrice * 100).toFixed(1)}% → ${(opportunity.predictedProbability * 100).toFixed(1)}%`
       );
     } else {
-      if (opportunity.confidence < this.tradingConfig.minConfidenceThreshold) {
+      const simpleConfig = getSimpleStrategyConfig();
+      const minConfidence = simpleConfig.ENABLED ? 0.7 : this.tradingConfig.minConfidenceThreshold;
+      
+      if (opportunity.confidence < minConfidence) {
         reasons.push(
-          `Confidence too low (${(opportunity.confidence * 100).toFixed(1)}%)`
+          `Confidence below threshold (${(opportunity.confidence * 100).toFixed(1)}% < ${(minConfidence * 100).toFixed(0)}%)`
         );
       }
       if (opportunity.expectedValue <= 5) {

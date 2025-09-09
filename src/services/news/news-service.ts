@@ -1,6 +1,7 @@
 import { logger } from "@elizaos/core";
 import axios from "axios";
 import { NewsConfig, NewsCategory, loadNewsConfig } from "./news-config";
+import { MarketKeywordExtractor, ExtractedKeywords } from "./market-keyword-extractor";
 
 export interface NewsArticle {
   title: string;
@@ -233,11 +234,30 @@ export class NewsService {
     }
   }
 
-  async getMarketSignals(marketTitle: string): Promise<NewsSignal> {
-    const searchTerms = this.extractSearchTerms(marketTitle);
-    const articles = await this.searchNews(searchTerms);
+  async getMarketSignals(marketTitle: string, marketRules?: string): Promise<NewsSignal> {
+    // Use keyword extractor for better search terms
+    const keywords = MarketKeywordExtractor.extractKeywords(marketTitle, marketRules);
+    const searchQuery = MarketKeywordExtractor.createSearchQuery(keywords);
     
-    if (articles.length === 0) {
+    const articles = await this.searchNews(searchQuery);
+    
+    // Calculate relevance for each article based on keyword matches
+    const scoredArticles = articles.map(article => {
+      const articleText = `${article.title} ${article.description}`;
+      const keywordScore = MarketKeywordExtractor.calculateRelevanceScore(articleText, keywords);
+      return {
+        ...article,
+        relevanceScore: keywordScore
+      };
+    });
+    
+    // Sort by relevance and filter low-scoring articles
+    const relevantArticles = scoredArticles
+      .filter(a => a.relevanceScore >= 0.3)
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, 10);
+    
+    if (relevantArticles.length === 0) {
       return {
         market: marketTitle,
         signal: "neutral",
@@ -246,14 +266,14 @@ export class NewsService {
       };
     }
 
-    // Analyze sentiment across all articles
+    // Analyze sentiment across all articles weighted by relevance
     let positiveCount = 0;
     let negativeCount = 0;
     let totalWeight = 0;
     
-    articles.forEach(article => {
-      // Weight by relevance score if available
-      const weight = article.relevanceScore || 1;
+    relevantArticles.forEach(article => {
+      // Weight by relevance score
+      const weight = article.relevanceScore || 0.5;
       totalWeight += weight;
       
       if (article.sentiment === "positive") {
@@ -280,15 +300,19 @@ export class NewsService {
       confidence = 0.5;
     }
 
-    // Scale confidence but cap at max configured value
-    const maxConfidence = this.config.cacheSettings.maxCacheSize / 100; // Convert to decimal
-    confidence = Math.min(maxConfidence, confidence * 1.2);
+    // Adjust confidence based on article count and average relevance
+    const avgRelevance = relevantArticles.reduce((sum, a) => sum + a.relevanceScore, 0) / relevantArticles.length;
+    const articleCountBonus = Math.min(0.2, relevantArticles.length * 0.02); // Up to 0.2 bonus for many articles
+    confidence = Math.min(0.95, confidence * avgRelevance + articleCountBonus);
+
+    logger.info(`Market signals for "${marketTitle.substring(0, 50)}...": ${signal} (${(confidence * 100).toFixed(1)}% confidence)`);
+    logger.info(`  Based on ${relevantArticles.length} relevant articles with avg relevance ${avgRelevance.toFixed(2)}`);
 
     return {
       market: marketTitle,
       signal,
       confidence,
-      articles: articles.slice(0, 5), // Return top 5 most relevant
+      articles: relevantArticles.slice(0, 5), // Return top 5 most relevant
     };
   }
 

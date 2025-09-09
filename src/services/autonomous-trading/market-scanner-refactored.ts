@@ -1,15 +1,8 @@
 /**
- * Market Scanner Module
+ * Market Scanner Module (Refactored)
  * 
  * Responsible for discovering and identifying trading opportunities in Polymarket.
- * This module fetches market data and applies various strategies to find profitable trades.
- * 
- * Strategies supported:
- * - Simple Threshold: Trades when prices hit configured buy/sell thresholds
- * - ML-based (planned): Uses machine learning models for opportunity detection
- * 
- * The scanner filters out markets where we already have positions and respects
- * configured market lists for focused trading.
+ * This refactored version improves code organization and reduces duplication.
  */
 
 import { elizaLogger } from "@elizaos/core";
@@ -19,7 +12,19 @@ import {
 } from "../../config/hardcoded-markets.js";
 import { MarketOpportunity, MarketData } from "./types.js";
 import { getNewsService, NewsSignal } from "../news/news-service.js";
-import { HybridConfidenceScorer } from "../news/hybrid-confidence-scorer.js";
+import { HybridConfidenceScorer, HybridConfidenceScore } from "../news/hybrid-confidence-scorer.js";
+
+// Constants
+const DEFAULT_CONFIDENCE = 0.8;
+const DEFAULT_PRICE = 0.5;
+const NEWS_ARTICLE_PREFIX = "📰";
+
+interface PriceOpportunity {
+  outcome: "YES" | "NO";
+  price: number;
+  edge: number;
+  isInverse: boolean;
+}
 
 export class MarketScanner {
   private openPositions: Map<string, any>;
@@ -129,139 +134,198 @@ export class MarketScanner {
     market: MarketData,
     config: any
   ): Promise<MarketOpportunity[]> {
-    const opportunities: MarketOpportunity[] = [];
-    
     elizaLogger.debug(`Analyzing market: ${market.question}`);
 
-    // Get news signals for this market
-    let newsSignal: NewsSignal | null = null;
+    // Fetch news signals once for the market
+    const newsSignal = await this.fetchNewsSignals(market.question);
+    
+    // Identify price opportunities
+    const priceOpportunities = this.identifyPriceOpportunities(market, config);
+    
+    // Evaluate each opportunity with news
+    const opportunities: MarketOpportunity[] = [];
+    for (const priceOpp of priceOpportunities) {
+      const opportunity = await this.evaluateOpportunityWithNews(
+        market,
+        priceOpp,
+        newsSignal,
+        config
+      );
+      
+      if (opportunity) {
+        opportunities.push(opportunity);
+      }
+    }
+
+    return opportunities;
+  }
+
+  private async fetchNewsSignals(marketQuestion: string): Promise<NewsSignal | null> {
     try {
-      newsSignal = await this.newsService.getMarketSignals(market.question);
+      const newsSignal = await this.newsService.getMarketSignals(marketQuestion);
       if (newsSignal && newsSignal.articles.length > 0) {
         elizaLogger.info(`  Found ${newsSignal.articles.length} news articles for market analysis`);
       }
+      return newsSignal;
     } catch (error) {
       elizaLogger.warn(`Failed to get news signals: ${error}`);
+      return null;
     }
+  }
 
+  private identifyPriceOpportunities(
+    market: MarketData,
+    config: any
+  ): PriceOpportunity[] {
+    const opportunities: PriceOpportunity[] = [];
     const outcomes = JSON.parse(market.outcomes);
     const prices = this.extractPrices(market);
 
     for (let i = 0; i < outcomes.length; i++) {
       const outcomeName = outcomes[i].toUpperCase();
-      const price = prices[i] || 0.5;
+      const price = prices[i] || DEFAULT_PRICE;
 
-      // Buy when price is BELOW threshold (cheap)
+      // Check for cheap YES opportunity
       if (price <= config.BUY_THRESHOLD) {
         const edge = config.BUY_THRESHOLD - price;
-
         if (edge >= config.MIN_EDGE) {
-          // Use hybrid confidence scoring if news is available
-          let confidence = 0.8; // Default confidence
-          let newsSignalTexts = [`Price edge: ${outcomeName} at ${(price * 100).toFixed(1)}%`];
-          let shouldTrade = true;
-          
-          if (newsSignal && newsSignal.articles.length > 0) {
-            const hybridScore = this.hybridScorer.calculateHybridConfidence(
-              edge,
-              newsSignal,
-              outcomeName as "YES" | "NO"
-            );
-            
-            confidence = hybridScore.combinedConfidence;
-            shouldTrade = hybridScore.shouldTrade;
-            newsSignalTexts.push(hybridScore.reasoning);
-            
-            // Add article headlines as signals
-            hybridScore.supportingArticles.forEach(article => {
-              newsSignalTexts.push(`📰 ${article.title}`);
-            });
-          }
-
-          if (shouldTrade) {
-            elizaLogger.info(
-              `Hybrid strategy opportunity found: ${market.question}`
-            );
-            elizaLogger.info(
-              `  ${outcomeName} at ${(price * 100).toFixed(1)}% with ${(confidence * 100).toFixed(1)}% confidence`
-            );
-
-            opportunities.push({
-              marketId: market.conditionId,
-              question: market.question,
-              outcome: outcomeName as "YES" | "NO",
-              currentPrice: price,
-              predictedProbability: price + edge,
-              confidence: confidence,
-              expectedValue: edge * 100 * confidence,
-              newsSignals: newsSignalTexts,
-              riskScore: 1 - confidence,
-            });
-          } else {
-            elizaLogger.info(
-              `Opportunity rejected by hybrid scorer: ${market.question} - ${outcomeName}`
-            );
-          }
+          opportunities.push({
+            outcome: outcomeName as "YES" | "NO",
+            price,
+            edge,
+            isInverse: false
+          });
         }
       }
 
-      // Look for NO being cheap (YES being expensive)
+      // Check for cheap NO opportunity (expensive YES)
       if (outcomeName === "YES" && price >= config.SELL_THRESHOLD) {
         const noPrice = 1 - price;
         const edge = price - config.SELL_THRESHOLD;
-
+        
         if (edge >= config.MIN_EDGE && noPrice <= config.BUY_THRESHOLD) {
-          // Use hybrid confidence scoring if news is available
-          let confidence = 0.8; // Default confidence
-          let newsSignalTexts = [`Price edge: NO at ${(noPrice * 100).toFixed(1)}% (YES expensive)`];
-          let shouldTrade = true;
-          
-          if (newsSignal && newsSignal.articles.length > 0) {
-            const hybridScore = this.hybridScorer.calculateHybridConfidence(
-              edge,
-              newsSignal,
-              "NO"
-            );
-            
-            confidence = hybridScore.combinedConfidence;
-            shouldTrade = hybridScore.shouldTrade;
-            newsSignalTexts.push(hybridScore.reasoning);
-            
-            // Add article headlines as signals
-            hybridScore.supportingArticles.forEach(article => {
-              newsSignalTexts.push(`📰 ${article.title}`);
-            });
-          }
-
-          if (shouldTrade) {
-            elizaLogger.info(
-              `Hybrid strategy opportunity found (inverse): ${market.question}`
-            );
-            elizaLogger.info(
-              `  NO at ${(noPrice * 100).toFixed(1)}% with ${(confidence * 100).toFixed(1)}% confidence`
-            );
-
-            opportunities.push({
-              marketId: market.conditionId,
-              question: market.question,
-              outcome: "NO",
-              currentPrice: noPrice,
-              predictedProbability: noPrice + edge,
-              confidence: confidence,
-              expectedValue: edge * 100 * confidence,
-              newsSignals: newsSignalTexts,
-              riskScore: 1 - confidence,
-            });
-          } else {
-            elizaLogger.info(
-              `Opportunity rejected by hybrid scorer: ${market.question} - NO`
-            );
-          }
+          opportunities.push({
+            outcome: "NO",
+            price: noPrice,
+            edge,
+            isInverse: true
+          });
         }
       }
     }
 
     return opportunities;
+  }
+
+  private async evaluateOpportunityWithNews(
+    market: MarketData,
+    priceOpp: PriceOpportunity,
+    newsSignal: NewsSignal | null,
+    config: any
+  ): Promise<MarketOpportunity | null> {
+    // Calculate hybrid confidence
+    const hybridResult = this.calculateHybridConfidence(
+      priceOpp,
+      newsSignal
+    );
+
+    if (!hybridResult.shouldTrade) {
+      elizaLogger.info(
+        `Opportunity rejected by hybrid scorer: ${market.question} - ${priceOpp.outcome}`
+      );
+      return null;
+    }
+
+    // Log the opportunity
+    this.logOpportunity(market.question, priceOpp, hybridResult);
+
+    // Build and return the opportunity
+    return this.buildOpportunity(
+      market,
+      priceOpp,
+      hybridResult
+    );
+  }
+
+  private calculateHybridConfidence(
+    priceOpp: PriceOpportunity,
+    newsSignal: NewsSignal | null
+  ): HybridConfidenceScore & { newsSignalTexts: string[] } {
+    // Build initial signal texts
+    const newsSignalTexts = [this.formatPriceSignal(priceOpp)];
+    
+    // Default values if no news
+    let confidence = DEFAULT_CONFIDENCE;
+    let shouldTrade = true;
+    let reasoning = "No news available, using price signal only";
+    let supportingArticles: any[] = [];
+
+    // Calculate hybrid score if news is available
+    if (newsSignal && newsSignal.articles.length > 0) {
+      const hybridScore = this.hybridScorer.calculateHybridConfidence(
+        priceOpp.edge,
+        newsSignal,
+        priceOpp.outcome
+      );
+      
+      confidence = hybridScore.combinedConfidence;
+      shouldTrade = hybridScore.shouldTrade;
+      reasoning = hybridScore.reasoning;
+      supportingArticles = hybridScore.supportingArticles;
+      
+      // Add reasoning and article headlines
+      newsSignalTexts.push(reasoning);
+      supportingArticles.forEach(article => {
+        newsSignalTexts.push(`${NEWS_ARTICLE_PREFIX} ${article.title}`);
+      });
+    }
+
+    return {
+      priceConfidence: confidence,
+      newsConfidence: confidence,
+      combinedConfidence: confidence,
+      shouldTrade,
+      reasoning,
+      supportingArticles,
+      newsSignalTexts
+    };
+  }
+
+  private formatPriceSignal(priceOpp: PriceOpportunity): string {
+    if (priceOpp.isInverse) {
+      return `Price edge: NO at ${(priceOpp.price * 100).toFixed(1)}% (YES expensive)`;
+    }
+    return `Price edge: ${priceOpp.outcome} at ${(priceOpp.price * 100).toFixed(1)}%`;
+  }
+
+  private logOpportunity(
+    question: string,
+    priceOpp: PriceOpportunity,
+    hybridResult: any
+  ): void {
+    const strategyType = priceOpp.isInverse ? "Hybrid strategy opportunity found (inverse)" : "Hybrid strategy opportunity found";
+    elizaLogger.info(`${strategyType}: ${question}`);
+    elizaLogger.info(
+      `  ${priceOpp.outcome} at ${(priceOpp.price * 100).toFixed(1)}% with ${(hybridResult.combinedConfidence * 100).toFixed(1)}% confidence`
+    );
+  }
+
+  private buildOpportunity(
+    market: MarketData,
+    priceOpp: PriceOpportunity,
+    hybridResult: any
+  ): MarketOpportunity {
+    return {
+      marketId: market.conditionId,
+      question: market.question,
+      outcome: priceOpp.outcome,
+      currentPrice: priceOpp.price,
+      predictedProbability: priceOpp.price + priceOpp.edge,
+      confidence: hybridResult.combinedConfidence,
+      expectedValue: priceOpp.edge * 100 * hybridResult.combinedConfidence,
+      newsSignals: hybridResult.newsSignalTexts,
+      riskScore: 1 - hybridResult.combinedConfidence,
+    };
   }
 
   private extractPrices(market: MarketData): number[] {
