@@ -8,6 +8,8 @@ import bootstrapPlugin from "@elizaos/plugin-bootstrap";
 import starterPlugin from "./plugin.ts";
 import polymarketPlugin from "../plugin-polymarket/src/plugin.ts";
 import { character } from "./character.ts";
+import { getNewsService } from "./utils/service-adapters";
+import { RedemptionService } from "./services/redemption-service";
 
 // Conditionally import Discord plugin if configured
 let discordPlugin: any = null;
@@ -26,9 +28,28 @@ if (process.env.DISCORD_API_TOKEN) {
 // Additional plugins can be imported here as needed
 // Note: Web search, news, and social plugins will be integrated in Phase 3-4
 
-const initCharacter = ({ runtime }: { runtime: IAgentRuntime }) => {
+const initCharacter = async ({ runtime }: { runtime: IAgentRuntime }) => {
   logger.info("Initializing character");
   logger.info("Name: ", character.name);
+  
+  // Start news service if configured
+  if (runtime.getSetting("NEWS_API_KEY")) {
+    try {
+      const newsService = getNewsService(runtime);
+      await newsService.start();
+      logger.info("News service started successfully");
+    } catch (error) {
+      logger.warn("Failed to start news service:", error);
+    }
+  }
+  
+  // Start redemption service
+  try {
+    await RedemptionService.start(runtime);
+    logger.info("Redemption service started successfully");
+  } catch (error) {
+    logger.warn("Failed to start redemption service:", error);
+  }
 };
 
 export const projectAgent: ProjectAgent = {

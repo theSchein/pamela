@@ -16,6 +16,13 @@ import {
   composePromptFromState,
 } from "@elizaos/core";
 import { z } from "zod";
+import { newsAnalysisAction } from "./actions/news-analysis";
+import { marketConfidenceAction } from "./actions/market-confidence";
+import { 
+  newsContextProvider, 
+  marketIntelligenceProvider, 
+  tradingSignalsProvider 
+} from "./providers/news-context-provider";
 
 /**
  * Define the configuration schema for the plugin
@@ -289,8 +296,17 @@ const plugin: Plugin = {
     ],
   },
   services: [StarterService],
-  actions: [conversationAction],
-  providers: [helloWorldProvider],
+  actions: [
+    conversationAction,
+    newsAnalysisAction,
+    marketConfidenceAction,
+  ],
+  providers: [
+    helloWorldProvider,
+    newsContextProvider,
+    marketIntelligenceProvider,
+    tradingSignalsProvider,
+  ],
 };
 
 export default plugin;
