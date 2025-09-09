@@ -1,49 +1,22 @@
 /**
  * Token Redemption Service
  * Automatically monitors and redeems winning positions from resolved Polymarket markets
+ * Uses the Polymarket plugin's redeemWinnings action for consistency
  */
 
-import { type IAgentRuntime, logger, Service } from "@elizaos/core";
-import { ethers, Wallet, Contract, JsonRpcProvider, ZeroHash } from "ethers";
-import {
-  initializeClobClient,
-  type ClobClient,
-} from "../../plugin-polymarket/src/utils/clobClient";
+import { type IAgentRuntime, logger, Service, type Memory, type State, type Content } from "@elizaos/core";
+import { redeemWinningsAction } from "../../plugin-polymarket/src/actions/redeemWinnings";
 
-// Contract addresses (Polygon mainnet)
-const CONDITIONAL_TOKENS_ADDRESS = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045";
-const NEG_RISK_ADAPTER_ADDRESS = "0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296";
-const USDC_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"; // USDC.e
-
-// ABIs for smart contract interaction
-const CONDITIONAL_TOKENS_ABI = [
-  "function redeemPositions(address collateralToken, bytes32 parentCollectionId, bytes32 conditionId, uint256[] calldata indexSets) external",
-  "function payoutNumerators(bytes32 conditionId, uint256 index) external view returns (uint256)",
-  "function payoutDenominator(bytes32 conditionId) external view returns (uint256)",
-];
-
-const NEG_RISK_ADAPTER_ABI = [
-  "function redeemPositions(bytes32 conditionId, uint256[] calldata amounts) external",
-];
-
-interface Position {
-  tokenId: string;
-  marketConditionId: string;
-  marketQuestion: string;
-  outcome: string;
-  size: string;
-  value: string;
-  resolved?: boolean;
-  winner?: boolean;
-}
-
-interface RedemptionResult {
-  marketQuestion: string;
-  conditionId: string;
-  amountRedeemed: string;
-  txHash: string;
-  success: boolean;
-  error?: string;
+interface RedemptionServiceResult {
+  totalRedeemed: number;
+  successCount: number;
+  failedCount: number;
+  results: Array<{
+    market: string;
+    txHash: string;
+    status: string;
+    error?: string;
+  }>;
 }
 
 export class RedemptionService extends Service {
@@ -53,7 +26,6 @@ export class RedemptionService extends Service {
 
   private checkInterval: NodeJS.Timeout | null = null;
   private readonly CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
-  private clobClient: ClobClient | null = null;
   private isChecking = false;
   private lastCheckTime: Date | null = null;
   private telegramBroadcaster: any = null; // Will be injected when Telegram service is ready
@@ -77,8 +49,11 @@ export class RedemptionService extends Service {
    */
   private async initialize(): Promise<void> {
     try {
-      this.clobClient = await initializeClobClient(this.runtime);
-      logger.info("[RedemptionService] Initialized successfully");
+      // Validate that the redeemWinnings action is available
+      if (!redeemWinningsAction) {
+        throw new Error("redeemWinnings action not available from Polymarket plugin");
+      }
+      logger.info("[RedemptionService] Initialized successfully with Polymarket plugin");
     } catch (error) {
       logger.error("[RedemptionService] Failed to initialize:", error);
       throw error;
@@ -124,70 +99,88 @@ export class RedemptionService extends Service {
     this.lastCheckTime = new Date();
 
     try {
-      logger.info("[RedemptionService] Starting redemption check");
+      logger.info("[RedemptionService] Starting redemption check using Polymarket plugin");
 
-      // Get current positions
-      const positions = await this.getPortfolioPositions();
+      // Create a mock memory object for the action
+      const mockMemory: Memory = {
+        id: crypto.randomUUID(),
+        entityId: crypto.randomUUID(),
+        agentId: this.runtime.agentId,
+        roomId: crypto.randomUUID(),
+        content: {
+          text: "redeem all winnings",
+          actions: ["REDEEM_WINNINGS"],
+        },
+        createdAt: Date.now(),
+      };
 
-      if (!positions || positions.length === 0) {
-        logger.info("[RedemptionService] No positions found");
+      // Create a minimal state object
+      const state: State = {
+        userId: crypto.randomUUID(),
+        agentId: this.runtime.agentId,
+        roomId: crypto.randomUUID(),
+        values: {},
+        data: {},
+        text: "",
+      };
+
+      // Validate that the action would trigger
+      const isValid = await redeemWinningsAction.validate(this.runtime, mockMemory, state);
+      
+      if (!isValid) {
+        logger.warn("[RedemptionService] redeemWinnings action validation failed - likely no private key configured");
         this.isChecking = false;
         return;
       }
 
-      logger.info(
-        `[RedemptionService] Found ${positions.length} positions to check`,
-      );
-
-      // Check each position for resolved markets
-      const resolvedPositions = await this.checkResolvedMarkets(positions);
-
-      if (resolvedPositions.length === 0) {
-        logger.info("[RedemptionService] No resolved positions found");
-        this.isChecking = false;
-        return;
-      }
-
-      logger.info(
-        `[RedemptionService] Found ${resolvedPositions.length} resolved positions`,
-      );
-
-      // Redeem winning positions
-      const redemptionResults: RedemptionResult[] = [];
-
-      for (const position of resolvedPositions) {
-        if (position.winner) {
-          const result = await this.redeemPosition(position);
-          redemptionResults.push(result);
-
-          if (result.success) {
-            logger.info(
-              `[RedemptionService] Successfully redeemed ${result.amountRedeemed} USDC from: ${result.marketQuestion}`,
-            );
-
-            // Notify via Telegram if available
-            if (this.telegramBroadcaster) {
-              await this.telegramBroadcaster.notifyRedemption(result);
-            }
-          } else {
-            logger.error(
-              `[RedemptionService] Failed to redeem position: ${result.error}`,
-            );
+      // Execute the redemption action
+      const result = await redeemWinningsAction.handler(
+        this.runtime,
+        mockMemory,
+        state,
+        {},
+        async (content: Content): Promise<Memory[]> => {
+          // Log progress updates from the action
+          if (typeof content === 'object' && content.text) {
+            logger.info(`[RedemptionService] Action update: ${content.text.substring(0, 100)}...`);
           }
+          return []; // Return empty array as we don't need to create memories
         }
+      );
+      
+      if (!result) {
+        logger.warn("[RedemptionService] No result returned from redemption action");
+        this.isChecking = false;
+        return;
       }
 
-      // Log summary
-      const successfulRedemptions = redemptionResults.filter((r) => r.success);
-      const totalRedeemed = successfulRedemptions.reduce(
-        (sum, r) => sum + parseFloat(r.amountRedeemed || "0"),
-        0,
-      );
+      // Process the result
+      if (result.success && result.data) {
+        const data = result.data as RedemptionServiceResult;
+        
+        if (data.successCount > 0) {
+          logger.info(
+            `[RedemptionService] Redemption complete: ${data.successCount} markets redeemed, total: ~$${data.totalRedeemed.toFixed(2)} USDC`
+          );
 
-      if (successfulRedemptions.length > 0) {
-        logger.info(
-          `[RedemptionService] Redemption complete: ${successfulRedemptions.length} positions redeemed, total: ${totalRedeemed} USDC`,
-        );
+          // Notify via Telegram if available
+          if (this.telegramBroadcaster && data.results) {
+            for (const redemption of data.results) {
+              if (redemption.status === "success") {
+                await this.telegramBroadcaster.notifyRedemption({
+                  marketQuestion: redemption.market,
+                  txHash: redemption.txHash,
+                  amountRedeemed: (data.totalRedeemed / data.successCount).toFixed(2),
+                  success: true,
+                });
+              }
+            }
+          }
+        } else {
+          logger.info("[RedemptionService] No positions were redeemed");
+        }
+      } else {
+        logger.warn("[RedemptionService] Redemption action did not succeed or returned no data");
       }
     } catch (error) {
       logger.error("[RedemptionService] Error during redemption check:", error);
@@ -196,183 +189,6 @@ export class RedemptionService extends Service {
     }
   }
 
-  /**
-   * Get current portfolio positions
-   */
-  private async getPortfolioPositions(): Promise<Position[]> {
-    try {
-      const walletAddress =
-        (this.clobClient as any).wallet?.address ||
-        (this.clobClient as any).signer?.address;
-
-      if (!walletAddress) {
-        throw new Error("Unable to determine wallet address");
-      }
-
-      // Get positions from CLOB API
-      const response = await fetch(
-        `${this.runtime.getSetting("CLOB_API_URL")}/portfolio/${walletAddress}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch portfolio: ${response.statusText}`);
-      }
-
-      const data: any = await response.json();
-
-      // Transform API response to Position format
-      const positions: Position[] =
-        data.positions?.map((p: any) => ({
-          tokenId: p.token_id,
-          marketConditionId: p.condition_id,
-          marketQuestion: p.question || "Unknown market",
-          outcome: p.outcome,
-          size: p.size,
-          value: p.current_value || "0",
-          resolved: false,
-          winner: false,
-        })) || [];
-
-      return positions;
-    } catch (error) {
-      logger.error(
-        "[RedemptionService] Failed to get portfolio positions:",
-        error,
-      );
-      return [];
-    }
-  }
-
-  /**
-   * Check which markets have been resolved
-   */
-  private async checkResolvedMarkets(
-    positions: Position[],
-  ): Promise<Position[]> {
-    const resolvedPositions: Position[] = [];
-
-    for (const position of positions) {
-      try {
-        // Check market resolution status via CLOB API
-        const response = await fetch(
-          `${this.runtime.getSetting("CLOB_API_URL")}/markets/${position.marketConditionId}`,
-          {
-            headers: {
-              "Content-Type": "application/json",
-            },
-          },
-        );
-
-        if (response.ok) {
-          const marketData: any = await response.json();
-
-          if (marketData.resolved === true) {
-            position.resolved = true;
-
-            // Check if this position is a winner
-            const winningOutcome = marketData.winning_outcome;
-            if (winningOutcome && position.outcome === winningOutcome) {
-              position.winner = true;
-              resolvedPositions.push(position);
-            }
-          }
-        }
-      } catch (error) {
-        logger.error(
-          `[RedemptionService] Error checking market ${position.marketConditionId}:`,
-          error,
-        );
-      }
-    }
-
-    return resolvedPositions;
-  }
-
-  /**
-   * Redeem a winning position
-   */
-  private async redeemPosition(position: Position): Promise<RedemptionResult> {
-    try {
-      const privateKey = this.runtime.getSetting("POLYMARKET_PRIVATE_KEY");
-      const rpcUrl =
-        this.runtime.getSetting("RPC_URL") || "https://polygon-rpc.com";
-
-      const provider = new JsonRpcProvider(rpcUrl);
-      const wallet = new Wallet(privateKey, provider);
-
-      // Check if this is a neg-risk market (binary markets)
-      const isNegRisk = position.tokenId.includes("neg-risk") || false;
-
-      let txHash: string;
-      let amountRedeemed: string = "0";
-
-      if (isNegRisk) {
-        // Use NegRiskAdapter for binary markets
-        const negRiskAdapter = new Contract(
-          NEG_RISK_ADAPTER_ADDRESS,
-          NEG_RISK_ADAPTER_ABI,
-          wallet,
-        );
-
-        const tx = await negRiskAdapter.redeemPositions(
-          position.marketConditionId,
-          [position.size],
-        );
-
-        const receipt = await tx.wait();
-        txHash = receipt.hash;
-        amountRedeemed = position.value; // Approximate value
-      } else {
-        // Use ConditionalTokens for regular markets
-        const conditionalTokens = new Contract(
-          CONDITIONAL_TOKENS_ADDRESS,
-          CONDITIONAL_TOKENS_ABI,
-          wallet,
-        );
-
-        // Calculate index set for the winning outcome
-        const indexSet = position.outcome === "YES" ? 1 : 2;
-
-        const tx = await conditionalTokens.redeemPositions(
-          USDC_ADDRESS,
-          ZeroHash, // parentCollectionId
-          position.marketConditionId,
-          [indexSet],
-        );
-
-        const receipt = await tx.wait();
-        txHash = receipt.hash;
-        amountRedeemed = position.value; // Approximate value
-      }
-
-      return {
-        marketQuestion: position.marketQuestion,
-        conditionId: position.marketConditionId,
-        amountRedeemed,
-        txHash,
-        success: true,
-      };
-    } catch (error: any) {
-      logger.error(
-        `[RedemptionService] Redemption failed for position ${position.marketConditionId}:`,
-        error,
-      );
-
-      return {
-        marketQuestion: position.marketQuestion,
-        conditionId: position.marketConditionId,
-        amountRedeemed: "0",
-        txHash: "",
-        success: false,
-        error: error.message || "Unknown error",
-      };
-    }
-  }
 
   /**
    * Set the Telegram broadcaster for notifications
