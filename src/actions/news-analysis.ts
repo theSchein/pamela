@@ -8,7 +8,22 @@ import {
   type State,
   logger,
 } from "@elizaos/core";
-import { getNewsService } from "../utils/service-adapters";
+import { getNewsService, type NewsArticle } from "../services/news";
+
+// Helper methods for extended news functionality
+async function getRelevantNews(newsService: any, topic: string, limit: number): Promise<NewsArticle[]> {
+  const articles = topic 
+    ? await newsService.searchNews(topic)
+    : await newsService.getLatestHeadlines();
+  return articles.slice(0, limit);
+}
+
+async function getNewsSentiment(newsService: any, topic: string): Promise<'positive' | 'negative' | 'neutral'> {
+  const signal = await newsService.getMarketSignals(topic);
+  if (signal.signal === 'bullish') return 'positive';
+  if (signal.signal === 'bearish') return 'negative';
+  return 'neutral';
+}
 
 /**
  * News Analysis Action
@@ -95,7 +110,7 @@ export const newsAnalysisAction: Action = {
     logger.info("[NewsAnalysisAction] Analyzing news for market impact");
 
     try {
-      const newsService = getNewsService(runtime);
+      const newsService = getNewsService();
       const text = message.content?.text || "";
       
       // Determine if user is asking about specific topic
@@ -117,8 +132,8 @@ export const newsAnalysisAction: Action = {
       }
       
       // Get relevant news
-      const news = await newsService.getRelevantNews(topic, 5);
-      const sentiment = topic ? await newsService.getNewsSentiment(topic) : "neutral";
+      const news = await getRelevantNews(newsService, topic, 5);
+      const sentiment = topic ? await getNewsSentiment(newsService, topic) : "neutral";
       
       let responseText = "";
       
@@ -147,7 +162,7 @@ ${news.slice(0, 3).map((article, i) =>
   `${i + 1}. **${article.title}**
    ${article.description?.substring(0, 100)}...
    📅 ${new Date(article.publishedAt).toLocaleString()}
-   🔗 Source: ${article.source.name}`
+   🔗 Source: ${article.source}`
 ).join("\n\n")}
 
 **💡 Trading Implications:**

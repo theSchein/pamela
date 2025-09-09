@@ -8,7 +8,7 @@ import bootstrapPlugin from "@elizaos/plugin-bootstrap";
 import starterPlugin from "./plugin.ts";
 import polymarketPlugin from "../plugin-polymarket/src/plugin.ts";
 import { character } from "./character.ts";
-import { getNewsService } from "./utils/service-adapters";
+import { getNewsService } from "./services/news";
 import { RedemptionService } from "./services/redemption-service";
 
 // Conditionally import Discord plugin if configured
@@ -35,7 +35,7 @@ const initCharacter = async ({ runtime }: { runtime: IAgentRuntime }) => {
   // Start news service if configured
   if (runtime.getSetting("NEWS_API_KEY")) {
     try {
-      const newsService = getNewsService(runtime);
+      const newsService = getNewsService();
       await newsService.start();
       logger.info("News service started successfully");
     } catch (error) {

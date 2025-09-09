@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { ConfidenceScorer, type MarketData } from "../../services/confidence-scorer";
+import { ConfidenceScorerService as ConfidenceScorer, type MarketMetrics as MarketData } from "../../services/news";
 import { type IAgentRuntime } from "@elizaos/core";
-import * as newsServiceModule from "../../services/news-service";
+import * as newsServiceModule from "../../services/news";
 
 // Mock the news service module
-vi.mock("../../services/news-service", () => ({
+vi.mock("../../services/news", () => ({
   getNewsService: vi.fn(() => ({
     getNewsSentiment: vi.fn(),
     getRelevantNews: vi.fn(),

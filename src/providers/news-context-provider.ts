@@ -6,7 +6,35 @@ import {
   type State,
   logger,
 } from "@elizaos/core";
-import { getNewsService } from "../utils/service-adapters";
+import { getNewsService, type NewsArticle } from "../services/news";
+
+// Helper methods for extended news functionality
+async function getNewsSummary(newsService: any): Promise<string> {
+  const articles = await newsService.getLatestHeadlines();
+  if (articles.length === 0) {
+    return "No recent market-relevant news available.";
+  }
+  
+  const summary = articles.slice(0, 5).map((article: NewsArticle, index: number) => 
+    `${index + 1}. **${article.title}**\n   ${article.description || "No description available"}\n   Source: ${article.source} | ${new Date(article.publishedAt).toLocaleString()}`
+  ).join("\n\n");
+  
+  return `📰 **Recent Market News**\n\n${summary}`;
+}
+
+async function getRelevantNews(newsService: any, topic: string, limit: number): Promise<NewsArticle[]> {
+  const articles = topic 
+    ? await newsService.searchNews(topic)
+    : await newsService.getLatestHeadlines();
+  return articles.slice(0, limit);
+}
+
+async function getNewsSentiment(newsService: any, topic: string): Promise<'positive' | 'negative' | 'neutral'> {
+  const signal = await newsService.getMarketSignals(topic);
+  if (signal.signal === 'bullish') return 'positive';
+  if (signal.signal === 'bearish') return 'negative';
+  return 'neutral';
+}
 
 /**
  * News Context Provider
@@ -18,7 +46,7 @@ export const newsContextProvider: Provider = {
 
   get: async (runtime: IAgentRuntime, message: Memory, state: State): Promise<ProviderResult> => {
     try {
-      const newsService = getNewsService(runtime);
+      const newsService = getNewsService();
       
       // Check if news service is available
       if (!runtime.getSetting("NEWS_API_KEY")) {
@@ -26,7 +54,7 @@ export const newsContextProvider: Provider = {
       }
 
       // Get recent news summary (cached, so won't hit API every time)
-      const summary = await newsService.getNewsSummary();
+      const summary = await getNewsSummary(newsService);
       
       // Only include if there's actual news
       if (summary.includes("No recent market-relevant news")) {
@@ -63,7 +91,7 @@ async function getOverallSentiment(newsService: any): Promise<string> {
     // Sample a few key topics
     const topics = ["economy", "election", "crypto"];
     const sentiments = await Promise.all(
-      topics.map(topic => newsService.getNewsSentiment(topic))
+      topics.map(topic => getNewsSentiment(newsService, topic))
     );
     
     const positiveCount = sentiments.filter(s => s === "positive").length;
@@ -91,7 +119,7 @@ export const marketIntelligenceProvider: Provider = {
 
   get: async (runtime: IAgentRuntime, message: Memory, state: State): Promise<ProviderResult> => {
     try {
-      const newsService = getNewsService(runtime);
+      const newsService = getNewsService();
       const text = message?.content?.text || "";
       
       // Only provide intelligence if discussing markets or trading
@@ -123,8 +151,8 @@ export const marketIntelligenceProvider: Provider = {
       }
 
       // Get relevant news and sentiment
-      const news = await newsService.getRelevantNews(topic, 3);
-      const sentiment = await newsService.getNewsSentiment(topic);
+      const news = await getRelevantNews(newsService, topic, 3);
+      const sentiment = await getNewsSentiment(newsService, topic);
       
       if (news.length === 0) {
         return { text: "", values: {}, data: {} };
@@ -180,15 +208,15 @@ export const tradingSignalsProvider: Provider = {
         return { text: "", values: {}, data: {} };
       }
 
-      const newsService = getNewsService(runtime);
+      const newsService = getNewsService();
       
       // Get hot topics with strong sentiment
       const hotTopics: string[] = [];
       const topics = ["election", "economy", "crypto", "tech"];
       
       for (const topic of topics) {
-        const sentiment = await newsService.getNewsSentiment(topic);
-        const news = await newsService.getRelevantNews(topic, 2);
+        const sentiment = await getNewsSentiment(newsService, topic);
+        const news = await getRelevantNews(newsService, topic, 2);
         
         if (news.length >= 2 && sentiment !== "neutral") {
           hotTopics.push(`${topic} (${sentiment})`);

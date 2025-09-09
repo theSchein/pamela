@@ -11,10 +11,113 @@ import {
 import { 
   getConfidenceScorer, 
   getNewsService,
-  calculateMarketConfidence,
-  type ConfidenceResult,
-  type MarketData 
-} from "../utils/service-adapters";
+  type ConfidenceResult as BaseConfidenceResult,
+  type MarketMetrics
+} from "../services/news";
+
+// Define local types for compatibility
+interface MarketData {
+  id: string;
+  question: string;
+  description?: string;
+  volume24hr?: number;
+  liquidityNum?: number;
+  endDate?: string;
+  currentPrices?: {
+    yes: number;
+    no: number;
+  };
+}
+
+interface ConfidenceResult {
+  overall: number;
+  factors: {
+    newsSentiment: string;
+    newsSentimentScore: number;
+    marketVolume: string;
+    marketVolumeScore: number;
+    timeToResolution: string;
+    timeToResolutionScore: number;
+  };
+  recommendation: string;
+  reasoning: string;
+}
+
+/**
+ * Calculate market confidence using the confidence scorer
+ */
+async function calculateMarketConfidence(
+  runtime: IAgentRuntime,
+  market: MarketData,
+  side: 'yes' | 'no'
+): Promise<ConfidenceResult> {
+  try {
+    const confidenceScorer = getConfidenceScorer();
+    const newsService = getNewsService();
+    
+    // Get news signal if available
+    let newsSignal = null;
+    try {
+      newsSignal = await newsService.getMarketSignals(market.question);
+    } catch (error) {
+      logger.warn("Failed to get news signal:", error);
+    }
+    
+    // Calculate days until resolution
+    const daysUntilResolution = market.endDate 
+      ? Math.max(0, (new Date(market.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      : 30; // Default to 30 days if no end date
+    
+    // Get current price for the side
+    const currentPrice = side === 'yes' 
+      ? (market.currentPrices?.yes || 0.5)
+      : (market.currentPrices?.no || 0.5);
+    
+    // Calculate confidence
+    const result = await confidenceScorer.calculateConfidence(
+      newsSignal,
+      {
+        volume24h: market.volume24hr || 0,
+        liquidity: market.liquidityNum || 0,
+        spread: 0.02, // Default spread
+        volatility: 0.1, // Default volatility
+      },
+      daysUntilResolution,
+      currentPrice
+    );
+    
+    // Adapt the result to match expected interface
+    return {
+      overall: result.totalScore,
+      factors: {
+        newsSentiment: result.factors.newsSentiment.signal,
+        newsSentimentScore: result.factors.newsSentiment.score * 100,
+        marketVolume: result.factors.marketVolume.level,
+        marketVolumeScore: result.factors.marketVolume.score * 100,
+        timeToResolution: result.factors.timeToResolution.urgency,
+        timeToResolutionScore: result.factors.timeToResolution.score * 100,
+      },
+      recommendation: result.recommendation.replace("_", " "),
+      reasoning: result.reasoning,
+    };
+  } catch (error) {
+    logger.error("Error calculating market confidence:", error);
+    // Return default low confidence result
+    return {
+      overall: 0,
+      factors: {
+        newsSentiment: "neutral",
+        newsSentimentScore: 50,
+        marketVolume: "low",
+        marketVolumeScore: 0,
+        timeToResolution: "distant",
+        timeToResolutionScore: 0,
+      },
+      recommendation: "skip",
+      reasoning: "Unable to calculate confidence due to error",
+    };
+  }
+}
 
 /**
  * Market Confidence Action
@@ -92,8 +195,8 @@ export const marketConfidenceAction: Action = {
     logger.info("[MarketConfidenceAction] Analyzing market confidence");
 
     try {
-      const confidenceScorer = getConfidenceScorer(runtime);
-      const newsService = getNewsService(runtime);
+      const confidenceScorer = getConfidenceScorer();
+      const newsService = getNewsService();
       const text = message.content?.text || "";
       
       // Check if user is asking about specific market

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { NewsService } from "../../services/news-service";
+import { NewsService } from "../../services/news";
 import { type IAgentRuntime } from "@elizaos/core";
 
 // Mock fetch globally before any tests
