@@ -37,6 +37,9 @@ export const character: Character = {
     ...(process.env.DISCORD_API_TOKEN?.trim()
       ? ["@elizaos/plugin-discord"]
       : []),
+    ...(process.env.TELEGRAM_BOT_TOKEN?.trim()
+      ? ["@elizaos/plugin-telegram"]
+      : []),
     ...(process.env.TWITTER_API_KEY?.trim() &&
     process.env.TWITTER_API_SECRET_KEY?.trim() &&
     process.env.TWITTER_ACCESS_TOKEN?.trim() &&
