@@ -51,7 +51,7 @@
 import { elizaLogger, IAgentRuntime, Service } from "@elizaos/core";
 import { TradingConfig } from "../../config/trading-config.js";
 import { getMarketsToMonitor } from "../../config/hardcoded-markets.js";
-import { initializeClobClient } from "../../../plugin-polymarket/src/utils/clobClient.js";
+import { initializeClobClient } from "@theschein/plugin-polymarket";
 
 import { MarketScanner } from "./market-scanner.js";
 import { OpportunityEvaluator } from "./opportunity-evaluator.js";

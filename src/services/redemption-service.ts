@@ -5,7 +5,7 @@
  */
 
 import { type IAgentRuntime, logger, Service, type Memory, type State, type Content } from "@elizaos/core";
-import { redeemWinningsAction } from "../../plugin-polymarket/src/actions/redeemWinnings";
+import { redeemWinningsAction } from "@theschein/plugin-polymarket";
 
 interface RedemptionServiceResult {
   totalRedeemed: number;

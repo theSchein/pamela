@@ -18,7 +18,7 @@
  */
 
 import { elizaLogger, IAgentRuntime, Memory, UUID, Content, HandlerCallback, State } from "@elizaos/core";
-import { getPortfolioPositionsAction } from "../../../plugin-polymarket/src/actions/getPortfolioPositions.js";
+import { getPortfolioPositionsAction } from "@theschein/plugin-polymarket";
 import { PositionData } from "./types.js";
 
 export class PositionManager {

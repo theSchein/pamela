@@ -6,7 +6,7 @@ import {
 } from "@elizaos/core";
 import bootstrapPlugin from "@elizaos/plugin-bootstrap";
 import starterPlugin from "./plugin.ts";
-import polymarketPlugin from "../plugin-polymarket/src/plugin.ts";
+import polymarketPlugin from "@theschein/plugin-polymarket";
 import { character } from "./character.ts";
 import { getNewsService } from "./services/news";
 import { RedemptionService } from "./services/redemption-service";

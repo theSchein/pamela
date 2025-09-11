@@ -17,7 +17,7 @@
  */
 
 import { elizaLogger, IAgentRuntime } from "@elizaos/core";
-import { checkPolymarketBalance } from "../../../plugin-polymarket/src/utils/balanceChecker.js";
+import { checkPolymarketBalance } from "./polymarket-utils.js";
 import { BalanceInfo } from "./types.js";
 
 export class BalanceManager {

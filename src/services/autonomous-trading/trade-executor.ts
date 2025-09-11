@@ -167,9 +167,7 @@ ${decision.reasoning}`;
       );
 
       // Import deposit manager
-      const { depositUSDC } = await import(
-        "../../../plugin-polymarket/src/utils/depositManager.js"
-      );
+      const { depositUSDC } = await import("./polymarket-utils.js");
 
       // Add a buffer to the required amount
       const depositAmount = Math.ceil(requiredAmount + 2); // Add $2 buffer
@@ -178,15 +176,15 @@ ${decision.reasoning}`;
 
       const depositResult = await depositUSDC(
         this.runtime,
-        depositAmount.toString()
+        depositAmount
       );
 
-      if (depositResult.success && depositResult.transactionHash) {
+      if (depositResult.success && depositResult.txHash) {
         elizaLogger.info(
-          `✅ Deposit successful! TX: ${depositResult.transactionHash}`
+          `✅ Deposit successful! TX: ${depositResult.txHash}`
         );
         elizaLogger.info(
-          `Deposit will be available on L2 shortly. Transaction: ${depositResult.transactionHash}`
+          `Deposit will be available on L2 shortly. Transaction: ${depositResult.txHash}`
         );
         return true;
       } else {

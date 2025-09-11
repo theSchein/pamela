@@ -29,9 +29,9 @@ import {
   Content,
   HandlerCallback,
 } from "@elizaos/core";
-import { initializeClobClient } from "../../../plugin-polymarket/src/utils/clobClient.js";
+import { initializeClobClient } from "@theschein/plugin-polymarket";
 import { Side } from "@polymarket/clob-client";
-import type { ClobClient } from "../../../plugin-polymarket/src/utils/clobClient.js";
+import type { ClobClient } from "@polymarket/clob-client";
 import { DirectOrderParams } from "./types.js";
 
 // Cache the CLOB client to avoid re-deriving API credentials on every order
