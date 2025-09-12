@@ -31,13 +31,21 @@
   "bugs": {
     "url": "https://github.com/your-org/pamela/issues"
   },
+  "workspaces": [
+    "web",
+    "shared"
+  ],
   "scripts": {
     "start": "node src/start-with-recovery.mjs",
     "start:original": "elizaos start",
     "start:recovery": "node src/start-with-recovery.mjs",
     "dev": "node src/start-with-recovery.mjs dev",
     "dev:original": "elizaos dev",
-    "build": "tsc --noEmit && tsup",
+    "dev:web": "cd web && npm run dev",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:web\"",
+    "build:agent": "tsc --noEmit && tsup",
+    "build:web": "cd web && npm run build:web",
+    "build": "npm run build:agent",
     "test": "bun test",
     "test:coverage": "bun test --coverage",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
