@@ -8,13 +8,31 @@ export function usePositions(address: string | undefined) {
       if (!address) throw new Error('No wallet address provided');
       const positions = await polymarketService.getPositions(address);
       
-      // Enrich positions with market data
+      // Enrich positions with market data and P&L
       const enrichedPositions = await Promise.all(
         positions.map(async (position) => {
           const market = await polymarketService.getMarket(position.market_id);
+          
+          // Calculate P&L if we have market data
+          let pnl = { unrealized: 0, realized: 0 };
+          if (market && market.outcomes) {
+            const outcome = market.outcomes.find(o => 
+              o.outcome === position.outcome || 
+              o.id === position.token_id?.split('-')[1]
+            );
+            if (outcome) {
+              pnl = await polymarketService.calculatePositionPnl(position, outcome.price);
+            }
+          }
+          
+          // Make sure we preserve all original position data including avgPrice
           return {
             ...position,
-            market
+            avgPrice: position.avgPrice, // Explicitly preserve avgPrice
+            size: position.size, // Explicitly preserve size
+            market,
+            unrealizedPnl: pnl.unrealized,
+            realizedPnl: pnl.realized
           };
         })
       );

@@ -29,8 +29,19 @@ export async function GET(request: NextRequest) {
     // Calculate positions from trades
     const positions = await calculatePositionsFromTrades(trades);
     
-    console.log(`Found ${positions.length} positions for address ${address}`);
-    return NextResponse.json(positions);
+    // Format positions with proper number values
+    const formattedPositions = positions.map(p => ({
+      market_id: p.market_id,
+      token_id: p.token_id,
+      outcome: p.outcome || 'Unknown',
+      size: p.size.toFixed(2),
+      avgPrice: p.avgPrice.toFixed(4),
+      unrealizedPnl: p.unrealizedPnl || 0,
+      realizedPnl: p.realizedPnl || 0
+    }));
+    
+    console.log(`Found ${formattedPositions.length} positions for address ${address}`);
+    return NextResponse.json(formattedPositions);
     
   } catch (error) {
     console.error('Error fetching positions:', error);

@@ -54,21 +54,30 @@ export async function calculatePositionsFromTrades(trades: any[]) {
   const positions: Map<string, any> = new Map();
 
   trades.forEach(trade => {
-    const key = `${trade.market}-${trade.outcome}`;
+    // Extract market ID and token ID from the asset_id
+    // Polymarket uses format: condition_id-outcome_index for asset_id
+    const assetId = trade.asset_id || trade.assetId;
+    const marketId = trade.market || trade.market_id || (assetId ? assetId.split('-')[0] : null);
+    const outcomeIndex = trade.outcome || (assetId ? assetId.split('-')[1] : null);
+    
+    const key = `${marketId}-${outcomeIndex}`;
     
     if (!positions.has(key)) {
       positions.set(key, {
-        market_id: trade.market,
-        outcome: trade.outcome,
+        market_id: marketId,
+        token_id: assetId,
+        outcome: trade.outcome || (outcomeIndex === '1' ? 'Yes' : 'No'),
         size: 0,
         avgPrice: 0,
-        totalCost: 0
+        totalCost: 0,
+        unrealizedPnl: 0,
+        realizedPnl: 0
       });
     }
 
     const position = positions.get(key)!;
-    const tradeSize = parseFloat(trade.size);
-    const tradePrice = parseFloat(trade.price);
+    const tradeSize = parseFloat(trade.size || trade.match_size || '0');
+    const tradePrice = parseFloat(trade.price || trade.match_price || '0');
     
     if (trade.side === 'BUY') {
       position.totalCost += tradeSize * tradePrice;

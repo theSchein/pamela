@@ -58,9 +58,9 @@ export class PolymarketService {
         token_id: pos.token_id,
         outcome: pos.outcome || 'Unknown',
         size: pos.size,
-        avgPrice: pos.avg_price || '0',
-        unrealizedPnl: pos.unrealized_pnl || 0,
-        realizedPnl: pos.realized_pnl || 0
+        avgPrice: pos.avgPrice || pos.avg_price || '0',  // Check both possible field names
+        unrealizedPnl: pos.unrealizedPnl || pos.unrealized_pnl || 0,
+        realizedPnl: pos.realizedPnl || pos.realized_pnl || 0
       }));
     } catch (error) {
       console.error('Error fetching positions:', error);
@@ -184,6 +184,38 @@ export class PolymarketService {
       realized,
       total: unrealized + realized
     };
+  }
+
+  async calculatePositionPnl(position: Position, currentPrice?: number): Promise<{ unrealized: number; realized: number }> {
+    try {
+      // If no current price provided, try to fetch it
+      if (currentPrice === undefined && position.market_id && position.token_id) {
+        // Try to get current market price
+        const market = await this.getMarket(position.market_id);
+        if (market && market.outcomes) {
+          const outcome = market.outcomes.find(o => 
+            o.id === position.token_id || 
+            o.outcome === position.outcome
+          );
+          currentPrice = outcome?.price || 0;
+        }
+      }
+
+      const size = parseFloat(position.size);
+      const avgPrice = parseFloat(position.avgPrice);
+      const current = currentPrice || 0;
+
+      // Calculate unrealized P&L
+      const unrealized = size * (current - avgPrice);
+      
+      // Realized P&L should come from trades data
+      const realized = position.realizedPnl || 0;
+
+      return { unrealized, realized };
+    } catch (error) {
+      console.error('Error calculating P&L:', error);
+      return { unrealized: 0, realized: 0 };
+    }
   }
 }
 

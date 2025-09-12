@@ -2,6 +2,7 @@
 
 import { useWalletBalance, useRecentTransactions } from '@/hooks/useWallet';
 import { usePositions, usePortfolioStats } from '@/hooks/usePolymarket';
+import { PositionsTable } from './PositionsTable';
 
 interface DashboardProps {
   walletAddress: string;
@@ -88,28 +89,7 @@ export function Dashboard({ walletAddress }: DashboardProps) {
       )}
 
       {positions && positions.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-2xl font-bold mb-4">Active Positions</h2>
-          <div className="space-y-3">
-            {positions.slice(0, 5).map((position, index) => (
-              <div key={index} className="border-b pb-3">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <p className="font-semibold">{position.market?.question || 'Unknown Market'}</p>
-                    <p className="text-sm text-gray-600">
-                      {position.outcome} • Size: {position.size} • Avg Price: ${position.avgPrice}
-                    </p>
-                  </div>
-                  {position.unrealizedPnl !== undefined && (
-                    <div className={`text-right ${position.unrealizedPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      ${position.unrealizedPnl.toFixed(2)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <PositionsTable positions={positions} />
       )}
 
       {transactions && transactions.length > 0 && (
