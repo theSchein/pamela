@@ -18,7 +18,9 @@ export function Dashboard({ walletAddress }: DashboardProps) {
   if (balanceLoading || positionsLoading) {
     return (
       <div className="p-8">
-        <div className="text-center">Loading wallet data...</div>
+        <div className="text-center text-2xl font-russo text-red-600 animate-pulse">
+          🌊 SCANNING THE WAVES... 🌊
+        </div>
       </div>
     );
   }
@@ -26,34 +28,41 @@ export function Dashboard({ walletAddress }: DashboardProps) {
   if (balanceError || positionsError) {
     return (
       <div className="p-8">
-        <div className="text-red-500">
-          Error loading data: {(balanceError || positionsError)?.toString()}
+        <div className="text-red-600 text-xl font-russo bg-yellow-100 border-4 border-red-600 rounded-lg p-4">
+          ⚠️ BEACH EMERGENCY: {(balanceError || positionsError)?.toString()}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="lg:col-span-1">
           <TelegramMessages />
         </div>
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-2xl font-bold mb-4">Wallet Overview</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-gray-600">Address</p>
-            <p className="font-mono text-sm">{walletAddress}</p>
+          <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 p-6">
+            <h2 className="text-3xl font-bebas text-red-600 mb-4 drop-shadow-md">WALLET SURVEILLANCE</h2>
+        <div className="space-y-4">
+          <div className="bg-red-50 border-2 border-red-400 rounded-lg p-3">
+            <p className="text-red-700 font-russo uppercase text-sm mb-1">WALLET ADDRESS</p>
+            <p className="font-mono text-red-600 text-lg font-bold break-all">
+              {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+            </p>
+            <p className="font-mono text-red-500 text-xs mt-1" title={walletAddress}>
+              {walletAddress}
+            </p>
           </div>
-          <div>
-            <p className="text-gray-600">USDC Balance</p>
-            <p className="text-2xl font-bold">${balance?.usdc || '0'}</p>
-          </div>
-          <div>
-            <p className="text-gray-600">MATIC Balance</p>
-            <p className="text-lg">{balance?.matic || '0'}</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-3">
+              <p className="text-red-700 font-russo uppercase text-sm">USDC BALANCE</p>
+              <p className="text-3xl font-bebas text-red-600">${balance?.usdc || '0'}</p>
+            </div>
+            <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-3">
+              <p className="text-red-700 font-russo uppercase text-sm">MATIC BALANCE</p>
+              <p className="text-xl font-bebas text-red-600">{balance?.matic || '0'}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -61,36 +70,36 @@ export function Dashboard({ walletAddress }: DashboardProps) {
       </div>
 
       {stats && (
-        <div className="bg-white rounded-lg shadow p-6 col-span-full">
-          <h2 className="text-2xl font-bold mb-4">Portfolio Statistics</h2>
+        <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 p-6 col-span-full">
+          <h2 className="text-3xl font-bebas text-red-600 mb-4 drop-shadow-md">TRADING PERFORMANCE METRICS</h2>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <p className="text-gray-600">Total Value</p>
-              <p className="text-xl font-bold">${stats.totalValue.toFixed(2)}</p>
+              <p className="text-red-700 font-russo uppercase text-sm">Total Value</p>
+              <p className="text-2xl font-bebas text-red-600">${stats.totalValue.toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-gray-600">Unrealized P&L</p>
-              <p className={`text-xl font-bold ${stats.pnl.unrealized >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p className="text-red-700 font-russo uppercase text-sm">Unrealized P&L</p>
+              <p className={`text-2xl font-bebas ${stats.pnl.unrealized >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 ${stats.pnl.unrealized.toFixed(2)}
               </p>
             </div>
             <div>
-              <p className="text-gray-600">Realized P&L</p>
-              <p className={`text-xl font-bold ${stats.pnl.realized >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p className="text-red-700 font-russo uppercase text-sm">Realized P&L</p>
+              <p className={`text-2xl font-bebas ${stats.pnl.realized >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 ${stats.pnl.realized.toFixed(2)}
               </p>
             </div>
             <div>
-              <p className="text-gray-600">Active Positions</p>
-              <p className="text-lg">{stats.activeCount}</p>
+              <p className="text-red-700 font-russo uppercase text-sm">Active Positions</p>
+              <p className="text-xl font-bebas text-red-600">{stats.activeCount}</p>
             </div>
             <div>
-              <p className="text-gray-600">Resolved Positions</p>
-              <p className="text-lg">{stats.resolvedCount}</p>
+              <p className="text-red-700 font-russo uppercase text-sm">Resolved Positions</p>
+              <p className="text-xl font-bebas text-red-600">{stats.resolvedCount}</p>
             </div>
             <div>
-              <p className="text-gray-600">Total Positions</p>
-              <p className="text-lg">{stats.positionCount}</p>
+              <p className="text-red-700 font-russo uppercase text-sm">Total Positions</p>
+              <p className="text-xl font-bebas text-red-600">{stats.positionCount}</p>
             </div>
           </div>
         </div>
@@ -103,18 +112,18 @@ export function Dashboard({ walletAddress }: DashboardProps) {
       )}
 
       {transactions && transactions.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6 col-span-full">
-          <h2 className="text-2xl font-bold mb-4">Recent Transactions</h2>
+        <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 p-6 col-span-full">
+          <h2 className="text-3xl font-bebas text-red-600 mb-4 drop-shadow-md">TRANSACTION LOG</h2>
           <div className="space-y-2">
             {transactions.map((tx, index) => (
               <div key={index} className="flex justify-between text-sm">
                 <div>
                   <p className="font-mono">{tx.hash.slice(0, 10)}...</p>
-                  <p className="text-gray-600">Block #{tx.blockNumber}</p>
+                  <p className="text-red-700 font-russo text-xs">Block #{tx.blockNumber}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold">${tx.amount} USDC</p>
-                  <p className="text-gray-600">
+                  <p className="font-bebas text-red-600 text-lg">${tx.amount} USDC</p>
+                  <p className="text-red-700 font-russo text-xs">
                     {new Date(tx.timestamp * 1000).toLocaleString()}
                   </p>
                 </div>

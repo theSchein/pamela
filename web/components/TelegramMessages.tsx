@@ -8,14 +8,14 @@ export function TelegramMessages() {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <MessageCircle className="h-5 w-5" />
-          Agent Messages
+      <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 p-6">
+        <h2 className="text-3xl font-bebas text-red-600 mb-4 flex items-center gap-2 drop-shadow-md">
+          <MessageCircle className="h-6 w-6 text-red-600" />
+          AGENT COMMUNICATIONS
         </h2>
         <div className="space-y-2">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-16 bg-gray-200 rounded animate-pulse" />
+            <div key={i} className="h-16 bg-red-200 rounded animate-pulse" />
           ))}
         </div>
       </div>
@@ -24,13 +24,13 @@ export function TelegramMessages() {
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <MessageCircle className="h-5 w-5" />
-          Agent Messages
+      <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 p-6">
+        <h2 className="text-3xl font-bebas text-red-600 mb-4 flex items-center gap-2 drop-shadow-md">
+          <MessageCircle className="h-6 w-6 text-red-600" />
+          AGENT COMMUNICATIONS
         </h2>
-        <p className="text-sm text-gray-500">
-          Unable to load messages
+        <p className="text-sm font-russo text-red-700">
+          SIGNAL LOST - UNABLE TO ESTABLISH COMMS
         </p>
       </div>
     );
@@ -61,12 +61,12 @@ export function TelegramMessages() {
   }, []);
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-        <MessageCircle className="h-5 w-5" />
-        Agent Messages
+    <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 p-6">
+      <h2 className="text-3xl font-bebas text-red-600 mb-4 flex items-center gap-2 drop-shadow-md">
+        <MessageCircle className="h-6 w-6 text-red-600" />
+        AGENT COMMUNICATIONS
         {botUsername && (
-          <span className="text-xs text-gray-500">
+          <span className="text-sm font-russo text-red-700">
             @{botUsername}
           </span>
         )}
@@ -74,19 +74,19 @@ export function TelegramMessages() {
       <div className="h-96 overflow-y-auto pr-4">
         <div className="space-y-4">
           {conversationPairs.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-8">
-              No messages yet
+            <p className="text-sm font-russo text-red-700 text-center py-8">
+              RADIO SILENT - MONITORING CHANNELS
             </p>
           ) : (
             conversationPairs.map((pair, index) => (
               <div key={index} className="space-y-2">
                 {pair.query && (
                   <div className="flex gap-3">
-                    <User className="h-5 w-5 text-gray-500 mt-0.5" />
+                    <User className="h-5 w-5 text-red-600 mt-0.5" />
                     <div className="flex-1">
-                      <div className="bg-gray-100 rounded-lg p-3">
-                        <p className="text-sm">{pair.query.text}</p>
-                        <p className="text-xs text-gray-500 mt-1">
+                      <div className="bg-yellow-100 border-2 border-yellow-400 rounded-lg p-3">
+                        <p className="text-sm font-russo text-red-800">{pair.query.text}</p>
+                        <p className="text-xs font-russo text-red-600 mt-1">
                           {new Date(pair.query.timestamp).toLocaleTimeString()}
                         </p>
                       </div>
@@ -95,13 +95,13 @@ export function TelegramMessages() {
                 )}
                 {pair.response && (
                   <div className="flex gap-3">
-                    <Bot className="h-5 w-5 text-blue-600 mt-0.5" />
+                    <Bot className="h-5 w-5 text-red-600 mt-0.5" />
                     <div className="flex-1">
-                      <div className="bg-blue-50 rounded-lg p-3">
-                        <p className="text-sm whitespace-pre-wrap">
+                      <div className="bg-red-50 border-2 border-red-400 rounded-lg p-3">
+                        <p className="text-sm font-russo text-red-900 whitespace-pre-wrap">
                           {pair.response.text}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs font-russo text-red-600 mt-1">
                           {new Date(pair.response.timestamp).toLocaleTimeString()}
                         </p>
                       </div>

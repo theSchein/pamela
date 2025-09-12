@@ -28,9 +28,9 @@ interface PositionsTableProps {
 export function PositionsTable({ positions }: PositionsTableProps) {
   if (!positions || positions.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold mb-4">All Positions</h2>
-        <p className="text-gray-500">No positions found</p>
+      <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 p-6">
+        <h2 className="text-3xl font-bebas text-red-600 mb-4 drop-shadow-md">MARKET POSITIONS</h2>
+        <p className="text-red-700 font-russo">NO ACTIVE POSITIONS - AGENT IS ON PATROL</p>
       </div>
     );
   }
@@ -63,44 +63,44 @@ export function PositionsTable({ positions }: PositionsTableProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="px-6 py-4 border-b">
-        <h2 className="text-2xl font-bold">All Positions ({positions.length})</h2>
+    <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 overflow-hidden">
+      <div className="px-6 py-4 bg-gradient-to-r from-red-500 to-orange-500">
+        <h2 className="text-3xl font-bebas text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">ACTIVE POSITIONS ({positions.length})</h2>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-red-100">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-russo text-red-700 uppercase tracking-wider">
                 Market
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-russo text-red-700 uppercase tracking-wider">
                 Position
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-russo text-red-700 uppercase tracking-wider">
                 Size
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-russo text-red-700 uppercase tracking-wider">
                 Avg Price
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-russo text-red-700 uppercase tracking-wider">
                 Current Price
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-russo text-red-700 uppercase tracking-wider">
                 Value
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-russo text-red-700 uppercase tracking-wider">
                 P&L
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-russo text-red-700 uppercase tracking-wider">
                 End Date
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-russo text-red-700 uppercase tracking-wider">
                 Status
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-yellow-50 divide-y divide-red-300">
             {positions.map((position, index) => {
               // Handle avgPrice whether it's a string or number - ensure we parse correctly
               const rawAvgPrice = position.avgPrice;
@@ -120,14 +120,14 @@ export function PositionsTable({ positions }: PositionsTableProps) {
               const daysUntilEnd = position.market?.end_date_iso ? getDaysUntilEnd(position.market.end_date_iso) : null;
 
               return (
-                <tr key={index} className="hover:bg-gray-50">
+                <tr key={index} className="hover:bg-orange-100 transition-colors">
                   <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">
+                    <div className="text-sm font-russo text-red-900">
                       {position.market?.question || `Market ${position.market_id.slice(0, 8)}...`}
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    <span className={`inline-flex px-2 py-1 text-xs font-bebas rounded-full ${
                       position.outcome === 'Yes' 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-red-100 text-red-800'
@@ -135,32 +135,32 @@ export function PositionsTable({ positions }: PositionsTableProps) {
                       {position.outcome}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
+                  <td className="px-6 py-4 text-sm font-russo text-red-800">
                     {size.toFixed(2)}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
+                  <td className="px-6 py-4 text-sm font-russo text-red-800">
                     ${avgPrice.toFixed(4)}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
+                  <td className="px-6 py-4 text-sm font-russo text-red-800">
                     ${currentPrice.toFixed(4)}
                   </td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                  <td className="px-6 py-4 text-sm font-bebas text-red-800">
                     ${totalValue.toFixed(2)}
                   </td>
                   <td className="px-6 py-4">
-                    <div className={`text-sm font-medium ${unrealizedPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className={`text-sm font-bebas ${unrealizedPnl >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                       ${unrealizedPnl.toFixed(2)}
                       <span className="text-xs ml-1">
                         ({pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(1)}%)
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
+                  <td className="px-6 py-4 text-sm font-russo text-red-800">
                     {position.market?.end_date_iso ? (
                       <div>
                         <div>{formatDate(position.market.end_date_iso)}</div>
                         {daysUntilEnd !== null && (
-                          <div className={`text-xs ${daysUntilEnd < 7 ? 'text-orange-600' : 'text-gray-500'}`}>
+                          <div className={`text-xs font-russo ${daysUntilEnd < 7 ? 'text-orange-700' : 'text-red-600'}`}>
                             {daysUntilEnd > 0 ? `${daysUntilEnd} days` : daysUntilEnd === 0 ? 'Today' : 'Ended'}
                           </div>
                         )}
@@ -168,7 +168,7 @@ export function PositionsTable({ positions }: PositionsTableProps) {
                     ) : '-'}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    <span className={`inline-flex px-2 py-1 text-xs font-bebas rounded-full ${
                       position.market?.resolved 
                         ? 'bg-gray-100 text-gray-800' 
                         : position.market?.active 
@@ -186,16 +186,16 @@ export function PositionsTable({ positions }: PositionsTableProps) {
               );
             })}
           </tbody>
-          <tfoot className="bg-gray-50">
+          <tfoot className="bg-gradient-to-r from-red-500 to-orange-500">
             <tr>
-              <td colSpan={5} className="px-6 py-3 text-sm font-medium text-gray-900">
-                Total
+              <td colSpan={5} className="px-6 py-3 text-lg font-bebas text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                TOTAL
               </td>
-              <td className="px-6 py-3 text-sm font-bold text-gray-900">
+              <td className="px-6 py-3 text-lg font-bebas text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                 ${positions.reduce((sum, pos) => sum + calculateTotalValue(pos), 0).toFixed(2)}
               </td>
               <td className="px-6 py-3">
-                <div className={`text-sm font-bold ${
+                <div className={`text-lg font-bebas drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] ${
                   positions.reduce((sum, pos) => {
                     const size = typeof pos.size === 'string' ? parseFloat(pos.size) : (pos.size || 0);
                     const avgPrice = typeof pos.avgPrice === 'string' ? parseFloat(pos.avgPrice) : (pos.avgPrice || 0);
@@ -203,7 +203,7 @@ export function PositionsTable({ positions }: PositionsTableProps) {
                       o.outcome === pos.outcome
                     )?.price || avgPrice;
                     return sum + (size * (currentPrice - avgPrice));
-                  }, 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                  }, 0) >= 0 ? 'text-green-300' : 'text-yellow-300'
                 }`}>
                   ${positions.reduce((sum, pos) => {
                     const size = typeof pos.size === 'string' ? parseFloat(pos.size) : (pos.size || 0);
