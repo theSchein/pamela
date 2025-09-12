@@ -43,24 +43,44 @@ export class BlockchainService {
   async getRecentTransactions(address: string, limit: number = 10): Promise<any[]> {
     try {
       const currentBlock = await this.provider.getBlockNumber();
-      const fromBlock = Math.max(0, currentBlock - 100); // Further reduced to last ~100 blocks to avoid "range too large" error
+      const maxBlockRange = 50; // Max blocks per request to avoid RPC limits
+      const totalBlocksToSearch = 200; // Total blocks to search
+      
+      let allLogs: ethers.Log[] = [];
+      
+      // Query in chunks to avoid "Block range is too large" errors
+      for (let i = 0; i < Math.ceil(totalBlocksToSearch / maxBlockRange); i++) {
+        const toBlock = currentBlock - (i * maxBlockRange);
+        const fromBlock = Math.max(0, toBlock - maxBlockRange + 1);
+        
+        if (toBlock < 0) break;
+        
+        const filter = {
+          address: USDC_ADDRESS,
+          topics: [
+            ethers.id('Transfer(address,address,uint256)'),
+            null,
+            ethers.zeroPadValue(address, 32)
+          ],
+          fromBlock,
+          toBlock
+        };
 
-      const filter = {
-        address: USDC_ADDRESS,
-        topics: [
-          ethers.id('Transfer(address,address,uint256)'),
-          null,
-          ethers.zeroPadValue(address, 32)
-        ],
-        fromBlock,
-        toBlock: currentBlock
-      };
+        try {
+          const logs = await this.provider.getLogs(filter);
+          allLogs = [...allLogs, ...logs];
+          
+          if (allLogs.length >= limit) break;
+        } catch (chunkError) {
+          console.error(`Error fetching logs for blocks ${fromBlock}-${toBlock}:`, chunkError);
+          continue;
+        }
+      }
 
-      const logs = await this.provider.getLogs(filter);
-      const decimals = 6; // USDC has 6 decimals on Polygon
+      const decimals = 6;
 
       const transactions = await Promise.all(
-        logs.slice(-limit).map(async (log) => {
+        allLogs.slice(-limit).map(async (log) => {
           const block = await this.provider.getBlock(log.blockNumber);
           return {
             hash: log.transactionHash,
