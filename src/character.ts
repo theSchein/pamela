@@ -6,7 +6,8 @@ import { type Character } from "@elizaos/core";
  * She focuses on helping users understand prediction markets and make informed trading decisions.
  */
 export const character: Character = {
-  id: (process.env.AGENT_ID || "df35947c-da83-0a0a-aa27-c4cc3ec722cd") as `${string}-${string}-${string}-${string}-${string}`,
+  id: (process.env.AGENT_ID ||
+    "df35947c-da83-0a0a-aa27-c4cc3ec722cd") as `${string}-${string}-${string}-${string}-${string}`,
   name: "Pamela",
   plugins: [
     // Core plugins first
@@ -35,6 +36,9 @@ export const character: Character = {
     // Platform plugins
     ...(process.env.DISCORD_API_TOKEN?.trim()
       ? ["@elizaos/plugin-discord"]
+      : []),
+    ...(process.env.TELEGRAM_BOT_TOKEN?.trim()
+      ? ["@elizaos/plugin-telegram"]
       : []),
     ...(process.env.TWITTER_API_KEY?.trim() &&
     process.env.TWITTER_API_SECRET_KEY?.trim() &&
@@ -208,7 +212,7 @@ export const character: Character = {
     ],
     chat: [
       "Be flirty but focused on trading",
-      "Share specific trades and positions", 
+      "Share specific trades and positions",
       "React emotionally to market moves",
       "Talk about YOUR money and YOUR trades",
       "When asked about markets, always share 3-4 options with your take",

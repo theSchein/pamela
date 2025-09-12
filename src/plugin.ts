@@ -16,6 +16,13 @@ import {
   composePromptFromState,
 } from "@elizaos/core";
 import { z } from "zod";
+import { newsAnalysisAction } from "./actions/news-analysis";
+import { marketConfidenceAction } from "./actions/market-confidence";
+import { 
+  newsContextProvider, 
+  marketIntelligenceProvider, 
+  tradingSignalsProvider 
+} from "./providers/news-context-provider";
 
 /**
  * Define the configuration schema for the plugin
@@ -87,7 +94,7 @@ const conversationAction: Action = {
       ]);
       logger.info(
         "Composed state text length:",
-        composedState.text?.length || 0,
+        String(composedState.text?.length || 0),
       );
 
       logger.info("Calling useModel...");
@@ -270,27 +277,36 @@ const plugin: Plugin = {
       async (params) => {
         logger.info("VOICE_MESSAGE_RECEIVED event received");
         // print the keys
-        logger.info(Object.keys(params));
+        logger.info("Keys:", JSON.stringify(Object.keys(params)));
       },
     ],
     WORLD_CONNECTED: [
       async (params) => {
         logger.info("WORLD_CONNECTED event received");
         // print the keys
-        logger.info(Object.keys(params));
+        logger.info("Keys:", JSON.stringify(Object.keys(params)));
       },
     ],
     WORLD_JOINED: [
       async (params) => {
         logger.info("WORLD_JOINED event received");
         // print the keys
-        logger.info(Object.keys(params));
+        logger.info("Keys:", JSON.stringify(Object.keys(params)));
       },
     ],
   },
   services: [StarterService],
-  actions: [conversationAction],
-  providers: [helloWorldProvider],
+  actions: [
+    conversationAction,
+    newsAnalysisAction,
+    marketConfidenceAction,
+  ],
+  providers: [
+    helloWorldProvider,
+    newsContextProvider,
+    marketIntelligenceProvider,
+    tradingSignalsProvider,
+  ],
 };
 
 export default plugin;
