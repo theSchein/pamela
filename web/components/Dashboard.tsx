@@ -3,6 +3,7 @@
 import { useWalletBalance, useRecentTransactions } from '@/hooks/useWallet';
 import { usePositions, usePortfolioStats } from '@/hooks/usePolymarket';
 import { PositionsTable } from './PositionsTable';
+import { TelegramMessages } from './TelegramMessages';
 
 interface DashboardProps {
   walletAddress: string;
@@ -34,8 +35,13 @@ export function Dashboard({ walletAddress }: DashboardProps) {
 
   return (
     <div className="p-8 space-y-6">
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold mb-4">Wallet Overview</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="lg:col-span-1">
+          <TelegramMessages />
+        </div>
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-2xl font-bold mb-4">Wallet Overview</h2>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-gray-600">Address</p>
@@ -51,9 +57,11 @@ export function Dashboard({ walletAddress }: DashboardProps) {
           </div>
         </div>
       </div>
+        </div>
+      </div>
 
       {stats && (
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-6 col-span-full">
           <h2 className="text-2xl font-bold mb-4">Portfolio Statistics</h2>
           <div className="grid grid-cols-3 gap-4">
             <div>
@@ -89,11 +97,13 @@ export function Dashboard({ walletAddress }: DashboardProps) {
       )}
 
       {positions && positions.length > 0 && (
-        <PositionsTable positions={positions} />
+        <div className="col-span-full">
+          <PositionsTable positions={positions} />
+        </div>
       )}
 
       {transactions && transactions.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-6 col-span-full">
           <h2 className="text-2xl font-bold mb-4">Recent Transactions</h2>
           <div className="space-y-2">
             {transactions.map((tx, index) => (
