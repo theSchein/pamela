@@ -1,10 +1,35 @@
 'use client';
 
-import { useTelegramMessages } from '@/hooks/useTelegramMessages';
-import { MessageCircle, Bot, User } from 'lucide-react';
+import { useTelegramSimple } from '@/hooks/useTelegramSimple';
+import { MessageCircle, Bot, User, WifiOff, Wifi, RefreshCw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 export function TelegramMessages() {
-  const { data, isLoading, error } = useTelegramMessages();
+  // Use the simpler polling mechanism for better reliability
+  const { 
+    data, 
+    isLoading, 
+    error,
+    isPolling,
+    togglePolling,
+    refresh,
+    lastError,
+    hasData
+  } = useTelegramSimple(8000); // Poll every 8 seconds
+  
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [lastMessageCount, setLastMessageCount] = useState(0);
+  
+  // Track new messages
+  useEffect(() => {
+    if (data?.messages && data.messages.length > lastMessageCount) {
+      setLastMessageCount(data.messages.length);
+      // Auto-scroll to bottom on new message
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    }
+  }, [data?.messages, lastMessageCount]);
 
   if (isLoading) {
     return (
@@ -62,16 +87,56 @@ export function TelegramMessages() {
 
   return (
     <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 p-6">
-      <h2 className="text-3xl font-bebas text-red-600 mb-4 flex items-center gap-2 drop-shadow-md">
-        <MessageCircle className="h-6 w-6 text-red-600" />
-        AGENT COMMUNICATIONS
-        {botUsername && (
-          <span className="text-sm font-russo text-red-700">
-            @{botUsername}
-          </span>
-        )}
-      </h2>
-      <div className="h-96 overflow-y-auto pr-4">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-3xl font-bebas text-red-600 flex items-center gap-2 drop-shadow-md">
+          <MessageCircle className="h-6 w-6 text-red-600" />
+          AGENT COMMUNICATIONS
+          {botUsername && (
+            <span className="text-sm font-russo text-red-700">
+              @{botUsername}
+            </span>
+          )}
+        </h2>
+        <div className="flex items-center gap-2">
+          {hasData && (
+            <span className="text-xs font-russo text-red-700">
+              {data?.messages?.length || 0} MSGS
+            </span>
+          )}
+          {isPolling ? (
+            <div className="flex items-center gap-1">
+              <Wifi className="h-4 w-4 text-green-600 animate-pulse" />
+              <span className="text-xs font-russo text-green-600">POLLING</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <WifiOff className="h-4 w-4 text-yellow-600" />
+              <span className="text-xs font-russo text-yellow-600">PAUSED</span>
+            </div>
+          )}
+          <button 
+            onClick={refresh}
+            className="flex items-center gap-1 text-red-600 hover:text-red-700 transition-colors"
+            title="Refresh messages"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
+          <button 
+            onClick={togglePolling}
+            className="text-xs font-russo text-red-600 hover:text-red-700 transition-colors"
+          >
+            {isPolling ? 'PAUSE' : 'RESUME'}
+          </button>
+        </div>
+      </div>
+      {lastError && (
+        <div className="bg-yellow-100 border border-yellow-400 rounded p-2 mb-2">
+          <p className="text-xs font-russo text-yellow-700">
+            NETWORK ISSUE: {lastError} - Data may be cached
+          </p>
+        </div>
+      )}
+      <div ref={scrollRef} className="h-96 overflow-y-auto pr-4">
         <div className="space-y-4">
           {conversationPairs.length === 0 ? (
             <p className="text-sm font-russo text-red-700 text-center py-8">
