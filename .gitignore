@@ -22,6 +22,9 @@ apps/agent/.env
 .elizadb/
 .elizadb-test/
 
+# Deployment
+.phala*
+
 # Logs (comprehensive)
 npm-debug.log*
 yarn-debug.log*
