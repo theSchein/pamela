@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   pamela:
-    image: oldirtybenji/pamela-tee-agent:latest
+    image: ${DOCKER_USERNAME}/pamela-agent:${DOCKER_IMAGE_TAG:-latest}
     container_name: pamela-agent
     ports:
       - "3000:3000"

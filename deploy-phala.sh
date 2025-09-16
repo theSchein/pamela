@@ -13,12 +13,25 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Configuration
-AGENT_NAME="pamela-tee-agent"
+# Configuration - Can be overridden by environment variables
+DOCKER_USERNAME="${DOCKER_USERNAME:-}"
+DOCKER_IMAGE_NAME="${DOCKER_IMAGE_NAME:-pamela-agent}"
+DOCKER_IMAGE_TAG="${DOCKER_IMAGE_TAG:-latest}"
+AGENT_NAME="${TEE_AGENT_NAME:-pamela-tee-agent}"
 ENV_FILE=".env"
 COMPOSE_FILE="docker-compose.yml"
 LOCAL_IMAGE_NAME="pamela-local"
 MODE="${1:-cloud}"  # Default to cloud mode if not specified
+
+# Validate Docker username is set
+if [ -z "$DOCKER_USERNAME" ]; then
+    echo -e "${RED}Error: DOCKER_USERNAME environment variable is not set${NC}"
+    echo "Please export DOCKER_USERNAME=your-dockerhub-username"
+    exit 1
+fi
+
+# Construct full image name
+FULL_IMAGE_NAME="${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}"
 
 # Function to display usage
 show_usage() {
@@ -55,12 +68,7 @@ echo ""
 deploy_local() {
     echo -e "${YELLOW}Starting local deployment with TEE simulator...${NC}"
     
-    # Get Docker username
-    DOCKER_USERNAME=$(docker info 2>/dev/null | grep "Username" | awk '{print $2}')
-    if [ -z "$DOCKER_USERNAME" ]; then
-        echo -e "${YELLOW}Please enter your Docker Hub username:${NC}"
-        read DOCKER_USERNAME
-    fi
+    # Docker username already validated at script start
     
     # The Phala CLI already prepends the username, so just use the base image name
     echo -e "${GREEN}Building image as: $DOCKER_USERNAME/$LOCAL_IMAGE_NAME:latest${NC}"
@@ -216,7 +224,7 @@ deploy_cloud() {
     fi
     
     # Also check and delete by listing all CVMs
-    EXISTING_CVMS=$(npx phala cvms list 2>/dev/null | grep "pamela-tee-agent" | grep "App ID" | awk '{print $4}' || true)
+    EXISTING_CVMS=$(npx phala cvms list 2>/dev/null | grep "$AGENT_NAME" | grep "App ID" | awk '{print $4}' || true)
     if [ ! -z "$EXISTING_CVMS" ]; then
         for CVM_ID in $EXISTING_CVMS; do
             echo -e "${YELLOW}Found CVM with ID $CVM_ID. Deleting...${NC}"
@@ -352,13 +360,7 @@ if ! docker info 2>/dev/null | grep -q "Username"; then
     docker login
 fi
 
-# Get Docker username
-DOCKER_USERNAME=$(docker info 2>/dev/null | grep "Username" | awk '{print $2}')
-
-if [ -z "$DOCKER_USERNAME" ]; then
-    echo -e "${YELLOW}Please enter your Docker Hub username:${NC}"
-    read DOCKER_USERNAME
-fi
+# Docker username already validated at script start
 
 echo -e "${GREEN}Using Docker Hub username: $DOCKER_USERNAME${NC}"
 
@@ -366,7 +368,7 @@ echo ""
 echo -e "${YELLOW}Building Docker image...${NC}"
 
 # Build and tag the Docker image for Docker Hub
-FULL_IMAGE_NAME="$DOCKER_USERNAME/$AGENT_NAME"
+# FULL_IMAGE_NAME already set at the top of script
 echo -e "${GREEN}Building image: $FULL_IMAGE_NAME:latest${NC}"
 docker build -t "$FULL_IMAGE_NAME:latest" -f Dockerfile .
 
@@ -469,12 +471,12 @@ echo -e "${YELLOW}Creating TEE-specific docker-compose with environment variable
 # This is more reliable than --env-file for Phala TEE
 COMPOSE_TEE_FILE="docker-compose.tee-deploy.yml"
 
-cat > "$COMPOSE_TEE_FILE" << 'EOF'
+cat > "$COMPOSE_TEE_FILE" << EOF
 version: '3.8'
 
 services:
   pamela:
-    image: oldirtybenji/pamela-tee-agent:latest
+    image: ${FULL_IMAGE_NAME}:${DOCKER_IMAGE_TAG}
     container_name: pamela-agent
     ports:
       - "3000:3000"
