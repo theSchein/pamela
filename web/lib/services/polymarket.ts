@@ -49,22 +49,61 @@ export class PolymarketService {
 
   async getPositions(address: string): Promise<Position[]> {
     try {
+      // Try CLOB API first
       const response = await this.api.get(`/positions`, {
         params: { address: address.toLowerCase() }
       });
       
-      return response.data.map((pos: any) => ({
-        market_id: pos.market_id,
-        token_id: pos.token_id,
-        outcome: pos.outcome || 'Unknown',
-        size: pos.size,
-        avgPrice: pos.avgPrice || pos.avg_price || '0',  // Check both possible field names
-        unrealizedPnl: pos.unrealizedPnl || pos.unrealized_pnl || 0,
-        realizedPnl: pos.realizedPnl || pos.realized_pnl || 0
-      }));
+      // If we get positions, validate them
+      if (response.data && response.data.length > 0) {
+        const positions = response.data.map((pos: any) => ({
+          market_id: pos.market_id,
+          token_id: pos.token_id,
+          outcome: pos.outcome || 'Unknown',
+          size: pos.size,
+          avgPrice: pos.avgPrice || pos.avg_price || '0',
+          unrealizedPnl: pos.unrealizedPnl || pos.unrealized_pnl || 0,
+          realizedPnl: pos.realizedPnl || pos.realized_pnl || 0
+        }));
+        
+        // Validate positions - check for suspicious values
+        const validPositions = positions.filter((pos: Position) => {
+          const size = parseFloat(pos.size);
+          const price = parseFloat(pos.avgPrice);
+          
+          // Flag suspicious positions
+          if (size > 1000 && price > 0.5) {
+            console.warn('Suspicious position detected:', pos);
+            return false; // Filter out clearly wrong positions
+          }
+          
+          return true;
+        });
+        
+        return validPositions;
+      }
+      
+      // Fallback to Gamma API if CLOB fails or returns empty
+      console.log('Falling back to Gamma API for positions');
+      const gammaResponse = await this.api.get(`/gamma-positions`, {
+        params: { address: address.toLowerCase() }
+      });
+      
+      return gammaResponse.data || [];
+      
     } catch (error) {
       console.error('Error fetching positions:', error);
-      return [];
+      
+      // Try Gamma API as final fallback
+      try {
+        const gammaResponse = await this.api.get(`/gamma-positions`, {
+          params: { address: address.toLowerCase() }
+        });
+        return gammaResponse.data || [];
+      } catch (gammaError) {
+        console.error('Gamma API also failed:', gammaError);
+        return [];
+      }
     }
   }
 
@@ -159,9 +198,8 @@ export class PolymarketService {
 
   async getTradeHistory(address: string, limit: number = 50): Promise<any[]> {
     try {
-      // Note: Trade history endpoint still needs direct CLOB access
-      // This might need a separate proxy route if CORS issues persist
-      const response = await axios.get(`${CLOB_API_URL}/trades`, {
+      // Use local proxy API to avoid CORS issues
+      const response = await this.api.get('/trades', {
         params: {
           address: address.toLowerCase(),
           limit

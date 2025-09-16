@@ -23,13 +23,14 @@ interface Position {
 
 interface PositionsTableProps {
   positions: Position[];
+  title?: string;
 }
 
-export function PositionsTable({ positions }: PositionsTableProps) {
+export function PositionsTable({ positions, title = "MARKET POSITIONS" }: PositionsTableProps) {
   if (!positions || positions.length === 0) {
     return (
       <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 p-6">
-        <h2 className="text-3xl font-bebas text-red-600 mb-4 drop-shadow-md">MARKET POSITIONS</h2>
+        <h2 className="text-3xl font-bebas text-red-600 mb-4 drop-shadow-md">{title}</h2>
         <p className="text-red-700 font-russo">NO ACTIVE POSITIONS - AGENT IS ON PATROL</p>
       </div>
     );
@@ -65,7 +66,7 @@ export function PositionsTable({ positions }: PositionsTableProps) {
   return (
     <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 overflow-hidden">
       <div className="px-6 py-4 bg-gradient-to-r from-red-500 to-orange-500">
-        <h2 className="text-3xl font-bebas text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">ACTIVE POSITIONS ({positions.length})</h2>
+        <h2 className="text-3xl font-bebas text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{title} ({positions.length})</h2>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">

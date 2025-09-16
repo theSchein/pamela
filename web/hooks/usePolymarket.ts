@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { polymarketService, Position, Market } from '@/lib/services/polymarket';
 
-export function usePositions(address: string | undefined) {
+export function usePositions(address: string | undefined, activeOnly: boolean = false) {
   return useQuery({
-    queryKey: ['polymarket', 'positions', address],
+    queryKey: ['polymarket', 'positions', address, activeOnly],
     queryFn: async () => {
       if (!address) throw new Error('No wallet address provided');
       const positions = await polymarketService.getPositions(address);
@@ -36,6 +36,21 @@ export function usePositions(address: string | undefined) {
           };
         })
       );
+      
+      // Filter for active positions only if requested
+      if (activeOnly) {
+        return enrichedPositions.filter(pos => {
+          // Position is active if market is not resolved and not ended
+          if (!pos.market) return true; // Keep if we don't have market data
+          
+          // Check if market has ended (past end date)
+          const hasEnded = pos.market.end_date_iso && 
+            new Date(pos.market.end_date_iso) < new Date();
+          
+          // Active = not resolved and not ended
+          return !pos.market.resolved && !hasEnded;
+        });
+      }
       
       return enrichedPositions;
     },
@@ -90,22 +105,52 @@ export function usePortfolioStats(positions: (Position & { market: Market | null
     queryFn: () => {
       if (!positions) return null;
       
-      const pnl = polymarketService.calculateTotalPnl(positions);
+      // Calculate total P&L from individual position P&L
+      const unrealizedPnl = positions.reduce((sum, pos) => sum + (pos.unrealizedPnl || 0), 0);
+      const realizedPnl = positions.reduce((sum, pos) => sum + (pos.realizedPnl || 0), 0);
+      
+      // Calculate total value based on current market prices
       const totalValue = positions.reduce((sum, pos) => {
         const size = parseFloat(pos.size);
-        const price = parseFloat(pos.avgPrice);
-        return sum + (size * price);
+        // Use current market price if available, otherwise use avg price
+        let currentPrice = parseFloat(pos.avgPrice);
+        if (pos.market && pos.market.outcomes) {
+          const outcome = pos.market.outcomes.find(o => 
+            o.outcome === pos.outcome || 
+            o.id === pos.token_id?.split('-')[1]
+          );
+          if (outcome) {
+            currentPrice = outcome.price;
+          }
+        }
+        return sum + (size * currentPrice);
       }, 0);
       
-      const activePositions = positions.filter(p => p.market?.active);
-      const resolvedPositions = positions.filter(p => p.market?.resolved);
+      // Filter positions by market status
+      const activePositions = positions.filter(p => {
+        // Position is active if market is active or not resolved
+        return p.market ? (!p.market.resolved && !p.market.closed) : true;
+      });
+      
+      const resolvedPositions = positions.filter(p => {
+        return p.market?.resolved === true;
+      });
+      
+      const closedPositions = positions.filter(p => {
+        return p.market?.closed === true && !p.market?.resolved;
+      });
       
       return {
-        pnl,
+        pnl: {
+          unrealized: unrealizedPnl,
+          realized: realizedPnl,
+          total: unrealizedPnl + realizedPnl
+        },
         totalValue,
         positionCount: positions.length,
         activeCount: activePositions.length,
         resolvedCount: resolvedPositions.length,
+        closedCount: closedPositions.length,
         positions
       };
     },

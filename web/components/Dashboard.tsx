@@ -1,8 +1,11 @@
 'use client';
 
-import { useWalletBalance, useRecentTransactions } from '@/hooks/useWallet';
-import { usePositions, usePortfolioStats } from '@/hooks/usePolymarket';
+import { useState } from 'react';
+import { useWalletBalance } from '@/hooks/useWallet';
+import { usePortfolioStats } from '@/hooks/usePolymarket';
+import { useDataApiPositions } from '@/hooks/useDataApiPositions';
 import { PositionsTable } from './PositionsTable';
+import { TradeHistoryV2 } from './TradeHistoryV2';
 import { TelegramMessages } from './TelegramMessages';
 
 interface DashboardProps {
@@ -10,10 +13,14 @@ interface DashboardProps {
 }
 
 export function Dashboard({ walletAddress }: DashboardProps) {
+  const [activeTab, setActiveTab] = useState<'positions' | 'history'>('positions');
   const { data: balance, isLoading: balanceLoading, error: balanceError } = useWalletBalance(walletAddress);
-  const { data: positions, isLoading: positionsLoading, error: positionsError } = usePositions(walletAddress);
-  const { data: stats } = usePortfolioStats(positions);
-  const { data: transactions } = useRecentTransactions(walletAddress, 5);
+  // Use Data API for positions - much faster and no extra market fetching needed
+  const { data: dataApiPositions, isLoading: positionsLoading, error: positionsError } = useDataApiPositions(walletAddress);
+  const { data: stats } = usePortfolioStats(dataApiPositions);
+  
+  // Filter for active positions (those with size > 0)
+  const activePositions = dataApiPositions?.filter((pos: any) => parseFloat(pos.size) > 0.01) || [];
 
   if (balanceLoading || positionsLoading) {
     return (
@@ -105,33 +112,44 @@ export function Dashboard({ walletAddress }: DashboardProps) {
         </div>
       )}
 
-      {positions && positions.length > 0 && (
-        <div className="col-span-full">
-          <PositionsTable positions={positions} />
+      {/* Tab Navigation */}
+      <div className="col-span-full">
+        <div className="flex gap-4 mb-4">
+          <button
+            onClick={() => setActiveTab('positions')}
+            className={`px-6 py-3 rounded-lg font-russo text-lg transition-all ${
+              activeTab === 'positions'
+                ? 'bg-red-600 text-yellow-100 shadow-lg scale-105'
+                : 'bg-yellow-200 text-red-700 hover:bg-yellow-300'
+            }`}
+          >
+            ACTIVE POSITIONS ({activePositions?.length || 0})
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-6 py-3 rounded-lg font-russo text-lg transition-all ${
+              activeTab === 'history'
+                ? 'bg-red-600 text-yellow-100 shadow-lg scale-105'
+                : 'bg-yellow-200 text-red-700 hover:bg-yellow-300'
+            }`}
+          >
+            TRADE HISTORY
+          </button>
         </div>
-      )}
 
-      {transactions && transactions.length > 0 && (
-        <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 p-6 col-span-full">
-          <h2 className="text-3xl font-bebas text-red-600 mb-4 drop-shadow-md">TRANSACTION LOG</h2>
-          <div className="space-y-2">
-            {transactions.map((tx, index) => (
-              <div key={index} className="flex justify-between text-sm">
-                <div>
-                  <p className="font-mono">{tx.hash.slice(0, 10)}...</p>
-                  <p className="text-red-700 font-russo text-xs">Block #{tx.blockNumber}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bebas text-red-600 text-lg">${tx.amount} USDC</p>
-                  <p className="text-red-700 font-russo text-xs">
-                    {new Date(tx.timestamp * 1000).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        {/* Tab Content */}
+        {activeTab === 'positions' ? (
+          activePositions && activePositions.length > 0 ? (
+            <PositionsTable positions={activePositions} title="ACTIVE POSITIONS" />
+          ) : (
+            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 p-6">
+              <p className="text-center text-xl font-russo text-red-600">No active positions</p>
+            </div>
+          )
+        ) : (
+          <TradeHistoryV2 walletAddress={walletAddress} />
+        )}
+      </div>
     </div>
   );
 }
