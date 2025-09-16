@@ -4,7 +4,7 @@ import { Providers } from '@/components/providers'
 
 export const metadata: Metadata = {
   title: 'PAMELA WATCH',
-  description: 'Real-time monitoring for Pamela - Autonomous Prediction Market Agent',
+  description: 'Real-time monitoring for Pamela - Autonomous Agent',
 }
 
 export default function RootLayout({

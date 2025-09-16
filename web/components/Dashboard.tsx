@@ -26,7 +26,7 @@ export function Dashboard({ walletAddress }: DashboardProps) {
     return (
       <div className="p-8">
         <div className="text-center text-2xl font-russo text-red-600 animate-pulse">
-          🌊 SCANNING THE WAVES... 🌊
+          LOADING...
         </div>
       </div>
     );
@@ -36,7 +36,7 @@ export function Dashboard({ walletAddress }: DashboardProps) {
     return (
       <div className="p-8">
         <div className="text-red-600 text-xl font-russo bg-yellow-100 border-4 border-red-600 rounded-lg p-4">
-          ⚠️ BEACH EMERGENCY: {(balanceError || positionsError)?.toString()}
+          ⚠️ ERROR: {(balanceError || positionsError)?.toString()}
         </div>
       </div>
     );

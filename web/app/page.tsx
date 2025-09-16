@@ -17,7 +17,7 @@ export default function Home() {
                 PAMELA WATCH
               </h1>
               <p className="text-xl md:text-2xl font-russo text-yellow-100 mt-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                🌊 24/7 AUTONOMOUS TRADING SURVEILLANCE 🌊
+                FOLLOW PAMELA'S TRADES
               </p>
             </div>
             
@@ -28,8 +28,7 @@ export default function Home() {
                   AGENT PAMELA
                 </h2>
                 <p className="text-sm text-yellow-100 max-w-xs">
-                  Elite AI trader patrolling the prediction markets.
-                  Always watching. Always trading. Never sleeping.
+                  An autonomous prediction market trading agent. See her communicate through telegram and follow here Polymarket positions below. 
                 </p>
               </div>
               <div className="relative">
