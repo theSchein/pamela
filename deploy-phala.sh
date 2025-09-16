@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Phala TEE Deployment Script for Pamela Agent
+# Supports both local development and cloud deployment
 # Uses ElizaOS native TEE integration
 
 set -e
@@ -16,28 +17,260 @@ NC='\033[0m' # No Color
 AGENT_NAME="pamela-tee-agent"
 ENV_FILE=".env"
 COMPOSE_FILE="docker-compose.yml"
+LOCAL_IMAGE_NAME="pamela-local"
+MODE="${1:-cloud}"  # Default to cloud mode if not specified
 
-# Check if CVM already exists and clean it up
-echo -e "${YELLOW}Checking for existing CVM...${NC}"
-if elizaos tee phala cvms get "$AGENT_NAME" &>/dev/null; then
-    echo -e "${YELLOW}Found existing CVM. Deleting...${NC}"
-    elizaos tee phala cvms delete "$AGENT_NAME" 2>/dev/null || true
-    sleep 5
+# Function to display usage
+show_usage() {
+    echo "Usage: $0 [MODE]"
+    echo ""
+    echo "Modes:"
+    echo "  local    - Deploy locally with TEE simulator for testing"
+    echo "  cloud    - Deploy to Phala Cloud (default)"
+    echo "  help     - Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0               # Deploy to cloud (default)"
+    echo "  $0 local         # Deploy locally for testing"
+    echo "  $0 cloud         # Deploy to cloud explicitly"
+    echo ""
+    exit 0
+}
+
+# Check for help flag
+if [[ "$MODE" == "help" ]] || [[ "$MODE" == "--help" ]] || [[ "$MODE" == "-h" ]]; then
+    show_usage
 fi
 
-echo -e "${GREEN}Using docker-compose.yml and .env from current directory${NC}"
+# Validate mode
+if [[ "$MODE" != "local" ]] && [[ "$MODE" != "cloud" ]]; then
+    echo -e "${RED}Error: Invalid mode '$MODE'. Use 'local' or 'cloud'.${NC}"
+    show_usage
+fi
 
-echo -e "${BLUE}=== Phala TEE Deployment for Pamela Agent ===${NC}"
+echo -e "${BLUE}=== Phala TEE Deployment - ${MODE^^} MODE ===${NC}"
 echo ""
 
-# Check prerequisites
-echo -e "${YELLOW}Checking prerequisites...${NC}"
+# Local deployment function
+deploy_local() {
+    echo -e "${YELLOW}Starting local deployment with TEE simulator...${NC}"
+    
+    # Get Docker username
+    DOCKER_USERNAME=$(docker info 2>/dev/null | grep "Username" | awk '{print $2}')
+    if [ -z "$DOCKER_USERNAME" ]; then
+        echo -e "${YELLOW}Please enter your Docker Hub username:${NC}"
+        read DOCKER_USERNAME
+    fi
+    
+    # The Phala CLI already prepends the username, so just use the base image name
+    echo -e "${GREEN}Building image as: $DOCKER_USERNAME/$LOCAL_IMAGE_NAME:latest${NC}"
+    
+    # Start TEE Simulator
+    echo -e "${YELLOW}Starting TEE simulator...${NC}"
+    npx phala simulator start &
+    SIMULATOR_PID=$!
+    sleep 3
+    echo -e "${GREEN}TEE simulator started (PID: $SIMULATOR_PID)${NC}"
+    
+    # Build Docker image locally - Phala CLI will add the username automatically
+    echo -e "${YELLOW}Building Docker image for local testing...${NC}"
+    npx phala docker build --image "$LOCAL_IMAGE_NAME" --tag "latest"
+    
+    # The built image will be named with the Docker username prepended
+    FULL_LOCAL_IMAGE_NAME="$DOCKER_USERNAME/$LOCAL_IMAGE_NAME"
+    
+    # Create local env file
+    LOCAL_ENV_FILE=".env.local"
+    cp "$ENV_FILE" "$LOCAL_ENV_FILE"
+    
+    # Ensure TEE_MODE is set
+    if ! grep -q "^TEE_MODE=" "$LOCAL_ENV_FILE"; then
+        echo "TEE_MODE=true" >> "$LOCAL_ENV_FILE"
+    fi
+    
+    # Add simulator flag
+    if ! grep -q "^PHALA_SIMULATOR=" "$LOCAL_ENV_FILE"; then
+        echo "PHALA_SIMULATOR=true" >> "$LOCAL_ENV_FILE"
+    fi
+    
+    # Add local Ollama endpoint if needed
+    if ! grep -q "^OLLAMA_API_ENDPOINT=" "$LOCAL_ENV_FILE"; then
+        echo "OLLAMA_API_ENDPOINT=http://host.docker.internal:11434" >> "$LOCAL_ENV_FILE"
+    fi
+    
+    echo -e "${GREEN}Local environment prepared${NC}"
+    
+    # Clean up any existing containers and free up port
+    echo -e "${YELLOW}Cleaning up any existing containers and freeing port 3000...${NC}"
+    
+    # Stop any container using port 3000
+    CONTAINER_ON_PORT=$(docker ps --format "table {{.Names}}" | grep -v NAMES | xargs -I {} sh -c 'docker port {} 2>/dev/null | grep -q "3000" && echo {}' | head -1)
+    if [ ! -z "$CONTAINER_ON_PORT" ]; then
+        echo -e "${YELLOW}Stopping container using port 3000: $CONTAINER_ON_PORT${NC}"
+        docker stop "$CONTAINER_ON_PORT" 2>/dev/null || true
+    fi
+    
+    # Also check for any process using port 3000 (like npm start)
+    PORT_PID=$(lsof -ti:3000 2>/dev/null)
+    if [ ! -z "$PORT_PID" ]; then
+        echo -e "${YELLOW}Found process $PORT_PID using port 3000.${NC}"
+        echo -e "${YELLOW}This might be the production agent running. Using port 3001 instead.${NC}"
+        LOCAL_PORT=3001
+    else
+        LOCAL_PORT=3000
+    fi
+    
+    # Clean up specific containers
+    docker stop pamela-local-tee 2>/dev/null || true
+    docker rm pamela-local-tee 2>/dev/null || true
+    docker stop pamela-agent 2>/dev/null || true
+    docker rm pamela-agent 2>/dev/null || true
+    
+    # Also clean up using docker-compose if a previous compose file exists
+    if [ -f "docker-compose.local.yml" ]; then
+        docker-compose -f docker-compose.local.yml down 2>/dev/null || true
+    fi
+    
+    echo -e "${GREEN}Cleanup complete${NC}"
+    
+    # Create a local compose file for testing
+    echo -e "${YELLOW}Creating local Docker Compose configuration...${NC}"
+    cat > docker-compose.local.yml << EOF
+version: '3.8'
 
-# Check if elizaos CLI is installed
-if ! command -v elizaos &> /dev/null; then
-    echo -e "${RED}Error: ElizaOS CLI not found. Please install it first:${NC}"
-    echo "npm install -g @elizaos/cli"
+services:
+  pamela:
+    image: ${FULL_LOCAL_IMAGE_NAME}:latest
+    container_name: pamela-local-tee
+    env_file:
+      - ${LOCAL_ENV_FILE}
+    environment:
+      - TEE_MODE=true
+      - PHALA_SIMULATOR=true
+      - NODE_ENV=development
+    volumes:
+      - ./data:/app/data
+      - ./.eliza:/app/.eliza
+    ports:
+      - "${LOCAL_PORT}:3000"
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+EOF
+    
+    echo -e "${GREEN}Docker Compose file created${NC}"
+    
+    # Run with docker-compose directly for local testing
+    echo -e "${YELLOW}Starting container with Docker Compose...${NC}"
+    docker-compose -f docker-compose.local.yml up -d --force-recreate
+    
+    # Wait for container to start
+    echo -e "${YELLOW}Waiting for container to initialize...${NC}"
+    sleep 5
+    
+    # Check if container is running
+    if docker ps | grep -q "pamela-local-tee"; then
+        echo -e "${GREEN}Container started successfully!${NC}"
+        
+        # Show initial logs
+        echo ""
+        echo -e "${YELLOW}Initial container logs:${NC}"
+        docker logs pamela-local-tee 2>&1 | tail -20
+    else
+        echo -e "${RED}Container failed to start${NC}"
+        echo "Checking docker-compose logs:"
+        docker-compose -f docker-compose.local.yml logs
+    fi
+    
+    echo ""
+    echo -e "${GREEN}Local deployment completed!${NC}"
+    echo ""
+    echo -e "${BLUE}=== Local Testing Information ===${NC}"
+    echo "Container: pamela-local-tee"
+    echo "Simulator PID: $SIMULATOR_PID"
+    echo "API Endpoint: http://localhost:${LOCAL_PORT}"
+    echo ""
+    echo -e "${BLUE}=== Useful Commands ===${NC}"
+    echo "View logs:        docker logs -f pamela-local-tee"
+    echo "Check status:     docker ps | grep pamela-local"
+    echo "Stop container:   docker-compose -f docker-compose.local.yml down"
+    echo "Stop simulator:   kill $SIMULATOR_PID"
+    echo "Test API:         curl http://localhost:${LOCAL_PORT}/health"
+    echo ""
+    echo -e "${YELLOW}The TEE simulator provides a local testing environment${NC}"
+    echo -e "${YELLOW}Monitor logs to ensure the agent starts correctly${NC}"
+    echo ""
+    exit 0
+}
+
+# Cloud deployment - original logic
+deploy_cloud() {
+    # Clean up any existing CVMs
+    echo -e "${YELLOW}Checking for existing CVMs...${NC}"
+    
+    # Try to delete by name first
+    if npx phala cvms get "$AGENT_NAME" &>/dev/null; then
+        echo -e "${YELLOW}Found existing CVM by name. Deleting...${NC}"
+        npx phala cvms delete "$AGENT_NAME" -y 2>/dev/null || true
+        sleep 5
+    fi
+    
+    # Also check and delete by listing all CVMs
+    EXISTING_CVMS=$(npx phala cvms list 2>/dev/null | grep "pamela-tee-agent" | grep "App ID" | awk '{print $4}' || true)
+    if [ ! -z "$EXISTING_CVMS" ]; then
+        for CVM_ID in $EXISTING_CVMS; do
+            echo -e "${YELLOW}Found CVM with ID $CVM_ID. Deleting...${NC}"
+            npx phala cvms delete "$CVM_ID" -y 2>/dev/null || true
+        done
+        sleep 5
+    fi
+    
+    echo -e "${GREEN}Cleanup complete${NC}"
+    echo -e "${GREEN}Using docker-compose.yml and .env from current directory${NC}"
+}
+
+# Route to appropriate deployment mode early
+if [[ "$MODE" == "local" ]]; then
+    # Check prerequisites for local mode
+    echo -e "${YELLOW}Checking prerequisites for local deployment...${NC}"
+    
+    if ! command -v npx &> /dev/null; then
+        echo -e "${RED}Error: npx not found. Please install Node.js and npm first.${NC}"
+        exit 1
+    fi
+    
+    if ! command -v docker &> /dev/null; then
+        echo -e "${RED}Error: Docker not found. Please install Docker first.${NC}"
+        exit 1
+    fi
+    
+    if [ ! -f "$ENV_FILE" ]; then
+        echo -e "${RED}Error: $ENV_FILE not found.${NC}"
+        exit 1
+    fi
+    
+    if ! grep -q "^POLYMARKET_PRIVATE_KEY=" "$ENV_FILE" || grep -q "^POLYMARKET_PRIVATE_KEY=$" "$ENV_FILE"; then
+        echo -e "${RED}Error: Please configure your POLYMARKET_PRIVATE_KEY in $ENV_FILE${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}Prerequisites check passed!${NC}"
+    deploy_local
+    exit 0
+fi
+
+# Continue with cloud deployment prerequisites
+echo -e "${YELLOW}Checking prerequisites for cloud deployment...${NC}"
+
+# Check if phala CLI is available
+if ! command -v npx &> /dev/null; then
+    echo -e "${RED}Error: npx not found. Please install Node.js and npm first.${NC}"
     exit 1
+fi
+
+# Check if phala CLI works
+if ! npx phala --version &> /dev/null; then
+    echo -e "${YELLOW}Phala CLI will be installed when first used via npx${NC}"
 fi
 
 # Check if env file exists
@@ -61,25 +294,49 @@ fi
 echo -e "${GREEN}Prerequisites check passed!${NC}"
 echo ""
 
-# Phala API Key check
-echo -e "${YELLOW}Phala Authentication${NC}"
+# Phala Authentication
+echo -e "${YELLOW}Checking Phala Authentication...${NC}"
 
-# Check if PHALA_API_KEY is in env file
-if grep -q "^PHALA_API_KEY=." "$ENV_FILE"; then
-    PHALA_API_KEY=$(grep "^PHALA_API_KEY=" "$ENV_FILE" | cut -d'=' -f2-)
-    echo -e "${GREEN}Using PHALA_API_KEY from .env file${NC}"
+# First check if already authenticated using direct phala CLI
+if npx phala auth status &>/dev/null; then
+    echo -e "${GREEN}Already authenticated with Phala Cloud${NC}"
+    npx phala auth status | grep "Logged in as" || true
 else
-    echo "Please enter your Phala Cloud API key (get it from https://cloud.phala.network):"
-    read -s PHALA_API_KEY
-    echo ""
+    echo -e "${YELLOW}Not authenticated. Need to login to Phala Cloud.${NC}"
+    
+    # Check if PHALA_API_KEY is in env file
+    if grep -q "^PHALA_API_KEY=." "$ENV_FILE"; then
+        PHALA_API_KEY=$(grep "^PHALA_API_KEY=" "$ENV_FILE" | cut -d'=' -f2-)
+        echo -e "${GREEN}Using PHALA_API_KEY from .env file${NC}"
+    else
+        echo ""
+        echo -e "${BLUE}Please enter your Phala Cloud API key${NC}"
+        echo -e "${YELLOW}Get it from: https://cloud.phala.network/account/api-keys${NC}"
+        echo -n "API Key: "
+        read -s PHALA_API_KEY
+        echo ""
+        
+        # Optionally save to .env file
+        echo ""
+        read -p "Save API key to .env file for future use? (y/n): " SAVE_KEY
+        if [[ "$SAVE_KEY" =~ ^[Yy]$ ]]; then
+            echo "PHALA_API_KEY=$PHALA_API_KEY" >> "$ENV_FILE"
+            echo -e "${GREEN}API key saved to .env file${NC}"
+        fi
+    fi
+    
+    # Login to Phala using direct CLI
+    echo -e "${YELLOW}Logging in to Phala Cloud...${NC}"
+    echo "$PHALA_API_KEY" | npx phala auth login
+    
+    if ! npx phala auth status &>/dev/null; then
+        echo -e "${RED}Failed to authenticate with Phala Cloud${NC}"
+        echo "Please check your API key and try again"
+        exit 1
+    fi
 fi
 
-# Login to Phala
-echo -e "${YELLOW}Logging in to Phala Cloud...${NC}"
-elizaos tee phala auth login "$PHALA_API_KEY"
-
-# Check auth status
-elizaos tee phala auth status
+echo -e "${GREEN}Successfully authenticated with Phala Cloud!${NC}"
 
 echo ""
 echo -e "${YELLOW}Checking account status...${NC}"
@@ -88,47 +345,30 @@ echo -e "${YELLOW}Checking account status...${NC}"
 echo -e "${YELLOW}Note: Ensure billing is set up at https://cloud.phala.network/billing${NC}"
 
 echo ""
-echo -e "${YELLOW}Logging in to Docker...${NC}"
-# Docker login for Phala registry
-elizaos tee phala docker login
-
-# Get Docker username from the elizaos docker login output or config
-# Check if we can get it from phala Docker config first
-DOCKER_USERNAME=$(cat ~/.phala-cloud/docker-credentials.json 2>/dev/null | grep '"username"' | cut -d'"' -f4)
-
-if [ -z "$DOCKER_USERNAME" ]; then
-    # Try getting from docker info
-    DOCKER_USERNAME=$(docker info 2>/dev/null | grep "Username" | awk '{print $2}')
+echo -e "${YELLOW}Checking Docker login...${NC}"
+# Make sure we're logged into Docker Hub
+if ! docker info 2>/dev/null | grep -q "Username"; then
+    echo -e "${YELLOW}Please login to Docker Hub:${NC}"
+    docker login
 fi
 
+# Get Docker username
+DOCKER_USERNAME=$(docker info 2>/dev/null | grep "Username" | awk '{print $2}')
+
 if [ -z "$DOCKER_USERNAME" ]; then
-    echo -e "${YELLOW}Note: Docker username will be requested by elizaos docker login${NC}"
-else
-    echo -e "${GREEN}Using Docker Hub username: $DOCKER_USERNAME${NC}"
+    echo -e "${YELLOW}Please enter your Docker Hub username:${NC}"
+    read DOCKER_USERNAME
 fi
 
-export DOCKER_USERNAME
+echo -e "${GREEN}Using Docker Hub username: $DOCKER_USERNAME${NC}"
 
 echo ""
 echo -e "${YELLOW}Building Docker image...${NC}"
 
-# Build the Docker image using ElizaOS TEE builder
-# We're already in the root directory
-elizaos tee phala docker build \
-  --file Dockerfile \
-  --image "$AGENT_NAME" \
-  --tag latest
-
-# Get the full image name after build
-# Read from phala config to ensure we have the correct username
-DOCKER_USERNAME=$(cat ~/.phala-cloud/docker-credentials.json 2>/dev/null | grep '"username"' | cut -d'"' -f4)
-if [ -z "$DOCKER_USERNAME" ]; then
-    echo -e "${RED}Error: Could not determine Docker username${NC}"
-    exit 1
-fi
-
+# Build and tag the Docker image for Docker Hub
 FULL_IMAGE_NAME="$DOCKER_USERNAME/$AGENT_NAME"
-echo -e "${GREEN}Full image name: $FULL_IMAGE_NAME:latest${NC}"
+echo -e "${GREEN}Building image: $FULL_IMAGE_NAME:latest${NC}"
+docker build -t "$FULL_IMAGE_NAME:latest" -f Dockerfile .
 
 echo ""
 echo -e "${YELLOW}Pushing Docker image to registry...${NC}"
@@ -181,33 +421,104 @@ esac
 echo ""
 echo -e "${BLUE}Deploying with: ${VCPU_COUNT} vCPU, ${MEMORY_SIZE} RAM, ${DISK_SIZE} disk${NC}"
 
-# Deploy without interactive mode - all config embedded in compose file
-echo -e "${YELLOW}Starting deployment...${NC}"
+# Create a temporary env file with all variables for TEE deployment
+echo -e "${YELLOW}Preparing environment configuration for TEE...${NC}"
 
-# Get node and image info first
-echo "Using default node: prod8 (US-WEST-1)"
-echo "Using image: dstack-dev-0.3.6"
+# Create a consolidated env file for TEE deployment
+TEMP_ENV_FILE=".env.tee"
+cp "$ENV_FILE" "$TEMP_ENV_FILE"
+
+# Ensure TEE_MODE is set
+if ! grep -q "^TEE_MODE=" "$TEMP_ENV_FILE"; then
+    echo "TEE_MODE=true" >> "$TEMP_ENV_FILE"
+fi
+
+echo -e "${GREEN}Environment file created: $TEMP_ENV_FILE${NC}"
+
+# Verify docker-compose.yml exists
+if [ ! -f "$COMPOSE_FILE" ]; then
+    echo -e "${RED}Error: docker-compose.yml not found!${NC}"
+    exit 1
+fi
+echo -e "${GREEN}Docker compose file found: $COMPOSE_FILE${NC}"
+
+# Check Docker image exists locally
+if docker images | grep -q "$FULL_IMAGE_NAME"; then
+    echo -e "${GREEN}Docker image exists locally: $FULL_IMAGE_NAME:latest${NC}"
+else
+    echo -e "${YELLOW}Warning: Docker image not found locally. Make sure it's pushed to Docker Hub.${NC}"
+fi
+
+# Verify we're authenticated
+echo -e "${YELLOW}Verifying Phala authentication...${NC}"
+if npx phala auth status; then
+    echo -e "${GREEN}Authentication verified${NC}"
+else
+    echo -e "${RED}Not authenticated with Phala!${NC}"
+    exit 1
+fi
 
 # Deploy with all parameters specified
-# The .env file is in the same directory as docker-compose.yml
-echo "Note: When prompted for env file, enter: .env"
-elizaos tee phala deploy \
-  --interactive \
+echo -e "${YELLOW}Starting deployment...${NC}"
+echo "Using configuration:"
+echo "  - Name: $AGENT_NAME"
+echo "  - Node: prod8 (US-WEST-1)"
+echo "  - Image: dstack-dev-0.3.6"
+echo "  - Resources: ${VCPU_COUNT} vCPU, ${MEMORY_SIZE} RAM, ${DISK_SIZE} disk"
+echo "  - Docker Compose: $COMPOSE_FILE"
+echo "  - Environment File: $TEMP_ENV_FILE"
+echo "  - Docker Image: $FULL_IMAGE_NAME:latest"
+
+echo ""
+echo -e "${YELLOW}Ensuring .env file is in place for docker-compose...${NC}"
+# Make sure .env exists for docker-compose to read
+if [ ! -f ".env" ]; then
+    echo -e "${RED}Error: .env file not found in current directory${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${YELLOW}Running deployment command...${NC}"
+echo "Command: npx phala deploy --name \"$AGENT_NAME\" --vcpu \"$VCPU_COUNT\" --memory \"$MEMORY_SIZE\" --disk-size \"$DISK_SIZE\" --compose \"$COMPOSE_FILE\" --node-id \"prod8\" --image \"dstack-dev-0.3.6\""
+echo ""
+echo -e "${BLUE}Note: Environment variables will be read from .env file by docker-compose.yml${NC}"
+
+# Deploy using direct Phala CLI (without --env-file since docker-compose handles it)
+npx phala deploy \
   --name "$AGENT_NAME" \
   --vcpu "$VCPU_COUNT" \
   --memory "$MEMORY_SIZE" \
   --disk-size "$DISK_SIZE" \
-  --compose "$COMPOSE_FILE" || {
+  --compose "$COMPOSE_FILE" \
+  --node-id "prod8" \
+  --image "dstack-dev-0.3.6" || {
     echo ""
-    echo -e "${RED}Deployment failed. Common issues:${NC}"
+    echo -e "${RED}Deployment failed!${NC}"
+    
+    # Check if it's a compose file issue
+    echo ""
+    echo -e "${YELLOW}Debugging information:${NC}"
+    echo "- Current directory: $(pwd)"
+    echo "- Compose file exists: $([ -f "$COMPOSE_FILE" ] && echo "Yes" || echo "No")"
+    echo "- Env file exists: $([ -f "$TEMP_ENV_FILE" ] && echo "Yes" || echo "No")"
+    
+    # Try to get more info about the failure
+    echo ""
+    echo -e "${YELLOW}Checking Phala CVMs status...${NC}"
+    npx phala cvms list || echo "Failed to list CVMs"
+    
+    echo ""
+    echo -e "${RED}Common issues:${NC}"
     echo "1. No billing/payment method set up"
     echo "2. Insufficient account balance"
     echo "3. Resource limits exceeded"
-    echo "4. Invalid configuration"
+    echo "4. Invalid configuration or compose file"
+    echo "5. Docker image not pushed to Docker Hub"
     echo ""
     echo "Please check:"
     echo "- Your billing at: https://cloud.phala.network/billing"
     echo "- Your account balance and limits"
+    echo "- Docker image is pushed: docker push $FULL_IMAGE_NAME:latest"
     echo "- Try with smaller resource allocation"
     exit 1
 }
@@ -218,7 +529,7 @@ echo ""
 
 # Get deployment info
 echo -e "${YELLOW}Getting deployment info...${NC}"
-elizaos tee phala cvms get "$AGENT_NAME" 2>/dev/null || echo -e "${GREEN}Check dashboard for status${NC}"
+npx phala cvms get "$AGENT_NAME" 2>/dev/null || echo -e "${GREEN}Check dashboard for status${NC}"
 
 echo ""
 echo -e "${BLUE}=== Deployment Information ===${NC}"
@@ -230,12 +541,18 @@ echo ""
 
 echo -e "${BLUE}=== Next Steps ===${NC}"
 echo "1. Check dashboard: https://cloud.phala.network/dashboard/cvms"
-echo "2. View logs: elizaos tee phala cvms logs $AGENT_NAME"
-echo "3. List CVMs: elizaos tee phala cvms list"
-echo "4. Monitor trading: ./monitor-phala-tee.sh"
+echo "2. View logs: npx phala cvms logs $AGENT_NAME"
+echo "3. List CVMs: npx phala cvms list"
+echo "4. Monitor trading: ./monitor-phala.sh"
 echo ""
 echo -e "${YELLOW}Note: The container may need environment variables configured in the dashboard${NC}"
 echo ""
+
+# Clean up temporary env file
+if [ -f "$TEMP_ENV_FILE" ]; then
+    rm -f "$TEMP_ENV_FILE"
+    echo -e "${GREEN}Cleaned up temporary files${NC}"
+fi
 
 echo -e "${GREEN}Deployment script completed!${NC}"
 echo -e "${YELLOW}Note: It may take 5-10 minutes for the agent to fully initialize.${NC}"

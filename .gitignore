@@ -139,6 +139,9 @@ agent_data/
 
 # Local testing
 .env.*.local
+docker-compose.local.yml
+phala-compose-local.yaml
+phala-compose.yaml
 # Test files
 test-*.js
 test-*.html
