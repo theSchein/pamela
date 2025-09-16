@@ -42,6 +42,8 @@ pids
 *.pid
 *.seed
 *.pid.lock
+.telegram-offset
+web/.telegram-offset
 
 # Coverage directory used by tools like istanbul
 coverage/

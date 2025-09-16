@@ -1,26 +1,34 @@
 'use client';
 
-import { useTelegramSimple } from '@/hooks/useTelegramSimple';
+import { useTelegramPolling } from '@/hooks/useTelegramPolling';
 import { MessageCircle, Bot, User, WifiOff, Wifi, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 export function TelegramMessages() {
-  // Use the simpler polling mechanism for better reliability
+  // Use the improved polling mechanism with proper offset tracking
   const { 
     data, 
     isLoading, 
     error,
-    isPolling,
-    togglePolling,
-    refresh,
-    lastError,
-    hasData
-  } = useTelegramSimple(8000); // Poll every 8 seconds
+    isConnected,
+    connectionError,
+    newMessageCount,
+    resetNewMessageCount,
+    reconnect,
+    disconnect,
+    reset,
+    refetch
+  } = useTelegramPolling({
+    enablePolling: true,
+    onNewMessage: (msg) => {
+      console.log('New message received:', msg.text.substring(0, 50));
+    }
+  });
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const [lastMessageCount, setLastMessageCount] = useState(0);
   
-  // Track new messages
+  // Track new messages and auto-scroll
   useEffect(() => {
     if (data?.messages && data.messages.length > lastMessageCount) {
       setLastMessageCount(data.messages.length);
@@ -30,6 +38,16 @@ export function TelegramMessages() {
       }
     }
   }, [data?.messages, lastMessageCount]);
+  
+  // Reset new message count when viewing
+  useEffect(() => {
+    if (newMessageCount > 0) {
+      const timer = setTimeout(() => {
+        resetNewMessageCount();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [newMessageCount, resetNewMessageCount]);
 
   if (isLoading) {
     return (
@@ -98,41 +116,53 @@ export function TelegramMessages() {
           )}
         </h2>
         <div className="flex items-center gap-2">
-          {hasData && (
+          {data?.messages && (
             <span className="text-xs font-russo text-red-700">
-              {data?.messages?.length || 0} MSGS
+              {data.messages.length} MSGS
             </span>
           )}
-          {isPolling ? (
+          {newMessageCount > 0 && (
+            <span className="text-xs font-russo text-green-600 animate-pulse">
+              +{newMessageCount} NEW
+            </span>
+          )}
+          {isConnected ? (
             <div className="flex items-center gap-1">
               <Wifi className="h-4 w-4 text-green-600 animate-pulse" />
-              <span className="text-xs font-russo text-green-600">POLLING</span>
+              <span className="text-xs font-russo text-green-600">LIVE</span>
             </div>
           ) : (
             <div className="flex items-center gap-1">
               <WifiOff className="h-4 w-4 text-yellow-600" />
-              <span className="text-xs font-russo text-yellow-600">PAUSED</span>
+              <span className="text-xs font-russo text-yellow-600">OFFLINE</span>
             </div>
           )}
           <button 
-            onClick={refresh}
+            onClick={() => refetch()}
             className="flex items-center gap-1 text-red-600 hover:text-red-700 transition-colors"
             title="Refresh messages"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
           <button 
-            onClick={togglePolling}
+            onClick={isConnected ? disconnect : reconnect}
             className="text-xs font-russo text-red-600 hover:text-red-700 transition-colors"
           >
-            {isPolling ? 'PAUSE' : 'RESUME'}
+            {isConnected ? 'PAUSE' : 'RESUME'}
+          </button>
+          <button 
+            onClick={reset}
+            className="text-xs font-russo text-red-600 hover:text-red-700 transition-colors"
+            title="Reset and clear cache"
+          >
+            RESET
           </button>
         </div>
       </div>
-      {lastError && (
+      {connectionError && (
         <div className="bg-yellow-100 border border-yellow-400 rounded p-2 mb-2">
           <p className="text-xs font-russo text-yellow-700">
-            NETWORK ISSUE: {lastError} - Data may be cached
+            CONNECTION ISSUE: {connectionError}
           </p>
         </div>
       )}

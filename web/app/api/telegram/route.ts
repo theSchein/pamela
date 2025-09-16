@@ -1,9 +1,48 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs/promises';
+import path from 'path';
 
-// In-memory storage for message tracking (no database)
-let messageCache = new Map<string, any>(); // Use Map to avoid duplicates
-const MAX_CACHE_SIZE = 200;
-let lastFetchTime = 0;
+// Persistent offset storage location
+const OFFSET_FILE = path.join(process.cwd(), '.telegram-offset');
+
+// Global state for offset tracking
+let currentOffset = 0;
+let messageBuffer = new Map<string, any>();
+const MAX_BUFFER_SIZE = 500;
+
+// Prevent concurrent polling
+let isPolling = false;
+let lastPollTime = 0;
+const MIN_POLL_INTERVAL = 1000; // Minimum 1 second between polls
+
+// Load saved offset from file
+async function loadSavedOffset(): Promise<number> {
+  try {
+    const data = await fs.readFile(OFFSET_FILE, 'utf-8');
+    return parseInt(data, 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Save offset to file
+async function saveOffset(offset: number): Promise<void> {
+  try {
+    await fs.writeFile(OFFSET_FILE, offset.toString());
+  } catch (error) {
+    console.error('Failed to save offset:', error);
+  }
+}
+
+// Initialize offset on first load
+let offsetInitialized = false;
+async function initializeOffset() {
+  if (!offsetInitialized) {
+    currentOffset = await loadSavedOffset();
+    offsetInitialized = true;
+    console.log(`Initialized Telegram offset: ${currentOffset}`);
+  }
+}
 
 export async function GET(request: Request) {
   try {
@@ -13,73 +52,97 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Telegram bot token not configured' }, { status: 500 });
     }
 
+    // Initialize offset
+    await initializeOffset();
+
     // Parse query parameters
     const { searchParams } = new URL(request.url);
-    const resetCache = searchParams.get('resetCache') === 'true';
-    const getAllHistory = searchParams.get('getAllHistory') === 'true';
+    const reset = searchParams.get('reset') === 'true';
+    const longPoll = searchParams.get('longPoll') === 'true';
+    const limit = parseInt(searchParams.get('limit') || '100');
     
-    // Reset cache if requested
-    if (resetCache) {
-      messageCache.clear();
-      lastFetchTime = 0;
+    // Reset if requested
+    if (reset) {
+      currentOffset = 0;
+      messageBuffer.clear();
+      await saveOffset(0);
     }
-
-    // Get bot info first
-    const botInfoResponse = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
-    const botInfo = await botInfoResponse.json();
-
-    if (!botInfo.ok) {
-      return NextResponse.json({ error: 'Failed to get bot info' }, { status: 500 });
-    }
-
-    // Fetch updates
-    let updates = { ok: true, result: [] };
-    const now = Date.now();
     
-    // Always try to fetch messages
-    try {
-      // No offset = get all pending messages
+    // Fetch updates from Telegram with conflict prevention
+    const fetchUpdates = async (timeout: number = 0): Promise<any> => {
+      // Check if we're already polling (for long polls)
+      if (timeout > 0) {
+        if (isPolling) {
+          console.log('Skipping poll - another poll is in progress');
+          return { ok: true, result: [] };
+        }
+        isPolling = true;
+      }
+      
+      // Ensure minimum interval between polls
+      const now = Date.now();
+      const timeSinceLastPoll = now - lastPollTime;
+      if (timeSinceLastPoll < MIN_POLL_INTERVAL) {
+        await new Promise(resolve => setTimeout(resolve, MIN_POLL_INTERVAL - timeSinceLastPoll));
+      }
+      
       const params = new URLSearchParams({
-        limit: '100'
-        // NO offset parameter - this gets ALL pending updates
+        offset: currentOffset.toString(),
+        limit: '100',
+        timeout: timeout.toString(),
+        allowed_updates: JSON.stringify(['message', 'edited_message', 'channel_post'])
       });
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+      const timeoutId = setTimeout(() => controller.abort(), (timeout + 5) * 1000);
       
-      const updatesResponse = await fetch(
-        `https://api.telegram.org/bot${botToken}/getUpdates?${params}`,
-        { signal: controller.signal }
-      );
-      
-      clearTimeout(timeoutId);
-      
-      if (updatesResponse.ok) {
-        updates = await updatesResponse.json();
-        lastFetchTime = now;
+      try {
+        lastPollTime = Date.now();
+        const response = await fetch(
+          `https://api.telegram.org/bot${botToken}/getUpdates?${params}`,
+          { signal: controller.signal }
+        );
         
-        // Log what we got
-        console.log(`Telegram API: Got ${updates.result?.length || 0} updates`);
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          // Handle 409 Conflict specifically
+          if (response.status === 409) {
+            const errorData = await response.json();
+            console.warn('Telegram API conflict:', errorData.description);
+            // Return empty result, don't throw
+            return { ok: true, result: [] };
+          }
+          
+          const errorText = await response.text();
+          throw new Error(`Telegram API error ${response.status}: ${errorText}`);
+        }
+        
+        return await response.json();
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          return { ok: true, result: [] };
+        }
+        throw error;
+      } finally {
+        if (timeout > 0) {
+          isPolling = false;
+        }
       }
-    } catch (err: any) {
-      console.log('Telegram fetch error, using cache:', err.message);
-    }
-
-    if (!updates.ok) {
-      return NextResponse.json({ error: 'Failed to get updates' }, { status: 500 });
-    }
-
-    // Process all updates
-    if (updates.result && updates.result.length > 0) {
-      // Process ALL messages, including bot responses
-      updates.result.forEach((update: any) => {
+    };
+    
+    // Process updates
+    const processUpdates = (updates: any[]) => {
+      const newMessages: any[] = [];
+      
+      for (const update of updates) {
         const msg = update.message || update.edited_message || update.channel_post;
-        if (!msg) return;
+        if (!msg) continue;
         
-        // Create unique key for each message
         const messageKey = `${msg.chat.id}_${msg.message_id}`;
         
-        // Store message with all details
+        // Create processed message
         const processedMessage = {
           id: msg.message_id,
           updateId: update.update_id,
@@ -94,47 +157,138 @@ export async function GET(request: Request) {
           isBot: msg.from?.is_bot || false
         };
         
-        // Add or update in cache
-        messageCache.set(messageKey, processedMessage);
-      });
+        // Check if this is a new message
+        if (!messageBuffer.has(messageKey) || update.edited_message) {
+          messageBuffer.set(messageKey, processedMessage);
+          newMessages.push(processedMessage);
+        }
+        
+        // Update offset
+        if (update.update_id >= currentOffset) {
+          currentOffset = update.update_id + 1;
+        }
+      }
       
-      // Limit cache size
-      if (messageCache.size > MAX_CACHE_SIZE) {
-        const entries = Array.from(messageCache.entries());
-        const toKeep = entries.slice(-MAX_CACHE_SIZE);
-        messageCache = new Map(toKeep);
+      // Trim buffer if needed
+      if (messageBuffer.size > MAX_BUFFER_SIZE) {
+        const entries = Array.from(messageBuffer.entries())
+          .sort((a, b) => b[1].date - a[1].date)
+          .slice(0, MAX_BUFFER_SIZE);
+        messageBuffer = new Map(entries);
+      }
+      
+      return newMessages;
+    };
+    
+    // Handle long polling request
+    if (longPoll) {
+      try {
+        const data = await fetchUpdates(25); // 25 second timeout
+        
+        if (!data.ok) {
+          // Don't treat as error, just return empty
+          console.warn('Telegram API returned not ok:', data.description);
+          return NextResponse.json({
+            messages: [],
+            meta: {
+              offset: currentOffset,
+              bufferSize: messageBuffer.size,
+              status: 'timeout',
+              timeout: true
+            }
+          });
+        }
+        
+        const newMessages = data.result ? processUpdates(data.result) : [];
+        if (newMessages.length > 0) {
+          await saveOffset(currentOffset);
+        }
+        
+        return NextResponse.json({
+          messages: newMessages,
+          meta: {
+            offset: currentOffset,
+            bufferSize: messageBuffer.size,
+            newMessages: newMessages.length,
+            status: newMessages.length > 0 ? 'new_messages' : 'timeout',
+            timeout: newMessages.length === 0
+          }
+        });
+      } catch (error: any) {
+        console.error('Long polling error:', error.message);
+        // Don't return error status to client, just timeout
+        return NextResponse.json({
+          messages: [],
+          meta: {
+            offset: currentOffset,
+            bufferSize: messageBuffer.size,
+            status: 'timeout',
+            timeout: true
+          }
+        });
       }
     }
     
-    // Get all messages and sort by date (oldest first for conversation flow)
-    const allMessages = Array.from(messageCache.values())
-      .sort((a, b) => a.date - b.date); // Changed to ascending order for conversation flow
+    // Regular request - fetch with no timeout
+    try {
+      const data = await fetchUpdates(0);
+      
+      if (data.ok && data.result) {
+        processUpdates(data.result);
+        await saveOffset(currentOffset);
+      }
+    } catch (error: any) {
+      console.warn('Failed to fetch updates:', error.message);
+      // Continue with cached data
+    }
+    
+    // Get bot info
+    let botInfo = null;
+    try {
+      const botInfoResponse = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
+      const botData = await botInfoResponse.json();
+      if (botData.ok) {
+        botInfo = {
+          id: botData.result.id,
+          username: botData.result.username,
+          first_name: botData.result.first_name
+        };
+      }
+    } catch (error) {
+      console.error('Failed to get bot info:', error);
+    }
+    
+    // Get messages from buffer
+    const messages = Array.from(messageBuffer.values())
+      .sort((a, b) => b.date - a.date)
+      .slice(0, limit);
 
     return NextResponse.json({
-      bot: {
-        id: botInfo.result.id,
-        username: botInfo.result.username,
-        first_name: botInfo.result.first_name
-      },
-      messages: allMessages,
+      bot: botInfo,
+      messages,
       meta: {
-        totalMessages: messageCache.size,
-        newMessages: updates.result?.length || 0,
-        lastFetch: new Date(lastFetchTime).toISOString(),
+        offset: currentOffset,
+        bufferSize: messageBuffer.size,
+        totalMessages: messages.length,
         status: 'ok'
       }
     });
-  } catch (error: any) {
-    console.error('Telegram API error:', error.message || error);
     
-    // Return empty but valid structure (don't fail the request)
+  } catch (error: any) {
+    console.error('Telegram API error:', error);
+    
+    // Return cached messages on error
+    const messages = Array.from(messageBuffer.values())
+      .sort((a, b) => b.date - a.date)
+      .slice(0, 100);
+    
     return NextResponse.json({ 
       bot: null,
-      messages: Array.from(messageCache.values()).sort((a, b) => a.date - b.date),
+      messages,
       meta: {
-        totalMessages: messageCache.size,
-        newMessages: 0,
-        lastFetch: lastFetchTime ? new Date(lastFetchTime).toISOString() : null,
+        offset: currentOffset,
+        bufferSize: messageBuffer.size,
+        totalMessages: messages.length,
         status: 'error',
         error: error.message || 'Unknown error'
       }
