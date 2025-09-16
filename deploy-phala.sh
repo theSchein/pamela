@@ -388,19 +388,15 @@ echo -e "${YELLOW}Attempting deployment...${NC}"
 echo ""
 echo -e "${YELLOW}Phala Cloud will automatically allocate resources based on your account tier${NC}"
 
-# Create a temporary env file with all variables for TEE deployment
+# For Phala deployment, we pass the .env file directly
 echo -e "${YELLOW}Preparing environment configuration for TEE...${NC}"
 
-# Create a consolidated env file for TEE deployment
-TEMP_ENV_FILE=".env.tee"
-cp "$ENV_FILE" "$TEMP_ENV_FILE"
+# Use the existing .env file for deployment
+# Phala will encrypt these variables automatically
+DEPLOYMENT_ENV_FILE="$ENV_FILE"
 
-# Ensure TEE_MODE is set
-if ! grep -q "^TEE_MODE=" "$TEMP_ENV_FILE"; then
-    echo "TEE_MODE=true" >> "$TEMP_ENV_FILE"
-fi
-
-echo -e "${GREEN}Environment file created: $TEMP_ENV_FILE${NC}"
+echo -e "${GREEN}Using environment file: $DEPLOYMENT_ENV_FILE${NC}"
+echo -e "${BLUE}Note: Environment variables will be encrypted by Phala Cloud${NC}"
 
 # Verify docker-compose.yml exists
 if [ ! -f "$COMPOSE_FILE" ]; then
@@ -431,7 +427,7 @@ echo "Using configuration:"
 echo "  - Name: $AGENT_NAME"
 echo "  - Docker Image: $FULL_IMAGE_NAME:latest"
 echo "  - Docker Compose: $COMPOSE_FILE"
-echo "  - Environment File: $TEMP_ENV_FILE"
+echo "  - Environment File: $DEPLOYMENT_ENV_FILE"
 
 echo ""
 echo -e "${YELLOW}Ensuring .env file is in place for docker-compose...${NC}"
@@ -443,15 +439,15 @@ fi
 
 echo ""
 echo -e "${YELLOW}Running deployment command...${NC}"
-echo "Command: npx phala cvms create --name \"$AGENT_NAME\" --compose \"$COMPOSE_FILE\" --env-file \"$TEMP_ENV_FILE\""
+echo "Command: npx phala cvms create --name \"$AGENT_NAME\" --compose \"$COMPOSE_FILE\" --env-file \"$DEPLOYMENT_ENV_FILE\""
 echo ""
-echo -e "${BLUE}Note: Using phala cvms create command with compose file${NC}"
+echo -e "${BLUE}Note: Using simplified docker-compose.yml to avoid environment conflicts${NC}"
 
 # Deploy using the correct phala cvms create command
 npx phala cvms create \
   --name "$AGENT_NAME" \
   --compose "$COMPOSE_FILE" \
-  --env-file "$TEMP_ENV_FILE" || {
+  --env-file "$DEPLOYMENT_ENV_FILE" || {
     echo ""
     echo -e "${RED}Deployment failed!${NC}"
     
@@ -471,9 +467,9 @@ npx phala cvms create \
     echo -e "${RED}Common issues:${NC}"
     echo "1. No billing/payment method set up"
     echo "2. Insufficient account balance"
-    echo "3. Resource limits exceeded"
-    echo "4. Invalid configuration or compose file"
-    echo "5. Docker image not pushed to Docker Hub"
+    echo "3. docker-compose.yml has both env_file and environment sections (use only volumes/ports/command)"
+    echo "4. Docker image not pushed to Docker Hub"
+    echo "5. Environment variables not properly formatted in .env"
     echo ""
     echo "Please check:"
     echo "- Your billing at: https://cloud.phala.network/billing"
@@ -508,11 +504,7 @@ echo ""
 echo -e "${YELLOW}Note: The container may need environment variables configured in the dashboard${NC}"
 echo ""
 
-# Clean up temporary env file
-if [ -f "$TEMP_ENV_FILE" ]; then
-    rm -f "$TEMP_ENV_FILE"
-    echo -e "${GREEN}Cleaned up temporary files${NC}"
-fi
+# No temporary files to clean up - using .env directly
 
 echo -e "${GREEN}Deployment script completed!${NC}"
 echo -e "${YELLOW}Note: It may take 5-10 minutes for the agent to fully initialize.${NC}"
