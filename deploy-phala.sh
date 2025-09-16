@@ -388,13 +388,38 @@ echo -e "${YELLOW}Attempting deployment...${NC}"
 echo ""
 echo -e "${YELLOW}Phala Cloud will automatically allocate resources based on your account tier${NC}"
 
-# For Phala deployment, we pass the .env file directly
+# For Phala deployment, we need to prepare a clean env file
 echo -e "${YELLOW}Preparing environment configuration for TEE...${NC}"
 
-# Use the existing .env file for deployment
-# Phala will encrypt these variables automatically
-DEPLOYMENT_ENV_FILE="$ENV_FILE"
+# Create a cleaned version of the .env file for TEE deployment
+# Some env vars might have special characters that break TEE parsing
+DEPLOYMENT_ENV_FILE=".env.tee"
 
+echo -e "${YELLOW}Creating TEE-compatible environment file...${NC}"
+# Filter and clean the environment variables
+# Remove comments, empty lines, and ensure proper formatting
+# Include variables with empty values (e.g., ANTHROPIC_API_KEY=)
+grep -E "^[A-Z_]+=" "$ENV_FILE" | sed 's/[[:space:]]*$//' > "$DEPLOYMENT_ENV_FILE"
+
+# Verify critical environment variables are present
+echo -e "${YELLOW}Verifying critical environment variables...${NC}"
+MISSING_VARS=""
+
+# Check for critical variables
+for VAR in POLYMARKET_PRIVATE_KEY CLOB_API_URL TELEGRAM_BOT_TOKEN; do
+    if ! grep -q "^$VAR=" "$DEPLOYMENT_ENV_FILE"; then
+        MISSING_VARS="$MISSING_VARS $VAR"
+    fi
+done
+
+if [ ! -z "$MISSING_VARS" ]; then
+    echo -e "${RED}Warning: Missing critical variables:$MISSING_VARS${NC}"
+    echo -e "${YELLOW}Deployment may not work correctly without these variables${NC}"
+fi
+
+# Count variables (including those with empty values)
+VAR_COUNT=$(grep -c "^[A-Z_]+=" "$DEPLOYMENT_ENV_FILE" || echo "0")
+echo -e "${GREEN}Prepared $VAR_COUNT environment variables for TEE${NC}"
 echo -e "${GREEN}Using environment file: $DEPLOYMENT_ENV_FILE${NC}"
 echo -e "${BLUE}Note: Environment variables will be encrypted by Phala Cloud${NC}"
 
@@ -438,16 +463,65 @@ if [ ! -f ".env" ]; then
 fi
 
 echo ""
-echo -e "${YELLOW}Running deployment command...${NC}"
-echo "Command: npx phala cvms create --name \"$AGENT_NAME\" --compose \"$COMPOSE_FILE\" --env-file \"$DEPLOYMENT_ENV_FILE\""
-echo ""
-echo -e "${BLUE}Note: Using simplified docker-compose.yml to avoid environment conflicts${NC}"
+echo -e "${YELLOW}Creating TEE-specific docker-compose with environment variables...${NC}"
 
-# Deploy using the correct phala cvms create command
+# Create a docker-compose file with environment variables inline
+# This is more reliable than --env-file for Phala TEE
+COMPOSE_TEE_FILE="docker-compose.tee-deploy.yml"
+
+cat > "$COMPOSE_TEE_FILE" << 'EOF'
+version: '3.8'
+
+services:
+  pamela:
+    image: oldirtybenji/pamela-tee-agent:latest
+    container_name: pamela-agent
+    ports:
+      - "3000:3000"
+    volumes:
+      - agent_data:/app/.eliza
+    restart: unless-stopped
+    environment:
+EOF
+
+# Add each environment variable from .env.tee to the docker-compose
+echo -e "${YELLOW}Injecting environment variables into docker-compose...${NC}"
+while IFS='=' read -r key value; do
+    # Skip empty lines and comments
+    if [[ -n "$key" && ! "$key" =~ ^# ]]; then
+        # Escape special characters in value
+        escaped_value=$(echo "$value" | sed 's/"/\\"/g')
+        echo "      - $key=$escaped_value" >> "$COMPOSE_TEE_FILE"
+    fi
+done < "$DEPLOYMENT_ENV_FILE"
+
+# Complete the docker-compose file
+cat >> "$COMPOSE_TEE_FILE" << 'EOF'
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+    command: ["npm", "start"]
+
+volumes:
+  agent_data:
+EOF
+
+echo -e "${GREEN}Created $COMPOSE_TEE_FILE with embedded environment variables${NC}"
+echo -e "${YELLOW}Variable count: $(grep -c "      - " "$COMPOSE_TEE_FILE")${NC}"
+
+echo ""
+echo -e "${YELLOW}Running deployment command...${NC}"
+echo "Command: npx phala cvms create --name \"$AGENT_NAME\" --compose \"$COMPOSE_TEE_FILE\""
+echo ""
+echo -e "${BLUE}Note: Environment variables are now embedded in docker-compose for reliable injection${NC}"
+
+# Deploy using the TEE-specific compose file
 npx phala cvms create \
   --name "$AGENT_NAME" \
-  --compose "$COMPOSE_FILE" \
-  --env-file "$DEPLOYMENT_ENV_FILE" || {
+  --compose "$COMPOSE_TEE_FILE" || {
     echo ""
     echo -e "${RED}Deployment failed!${NC}"
     
@@ -467,9 +541,19 @@ npx phala cvms create \
     echo -e "${RED}Common issues:${NC}"
     echo "1. No billing/payment method set up"
     echo "2. Insufficient account balance"
-    echo "3. docker-compose.yml has both env_file and environment sections (use only volumes/ports/command)"
-    echo "4. Docker image not pushed to Docker Hub"
-    echo "5. Environment variables not properly formatted in .env"
+    echo "3. Environment variables not properly loaded - check $DEPLOYMENT_ENV_FILE"
+    echo ""
+    echo -e "${YELLOW}To debug environment variables:${NC}"
+    echo "cat $DEPLOYMENT_ENV_FILE | head -5"
+    
+    echo "4. docker-compose.yml has both env_file and environment sections (use only volumes/ports/command)"
+    echo "5. Docker image not pushed to Docker Hub"
+    echo "6. Environment variables not properly formatted in .env"
+    
+    # Clean up temp env file on failure
+    if [ -f "$DEPLOYMENT_ENV_FILE" ] && [ "$DEPLOYMENT_ENV_FILE" != ".env" ]; then
+        echo -e "${YELLOW}Keeping $DEPLOYMENT_ENV_FILE for debugging${NC}"
+    fi
     echo ""
     echo "Please check:"
     echo "- Your billing at: https://cloud.phala.network/billing"
@@ -504,7 +588,25 @@ echo ""
 echo -e "${YELLOW}Note: The container may need environment variables configured in the dashboard${NC}"
 echo ""
 
-# No temporary files to clean up - using .env directly
+# Clean up temporary files after successful deployment
+if [ -f "$DEPLOYMENT_ENV_FILE" ] && [ "$DEPLOYMENT_ENV_FILE" != ".env" ]; then
+    echo -e "${YELLOW}Cleaning up temporary files...${NC}"
+    # Keep a backup for debugging
+    cp "$DEPLOYMENT_ENV_FILE" "$DEPLOYMENT_ENV_FILE.backup"
+    rm -f "$DEPLOYMENT_ENV_FILE"
+    echo -e "${GREEN}Backup saved to $DEPLOYMENT_ENV_FILE.backup for reference${NC}"
+fi
+
+# Also keep the TEE compose file for reference
+if [ -f "$COMPOSE_TEE_FILE" ]; then
+    cp "$COMPOSE_TEE_FILE" "$COMPOSE_TEE_FILE.backup"
+    echo -e "${GREEN}Docker compose saved to $COMPOSE_TEE_FILE.backup for debugging${NC}"
+fi
 
 echo -e "${GREEN}Deployment script completed!${NC}"
 echo -e "${YELLOW}Note: It may take 5-10 minutes for the agent to fully initialize.${NC}"
+echo ""
+echo -e "${BLUE}To test Telegram bot after deployment:${NC}"
+echo "1. Wait for agent to fully initialize (check logs)"
+echo "2. Send a message to @pamela_pm_bot on Telegram"
+echo "3. If bot doesn't respond, check: npx phala cvms get $AGENT_NAME"

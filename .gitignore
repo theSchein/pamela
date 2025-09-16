@@ -163,3 +163,9 @@ plugin-polymarket/
 .claude
 CLAUDE.md
 *.md
+
+# TEE deployment generated files
+.env.tee
+.env.tee.backup
+docker-compose.tee-deploy.yml
+docker-compose.tee-deploy.yml.backup
