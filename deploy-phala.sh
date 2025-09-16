@@ -376,50 +376,17 @@ echo -e "${YELLOW}Pushing Docker image to registry...${NC}"
 # Push the image to Docker Hub
 docker push "$FULL_IMAGE_NAME:latest"
 
+echo -e "${GREEN}Docker image pushed successfully to Docker Hub${NC}"
+
 echo ""
 echo -e "${YELLOW}Deploying to Phala TEE...${NC}"
 
 # Deploy to Phala Cloud
 echo -e "${YELLOW}Attempting deployment...${NC}"
 
-# Resource selection for cost optimization
+# Note: Resource allocation is handled automatically by Phala Cloud
 echo ""
-echo -e "${YELLOW}Select resource allocation:${NC}"
-echo "1) Minimal (1 vCPU, 1GB RAM, 10GB disk) - ~$10/month - Testing only"
-echo "2) Small (1 vCPU, 2GB RAM, 20GB disk) - ~$15/month"
-echo "3) Medium (2 vCPUs, 4GB RAM, 30GB disk) - ~$30/month"
-echo "4) Large (4 vCPUs, 8GB RAM, 50GB disk) - ~$58/month - Production"
-read -p "Enter choice (1-4): " RESOURCE_SIZE
-
-case $RESOURCE_SIZE in
-    1)
-        VCPU_COUNT=1
-        MEMORY_SIZE="1G"
-        DISK_SIZE="10G"
-        echo -e "${GREEN}Using minimal resources for testing${NC}"
-        ;;
-    2)
-        VCPU_COUNT=1
-        MEMORY_SIZE="2G"
-        DISK_SIZE="20G"
-        echo -e "${GREEN}Using small resources${NC}"
-        ;;
-    3)
-        VCPU_COUNT=2
-        MEMORY_SIZE="4G"
-        DISK_SIZE="30G"
-        echo -e "${GREEN}Using medium resources${NC}"
-        ;;
-    *)
-        VCPU_COUNT=4
-        MEMORY_SIZE="8G"
-        DISK_SIZE="50G"
-        echo -e "${GREEN}Using large resources for production${NC}"
-        ;;
-esac
-
-echo ""
-echo -e "${BLUE}Deploying with: ${VCPU_COUNT} vCPU, ${MEMORY_SIZE} RAM, ${DISK_SIZE} disk${NC}"
+echo -e "${YELLOW}Phala Cloud will automatically allocate resources based on your account tier${NC}"
 
 # Create a temporary env file with all variables for TEE deployment
 echo -e "${YELLOW}Preparing environment configuration for TEE...${NC}"
@@ -462,12 +429,9 @@ fi
 echo -e "${YELLOW}Starting deployment...${NC}"
 echo "Using configuration:"
 echo "  - Name: $AGENT_NAME"
-echo "  - Node: prod8 (US-WEST-1)"
-echo "  - Image: dstack-dev-0.3.6"
-echo "  - Resources: ${VCPU_COUNT} vCPU, ${MEMORY_SIZE} RAM, ${DISK_SIZE} disk"
+echo "  - Docker Image: $FULL_IMAGE_NAME:latest"
 echo "  - Docker Compose: $COMPOSE_FILE"
 echo "  - Environment File: $TEMP_ENV_FILE"
-echo "  - Docker Image: $FULL_IMAGE_NAME:latest"
 
 echo ""
 echo -e "${YELLOW}Ensuring .env file is in place for docker-compose...${NC}"
@@ -479,19 +443,15 @@ fi
 
 echo ""
 echo -e "${YELLOW}Running deployment command...${NC}"
-echo "Command: npx phala deploy --name \"$AGENT_NAME\" --vcpu \"$VCPU_COUNT\" --memory \"$MEMORY_SIZE\" --disk-size \"$DISK_SIZE\" --compose \"$COMPOSE_FILE\" --node-id \"prod8\" --image \"dstack-dev-0.3.6\""
+echo "Command: npx phala cvms create --name \"$AGENT_NAME\" --compose \"$COMPOSE_FILE\" --env-file \"$TEMP_ENV_FILE\""
 echo ""
-echo -e "${BLUE}Note: Environment variables will be read from .env file by docker-compose.yml${NC}"
+echo -e "${BLUE}Note: Using phala cvms create command with compose file${NC}"
 
-# Deploy using direct Phala CLI (without --env-file since docker-compose handles it)
-npx phala deploy \
+# Deploy using the correct phala cvms create command
+npx phala cvms create \
   --name "$AGENT_NAME" \
-  --vcpu "$VCPU_COUNT" \
-  --memory "$MEMORY_SIZE" \
-  --disk-size "$DISK_SIZE" \
   --compose "$COMPOSE_FILE" \
-  --node-id "prod8" \
-  --image "dstack-dev-0.3.6" || {
+  --env-file "$TEMP_ENV_FILE" || {
     echo ""
     echo -e "${RED}Deployment failed!${NC}"
     
