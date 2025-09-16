@@ -33,6 +33,8 @@
   "exclude": [
     "dist",
     "node_modules",
+    "web",
+    "shared",
     "src/__tests__/**/*",
     "src/**/cypress/**/*",
     "**/*.test.ts",

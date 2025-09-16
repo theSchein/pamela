@@ -138,6 +138,31 @@ MIN_CONFIDENCE_THRESHOLD=0.7
 PGLITE_DATA_DIR=./.eliza/.elizadb
 ```
 
+### Docker & TEE Deployment Configuration
+
+When deploying with Docker or to Phala TEE, you need to set your Docker Hub username:
+
+```bash
+# Set your Docker Hub username (required for deployment)
+export DOCKER_USERNAME=your-dockerhub-username
+
+# Optional: Customize image name and tag
+export DOCKER_IMAGE_NAME=pamela-agent  # Default: pamela-agent
+export DOCKER_IMAGE_TAG=latest          # Default: latest
+export TEE_AGENT_NAME=pamela-tee-agent  # Default: pamela-tee-agent
+
+# Deploy to Phala TEE (secure enclave)
+./deploy-phala.sh
+
+# Or run with docker-compose
+docker-compose up
+```
+
+The deployment scripts will use these environment variables to:
+- Build and tag your Docker image as `${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}`
+- Push to your Docker Hub account
+- Deploy to Phala TEE with proper environment variable injection
+
 ### Running Pamela
 
 ```bash
@@ -147,7 +172,7 @@ npm run dev
 # Production (Railway deployment)
 railway up --detach
 
-# Docker testing
+# Docker testing (requires DOCKER_USERNAME env var)
 docker-compose up
 
 # Run tests
@@ -155,6 +180,10 @@ npm test
 
 # Deploy to Railway (24/7 operation)
 ./scripts/deploy-railway.sh
+
+# Deploy to Phala TEE (secure trading)
+export DOCKER_USERNAME=your-dockerhub-username
+./deploy-phala.sh
 ```
 
 

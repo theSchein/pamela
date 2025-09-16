@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  pamela:
+    image: ${DOCKER_USERNAME}/pamela-agent:${DOCKER_IMAGE_TAG:-latest}
+    container_name: pamela-agent
+    ports:
+      - "3000:3000"
+    volumes:
+      - agent_data:/app/.eliza
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+    command: ["npm", "start"]
+
+volumes:
+  agent_data:
