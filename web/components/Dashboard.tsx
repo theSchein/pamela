@@ -6,7 +6,7 @@ import { usePortfolioStats } from '@/hooks/usePolymarket';
 import { useDataApiPositions } from '@/hooks/useDataApiPositions';
 import { PositionsTable } from './PositionsTable';
 import { TradeHistoryV2 } from './TradeHistoryV2';
-import { TelegramMessages } from './TelegramMessages';
+import { TelegramStatus } from './TelegramStatus';
 
 interface DashboardProps {
   walletAddress: string;
@@ -46,7 +46,7 @@ export function Dashboard({ walletAddress }: DashboardProps) {
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="lg:col-span-1">
-          <TelegramMessages />
+          <TelegramStatus />
         </div>
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg shadow-xl border-4 border-red-500 p-6">

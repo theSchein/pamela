@@ -5,7 +5,8 @@ import { MessageCircle, Bot, User, WifiOff, Wifi, RefreshCw } from 'lucide-react
 import { useEffect, useRef, useState } from 'react';
 
 export function TelegramMessages() {
-  // Use the improved polling mechanism with proper offset tracking
+  // DISABLED: Telegram polling conflicts with the bot's own polling
+  // Both cannot use getUpdates API simultaneously
   const { 
     data, 
     isLoading, 
@@ -19,7 +20,7 @@ export function TelegramMessages() {
     reset,
     refetch
   } = useTelegramPolling({
-    enablePolling: true,
+    enablePolling: false,  // DISABLED to prevent 409 Conflict errors with bot
     onNewMessage: (msg) => {
       console.log('New message received:', msg.text.substring(0, 50));
     }
@@ -166,11 +167,17 @@ export function TelegramMessages() {
           </p>
         </div>
       )}
+      <div className="bg-yellow-100 border-2 border-yellow-500 rounded p-3 mb-4">
+        <p className="text-sm font-russo text-yellow-800">
+          ⚠️ TELEGRAM MONITORING DISABLED: Cannot poll while bot is running (409 Conflict). 
+          Only one process can use getUpdates at a time. Stop the bot to enable monitoring.
+        </p>
+      </div>
       <div ref={scrollRef} className="h-96 overflow-y-auto pr-4">
         <div className="space-y-4">
           {conversationPairs.length === 0 ? (
             <p className="text-sm font-russo text-red-700 text-center py-8">
-              RADIO SILENT - MONITORING CHANNELS
+              MONITORING DISABLED - BOT IS ACTIVE
             </p>
           ) : (
             conversationPairs.map((pair, index) => (

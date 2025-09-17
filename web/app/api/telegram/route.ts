@@ -52,14 +52,55 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Telegram bot token not configured' }, { status: 500 });
     }
 
-    // Initialize offset
-    await initializeOffset();
-
     // Parse query parameters
     const { searchParams } = new URL(request.url);
     const reset = searchParams.get('reset') === 'true';
     const longPoll = searchParams.get('longPoll') === 'true';
     const limit = parseInt(searchParams.get('limit') || '100');
+    const monitorOnly = searchParams.get('monitorOnly') !== 'false'; // Default to true
+    
+    // IMPORTANT: In monitor-only mode, we don't poll Telegram directly
+    // to avoid conflicts with the bot. Instead, return cached data only.
+    if (monitorOnly && !reset) {
+      // Just return cached messages without polling
+      const messages = Array.from(messageBuffer.values())
+        .sort((a, b) => b.date - a.date)
+        .slice(0, limit);
+      
+      // Get bot info from cache or fetch once
+      let botInfo = null;
+      try {
+        const botInfoResponse = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
+        const botData = await botInfoResponse.json();
+        if (botData.ok) {
+          botInfo = {
+            id: botData.result.id,
+            username: botData.result.username,
+            first_name: botData.result.first_name
+          };
+        }
+      } catch (error) {
+        console.error('Failed to get bot info:', error);
+      }
+      
+      return NextResponse.json({
+        bot: botInfo,
+        messages,
+        meta: {
+          offset: -1,
+          bufferSize: messageBuffer.size,
+          totalMessages: messages.length,
+          status: 'monitor-only',
+          monitorOnly: true,
+          note: 'Monitor-only mode - not polling to avoid conflicts with bot'
+        }
+      });
+    }
+    
+    // Initialize offset (skip for monitor-only mode which is default)
+    if (!monitorOnly) {
+      await initializeOffset();
+    }
     
     // Reset if requested
     if (reset) {
@@ -69,7 +110,7 @@ export async function GET(request: Request) {
     }
     
     // Fetch updates from Telegram with conflict prevention
-    const fetchUpdates = async (timeout: number = 0): Promise<any> => {
+    const fetchUpdates = async (timeout: number = 0, monitorMode: boolean = false): Promise<any> => {
       // Check if we're already polling (for long polls)
       if (timeout > 0) {
         if (isPolling) {
@@ -86,8 +127,11 @@ export async function GET(request: Request) {
         await new Promise(resolve => setTimeout(resolve, MIN_POLL_INTERVAL - timeSinceLastPoll));
       }
       
+      // In monitor-only mode, use offset -1 to not consume messages
+      const offsetToUse = monitorMode ? '-1' : currentOffset.toString();
+      
       const params = new URLSearchParams({
-        offset: currentOffset.toString(),
+        offset: offsetToUse,
         limit: '100',
         timeout: timeout.toString(),
         allowed_updates: JSON.stringify(['message', 'edited_message', 'channel_post'])
@@ -132,8 +176,8 @@ export async function GET(request: Request) {
       }
     };
     
-    // Process updates
-    const processUpdates = (updates: any[]) => {
+    // Process updates  
+    const processUpdates = (updates: any[], skipOffsetUpdate: boolean = false) => {
       const newMessages: any[] = [];
       
       for (const update of updates) {
@@ -163,8 +207,8 @@ export async function GET(request: Request) {
           newMessages.push(processedMessage);
         }
         
-        // Update offset
-        if (update.update_id >= currentOffset) {
+        // Update offset (skip if requested)
+        if (!skipOffsetUpdate && update.update_id >= currentOffset) {
           currentOffset = update.update_id + 1;
         }
       }
@@ -183,7 +227,7 @@ export async function GET(request: Request) {
     // Handle long polling request
     if (longPoll) {
       try {
-        const data = await fetchUpdates(25); // 25 second timeout
+        const data = await fetchUpdates(25, monitorOnly); // 25 second timeout
         
         if (!data.ok) {
           // Don't treat as error, just return empty
@@ -199,8 +243,8 @@ export async function GET(request: Request) {
           });
         }
         
-        const newMessages = data.result ? processUpdates(data.result) : [];
-        if (newMessages.length > 0) {
+        const newMessages = data.result ? processUpdates(data.result, monitorOnly) : [];
+        if (!monitorOnly && newMessages.length > 0) {
           await saveOffset(currentOffset);
         }
         
@@ -231,11 +275,13 @@ export async function GET(request: Request) {
     
     // Regular request - fetch with no timeout
     try {
-      const data = await fetchUpdates(0);
+      const data = await fetchUpdates(0, monitorOnly);
       
       if (data.ok && data.result) {
-        processUpdates(data.result);
-        await saveOffset(currentOffset);
+        processUpdates(data.result, monitorOnly);
+        if (!monitorOnly) {
+          await saveOffset(currentOffset);
+        }
       }
     } catch (error: any) {
       console.warn('Failed to fetch updates:', error.message);
