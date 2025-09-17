@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
 
 const DATA_API_URL = 'https://data-api.polymarket.com';
 
@@ -15,35 +14,24 @@ export async function GET(request: NextRequest) {
     // Fetch data from Polymarket API only - NO blockchain calls
     const [currentPositions, closedPositions] = await Promise.all([
       // Get current positions
-      axios.get(`${DATA_API_URL}/positions`, {
-        params: {
-          user: address.toLowerCase(),
-          sizeThreshold: 0.01,
-          limit: 500,
-        },
+      fetch(`${DATA_API_URL}/positions?user=${address.toLowerCase()}&sizeThreshold=0.01&limit=500`, {
         headers: { 'Accept': 'application/json' }
-      }).catch(err => {
+      }).then(res => res.json()).catch(err => {
         console.error('Error fetching current positions:', err.message);
-        return { data: [] };
+        return [];
       }),
       
       // Get closed positions
-      axios.get(`${DATA_API_URL}/closed-positions`, {
-        params: {
-          user: address.toLowerCase(),
-          limit: 200,
-          sortBy: 'REALIZEDPNL',
-          sortDirection: 'DESC'
-        },
+      fetch(`${DATA_API_URL}/closed-positions?user=${address.toLowerCase()}&limit=200&sortBy=REALIZEDPNL&sortDirection=DESC`, {
         headers: { 'Accept': 'application/json' }
-      }).catch(err => {
+      }).then(res => res.json()).catch(err => {
         console.error('Error fetching closed positions:', err.message);
-        return { data: [] };
+        return [];
       })
     ]);
 
     // Format current positions - the API already includes title field!
-    const formattedCurrentPositions = (currentPositions.data || []).map((pos: any) => ({
+    const formattedCurrentPositions = (currentPositions || []).map((pos: any) => ({
       id: `current-${pos.conditionId}-${pos.outcome}`,
       type: 'position',
       status: 'open',
@@ -61,7 +49,7 @@ export async function GET(request: NextRequest) {
     }));
 
     // Format closed positions as historical trades
-    const formattedClosedPositions = (closedPositions.data || []).map((pos: any) => ({
+    const formattedClosedPositions = (closedPositions || []).map((pos: any) => ({
       id: `closed-${pos.conditionId}-${pos.outcome}`,
       type: 'closed_position',
       status: pos.realizedPnl > 0 ? 'won' : pos.realizedPnl < 0 ? 'lost' : 'breakeven',

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
 
 const DATA_API_URL = 'https://data-api.polymarket.com';
 
@@ -14,20 +13,26 @@ export async function GET(request: NextRequest) {
 
   try {
     // Get closed positions (historical trades)
-    const closedPositions = await axios.get(`${DATA_API_URL}/closed-positions`, {
-      params: {
-        user: address.toLowerCase(),
-        limit: parseInt(limit),
-        sortBy: 'REALIZEDPNL',
-        sortDirection: 'DESC'
-      },
+    const url = new URL(`${DATA_API_URL}/closed-positions`);
+    url.searchParams.append('user', address.toLowerCase());
+    url.searchParams.append('limit', limit);
+    url.searchParams.append('sortBy', 'REALIZEDPNL');
+    url.searchParams.append('sortDirection', 'DESC');
+    
+    const response = await fetch(url.toString(), {
       headers: {
         'Accept': 'application/json',
       }
     });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const closedPositions = await response.json();
 
     // Format closed positions for our UI
-    const positions = (closedPositions.data || []).map((pos: any) => ({
+    const positions = (closedPositions || []).map((pos: any) => ({
       market_id: pos.conditionId,
       token_id: pos.asset,
       outcome: pos.outcome,

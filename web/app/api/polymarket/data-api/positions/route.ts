@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
 
 const DATA_API_URL = 'https://data-api.polymarket.com';
 
@@ -12,20 +11,26 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Get current positions
-    const currentPositions = await axios.get(`${DATA_API_URL}/positions`, {
-      params: {
-        user: address.toLowerCase(),
-        sizeThreshold: 0.01, // Include small positions
-        limit: 500,
-      },
+    // Get current positions using fetch instead of axios
+    const url = new URL(`${DATA_API_URL}/positions`);
+    url.searchParams.append('user', address.toLowerCase());
+    url.searchParams.append('sizeThreshold', '0.01');
+    url.searchParams.append('limit', '500');
+    
+    const response = await fetch(url.toString(), {
       headers: {
         'Accept': 'application/json',
       }
     });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const currentPositions = await response.json();
 
     // Format positions for our UI with all available data
-    const positions = (currentPositions.data || []).map((pos: any) => ({
+    const positions = (currentPositions || []).map((pos: any) => ({
       market_id: pos.conditionId,
       token_id: pos.asset,
       outcome: pos.outcome,

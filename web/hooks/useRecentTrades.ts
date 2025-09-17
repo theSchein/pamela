@@ -6,23 +6,29 @@ export function useRecentTrades(address: string) {
   return useQuery<Trade[]>({
     queryKey: ['recent-trades', address],
     queryFn: async () => {
-      const orders = await polymarketService.getOrders(address);
+      // Get both open orders and trade history
+      const [openOrders, tradeHistory] = await Promise.all([
+        polymarketService.getOpenOrders(address),
+        polymarketService.getTradeHistory(address)
+      ]);
       
-      // Transform orders to trades format
-      return orders.map(order => ({
-        id: order.id,
-        marketId: order.marketId,
+      // Combine and transform to trades format
+      const allOrders = [...openOrders, ...tradeHistory];
+      
+      return allOrders.map(order => ({
+        id: order.id || Math.random().toString(36),
+        marketId: order.market || order.marketId || '',
         marketQuestion: order.marketQuestion || 'Unknown Market',
-        side: order.side as 'buy' | 'sell',
-        outcome: order.outcome,
-        quantity: order.size,
-        price: order.price,
-        total: order.size * order.price,
-        timestamp: order.createdAt,
-        status: order.status === 'matched' ? 'filled' as const : 
+        side: (order.side || order.type || 'buy') as 'buy' | 'sell',
+        outcome: order.outcome || 'Yes',
+        quantity: parseFloat(order.size || order.amount || '0'),
+        price: parseFloat(order.price || '0'),
+        total: parseFloat(order.size || order.amount || '0') * parseFloat(order.price || '0'),
+        timestamp: order.createdAt || order.timestamp || new Date().toISOString(),
+        status: order.status === 'matched' || order.status === 'filled' ? 'filled' as const : 
                 order.status === 'cancelled' ? 'cancelled' as const : 
                 'pending' as const,
-        txHash: order.transactionHash,
+        txHash: order.transactionHash || order.txHash,
       }));
     },
     refetchInterval: 20000, // Refetch every 20 seconds

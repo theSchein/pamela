@@ -36,7 +36,11 @@ export function useRecentTransactions(address: string | undefined, limit: number
 export function useBlockNumber() {
   return useQuery({
     queryKey: ['blockchain', 'blockNumber'],
-    queryFn: () => blockchainService.getBlockNumber(),
+    queryFn: async () => {
+      // Block number fetching not yet implemented
+      // TODO: Implement getBlockNumber in BlockchainService
+      return 0;
+    },
     refetchInterval: 5000,
   });
 }

@@ -35,6 +35,8 @@ export interface TelegramData {
     cacheSize: number;
     newMessages: number;
     longPolling: boolean;
+    timeout?: boolean;
+    error?: string;
   };
 }
 
