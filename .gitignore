@@ -164,7 +164,6 @@ plugin-polymarket/
 # LLMs
 .claude
 CLAUDE.md
-*.md
 
 # TEE deployment generated files
 .env.tee

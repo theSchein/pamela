@@ -1,34 +1,44 @@
-# PaMeLa - Prediction Market Layer 
-## A Prediction Market Trading Agent Framework
+# PaMeLa - Prediction Market Layer  
 
 <div align="center">
 
 ![Pamela Logo](/images/pamela.png)
 
-**An autonomous AI prediction market trading agent built on ElizaOS**
+**A Prediction Market Trading Agent Framework**
 
+[![Website](https://img.shields.io/badge/Website-pamelabot.watch-blue)](https://pamelabot.watch)
+[![Telegram Bot](https://img.shields.io/badge/Telegram-%40pamela__pm__bot-0088cc)](https://t.me/pamela_pm_bot)
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue.svg)](https://www.typescriptlang.org/)
-[![ElizaOS](https://img.shields.io/badge/ElizaOS-Latest-purple.svg)](https://github.com/elizaos/eliza)
+[![Built on ElizaOS](https://img.shields.io/badge/Built%20on-ElizaOS-purple)](https://github.com/elizaos/eliza)
 
 </div>
 
-## Overview
+## What is Pamela?
 
-Pamela is a framework prediction market trading agent to independently execute trades on Polymarket using her own Polygon wallet. The agent is able to trade autonomously using its own signals and models as well as take order requests from users over telegram. Built on ElizaOS, this is an example implementation of the @plugin-polymarket to bring Polymarket trading action to agents. 
+Pamela is an autonomous AI agent that trades prediction markets 24/7. She analyzes news, evaluates probabilities, and executes trades on Polymarket. This agent is capable of trading autonomously or according to the direction of user prompts over telegram. Built on ElizaOS, she demonstrates how AI agents can participate in prediction markets.
 
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="/images/tg_pam.jpeg" width="300" alt="Telegram Interface">
+        <br><b>Chat with Pamela on Telegram</b>
+      </td>
+      <td align="center">
+        <img src="/images/pamela_monitor.png" width="400" alt="Web Monitor">
+        <br><b>Track live at <a href="https://pamelabot.watch">pamelabot.watch</a></b>
+      </td>
+    </tr>
+  </table>
+</div>
 
-### Key Capabilities
-- **Autonomous Trading**: Executes buy, sell, and redemption orders independently
-- **Market Intelligence**: Real-time analysis of 1000+ prediction markets
-- **Risk Management**: Built-in position sizing and safety controls
-- **Natural Language Interface**: Accepts trading commands in plain English
-- **Portfolio Management**: Tracks positions, performance, and P&L
-- **CLOB Integration**: Direct connection to Polymarket's order book
-- **External Signals**: Integrates the news plugins and language processing to perform sentiment analysis on  real news stories
-- **Telegram Interface**: Communitcate with the agent to monitor status and initiate orders
-- ****:
+### Features
+-  **Fully Autonomous**: Trades 24/7 without supervision
+-  **Telegram Bot**: Chat interface for monitoring and commands at @pamela_pm_bot
+-  **Web Dashboard**: Real-time portfolio tracking at [pamelabot.watch](https://pamelabot.watch)
+-  **News Analysis**: Processes breaking news for trading signals
+-  **Risk Management**: Built-in position limits and safety controls
+-  **TEE Ready**: Deployable to secure enclaves for verifiable trading
 
 ## Quick Start
 
@@ -36,20 +46,20 @@ Pamela is a framework prediction market trading agent to independently execute t
 - Node.js 20+ and Bun runtime (required)
 - Docker & Docker Compose (for containerized testing)
 - Polygon wallet with USDC.e for trading
-- LLM API key (Anthropic, OpenAI, or others)
+- LLM API key (Anthropic, OpenAI, or others) (local llm coming soon)
 - Telegram Bot Token 
 
 
-### Monorepo Structure
+### Project Structure
 
 ```
 pamela/
-├── apps/
-│   ├── agent/     # ElizaOS backend with Polymarket integration
-│   └── web/       # React frontend (optional)
-├── packages/
-│   └── shared/    # Shared TypeScript types
-└── scripts/       # Testing and deployment scripts
+├── src/               # Agent source (ElizaOS + character)
+├── web/              # Dashboard at pamelabot.watch
+├── shared/           # Shared types and constants
+├── scripts/          # Deployment and monitoring tools
+├── images/           # Screenshots and assets
+└── docs/             # Documentation
 ```
 
 ### Installation
@@ -105,9 +115,6 @@ elizaos dev
 
 # Docker testing (requires DOCKER_USERNAME env var)
 docker-compose up
-
-# Run tests
-npm test
 
 
 # Deploy to Phala TEE (secure trading)

@@ -14,7 +14,7 @@ Thank you for your interest in contributing to Pamela! This document provides gu
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/your-username/pamela
+   git clone https://github.com/theSchein/pamela
    cd pamela
    ```
 
