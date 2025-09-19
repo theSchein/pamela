@@ -1,4 +1,4 @@
-# PaMeLa - Prediction Market Lady 
+# PaMeLa - Prediction Market Layer 
 ## A Prediction Market Trading Agent Framework
 
 <div align="center">
@@ -16,7 +16,7 @@
 
 ## Overview
 
-Pamela is a framework prediction market trading agent to independently execute trades on Polymarket using her own Polygon wallet. Built on ElizaOS, this is an example implementation of the @plugin-polymarket to bring Polymarket trading action to Eliza agents. 
+Pamela is a framework prediction market trading agent to independently execute trades on Polymarket using her own Polygon wallet. The agent is able to trade autonomously using its own signals and models as well as take order requests from users over telegram. Built on ElizaOS, this is an example implementation of the @plugin-polymarket to bring Polymarket trading action to agents. 
 
 
 ### Key Capabilities
@@ -26,24 +26,19 @@ Pamela is a framework prediction market trading agent to independently execute t
 - **Natural Language Interface**: Accepts trading commands in plain English
 - **Portfolio Management**: Tracks positions, performance, and P&L
 - **CLOB Integration**: Direct connection to Polymarket's order book
+- **External Signals**: Integrates the news plugins and language processing to perform sentiment analysis on  real news stories
+- **Telegram Interface**: Communitcate with the agent to monitor status and initiate orders
+- ****:
 
 ## Quick Start
 
 ### Prerequisites
 - Node.js 20+ and Bun runtime (required)
 - Docker & Docker Compose (for containerized testing)
-- Polygon wallet with USDC for trading
+- Polygon wallet with USDC.e for trading
 - LLM API key (Anthropic, OpenAI, or others)
-- Discord Bot Token (for Discord deployment)
+- Telegram Bot Token 
 
-### Deployment Options
-
-Pamela can be deployed as:
-1. **Railway** (Recommended for 24/7) - Cloud deployment with auto-scaling
-2. **Discord Bot** - Using Discord plugin for community trading
-3. **Telegram Bot** - Stable, production-ready
-4. **Web Interface** - Custom React frontend (experimental)
-5. **API Service** - Direct HTTP/WebSocket access
 
 ### Monorepo Structure
 
@@ -61,7 +56,7 @@ pamela/
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/pamela
+git clone https://github.com/theSchein/pamela
 cd pamela
 
 # Quick start with Docker
@@ -75,68 +70,6 @@ cp apps/agent/.env.example apps/agent/.env
 # Edit apps/agent/.env with your API keys
 ```
 
-### Telegram Bot Setup
-
-1. **Create Bot with BotFather**
-   ```bash
-   # In Telegram, message @BotFather
-   /newbot
-   # Follow prompts to get your bot token
-   ```
-
-2. **Configure Environment**
-   ```bash
-   # Add to .env
-   TELEGRAM_BOT_TOKEN=your_bot_token_here
-   ```
-
-3. **Start Telegram Bot**
-   ```bash
-   # Quick start
-   ./start-telegram.sh
-   
-   # Or with Docker
-   docker-compose -f docker-compose.telegram.yml up
-   ```
-
-4. **Chat with Pamela**
-   - Find your bot on Telegram
-   - Send `/start` to begin
-   - Ask about markets, prices, or place trades
-
-See [TELEGRAM_SETUP.md](TELEGRAM_SETUP.md) for detailed setup instructions.
-
-### Configuration
-
-Edit `.env` with your credentials:
-
-```env
-# Required: Polymarket Trading (all three must be the same key)
-WALLET_PRIVATE_KEY=your_polygon_private_key
-PRIVATE_KEY=your_polygon_private_key
-POLYMARKET_PRIVATE_KEY=your_polygon_private_key
-CLOB_API_URL=https://clob.polymarket.com/
-
-# Required: AI Model (at least one)
-ANTHROPIC_API_KEY=your_anthropic_api_key
-# OR
-OPENAI_API_KEY=your_openai_api_key
-
-# Discord Bot (if using Discord)
-DISCORD_API_TOKEN=your_discord_bot_token
-DISCORD_APPLICATION_ID=your_discord_app_id
-
-# Memory Optimization (important for production)
-NODE_OPTIONS=--max-old-space-size=4096
-
-# Trading Configuration
-TRADING_ENABLED=true
-MAX_POSITION_SIZE=100
-MIN_CONFIDENCE_THRESHOLD=0.7
-
-# Database
-PGLITE_DATA_DIR=./.eliza/.elizadb
-```
 
 ### Docker & TEE Deployment Configuration
 
@@ -167,10 +100,8 @@ The deployment scripts will use these environment variables to:
 
 ```bash
 # Development (local)
-npm run dev
+elizaos dev
 
-# Production (Railway deployment)
-railway up --detach
 
 # Docker testing (requires DOCKER_USERNAME env var)
 docker-compose up
@@ -178,48 +109,12 @@ docker-compose up
 # Run tests
 npm test
 
-# Deploy to Railway (24/7 operation)
-./scripts/deploy-railway.sh
 
 # Deploy to Phala TEE (secure trading)
 export DOCKER_USERNAME=your-dockerhub-username
 ./deploy-phala.sh
 ```
 
-
-## Trading Capabilities
-
-
-### Natural Language Trading
-```
-"Show me markets about the 2028 election"
-"Buy $25 of YES on Trump winning at 65 cents"
-"What's my current portfolio value?"
-```
-
-## Architecture
-
-### Plugin System
-- **Core Plugin**: Basic conversational capabilities
-- **Polymarket Plugin**: Trading and market analysis
-- **Bootstrap Plugin**: Message handling and routing
-- **Discord Plugin**: Discord bot integration (optional)
-- **Telegram Plugin**: Telegram bot integration (optional)
-
-
-## 🛡️ Security & Risk Management
-
-### Built-in Safeguards
-- **Position Limits**: Configurable maximum position sizes
-- **Balance Verification**: Checks wallet balance before trades
-- **Market Validation**: Verifies token IDs and market status
-- **Confidence Thresholds**: Only trades above confidence levels
-
-### Security Features
-- Private key handling via environment variables
-- Secure CLOB API authentication
-- Input validation and sanitization
-- Comprehensive error handling
 
 ## Contributing
 
@@ -236,9 +131,10 @@ We welcome contributions to Pamela! This is an active open-source project focuse
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-org/pamela/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/pamela/discussions)
-- **Security**: See [SECURITY.md](SECURITY.md) for reporting vulnerabilities
+- **Issues**: [GitHub Issues](https://github.com/theSchein/pamela/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/theSchein/pamela/discussions)
+- **Questions**: Email me at ben@spmc.dev
+
 
 ---
 
