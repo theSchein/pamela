@@ -158,6 +158,12 @@ EOF < /dev/null
 *.backup
 railway.json.backup
 
+# Wallet files - NEVER commit these!
+wallets/
+wallet-*.json
+*.wallet
+*.keystore
+
 # Plugin repositories (maintained separately)
 plugin-polymarket/
 
