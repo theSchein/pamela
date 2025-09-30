@@ -18,6 +18,8 @@ import {
 import { z } from "zod";
 import { newsAnalysisAction } from "./actions/news-analysis";
 import { marketConfidenceAction } from "./actions/market-confidence";
+import { syncIndexAction } from "./actions/syncIndex";
+import { indexStatusAction } from "./actions/indexStatus";
 import { 
   newsContextProvider, 
   marketIntelligenceProvider, 
@@ -300,6 +302,8 @@ const plugin: Plugin = {
     conversationAction,
     newsAnalysisAction,
     marketConfidenceAction,
+    syncIndexAction,
+    indexStatusAction,
   ],
   providers: [
     helloWorldProvider,

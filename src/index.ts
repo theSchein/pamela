@@ -10,6 +10,7 @@ import polymarketPlugin from "@theschein/plugin-polymarket";
 import { character } from "./character.ts";
 import { getNewsService } from "./services/news";
 import { RedemptionService } from "./services/redemption-service";
+import { IndexTradingService } from "./services/IndexTradingService";
 
 // Conditionally import Discord plugin if configured
 let discordPlugin: any = null;
@@ -49,6 +50,18 @@ const initCharacter = async ({ runtime }: { runtime: IAgentRuntime }) => {
     logger.info("Redemption service started successfully");
   } catch (error) {
     logger.warn("Failed to start redemption service:", error);
+  }
+  
+  // Start index trading service if configured
+  if (process.env.INDEX_TRADING_ENABLED === 'true') {
+    try {
+      const indexService = IndexTradingService.getInstance();
+      await indexService.initialize(runtime);
+      await indexService.start();
+      logger.info("Index trading service started successfully");
+    } catch (error) {
+      logger.warn("Failed to start index trading service:", error);
+    }
   }
 };
 

@@ -17,6 +17,8 @@
 
 Pamela is an autonomous AI agent that trades prediction markets 24/7. She analyzes news, evaluates probabilities, and executes trades on Polymarket. This agent is capable of trading autonomously or according to the direction of user prompts over telegram. Built on ElizaOS, she demonstrates how AI agents can participate in prediction markets.
 
+**Use this repository as a template to create your own trading agent!** Fork it, customize the character, and deploy your own unique strategy. See [FORKING.md](FORKING.md) for detailed instructions.
+
 <div align="center">
   <table>
     <tr>
@@ -69,19 +71,44 @@ pamela/
 git clone https://github.com/theSchein/pamela
 cd pamela
 
-# Quick start with Docker
-cp .env.local.example .env.local
-# Edit .env.local with your API keys
-./scripts/test-local.sh
-
-# OR install manually
+# Install manually
 npm install
-cp apps/agent/.env.example apps/agent/.env
-# Edit apps/agent/.env with your API keys
+cp .env.example .env
+# Edit .env with your API keys and settings
+
+# OR quick start with Docker
+cp .env.example .env
+# Edit .env with your API keys
+docker-compose up
 ```
 
 
-### Docker & TEE Deployment Configuration
+### Configuration
+
+```bash
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env with:
+# - Your wallet private key
+# - LLM API keys (OpenAI, Anthropic, etc.)
+# - Trading parameters
+# - Optional: Telegram bot token, social media keys
+```
+
+### Running Pamela
+
+```bash
+# Development mode
+npm run dev
+
+# Production mode
+npm start
+
+# With web dashboard
+npm run dev:all  # Runs both agent and web dashboard
+```
+
+### Docker & TEE Deployment
 
 When deploying with Docker or to Phala TEE, you need to set your Docker Hub username:
 
@@ -106,21 +133,6 @@ The deployment scripts will use these environment variables to:
 - Push to your Docker Hub account
 - Deploy to Phala TEE with proper environment variable injection
 
-### Running Pamela
-
-```bash
-# Development (local)
-elizaos dev
-
-
-# Docker testing (requires DOCKER_USERNAME env var)
-docker-compose up
-
-
-# Deploy to Phala TEE (secure trading)
-export DOCKER_USERNAME=your-dockerhub-username
-./deploy-phala.sh
-```
 
 
 ## Contributing
@@ -136,11 +148,20 @@ We welcome contributions to Pamela! This is an active open-source project focuse
 5. Open a Pull Request
 
 
+## Customization & Forking
+
+This repository is designed to be forked and customized for your own trading agent:
+
+1. **Read the Forking Guide**: See [FORKING.md](FORKING.md) for detailed instructions
+2. **Customize Character**: Edit `src/character.ts` with your agent's personality
+3. **Configure Strategy**: Adjust trading parameters in `.env`
+4. **Deploy Your Agent**: Use the same deployment methods with your configuration
+
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/theSchein/pamela/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/theSchein/pamela/discussions)
-- **Questions**: Email me at ben@spmc.dev
+- **Documentation**: Check `/docs` folder for guides
 
 
 ---
