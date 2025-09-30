@@ -23,13 +23,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/pamela"
+    "url": "https://github.com/theSchein/pamela"
   },
   "license": "MIT",
-  "author": "Pamela Contributors",
-  "homepage": "https://github.com/your-org/pamela#readme",
+  "author": "Pamela Trading Agent Contributors",
+  "homepage": "https://github.com/theSchein/pamela#readme",
   "bugs": {
-    "url": "https://github.com/your-org/pamela/issues"
+    "url": "https://github.com/theSchein/pamela/issues"
   },
   "workspaces": [
     "web",
