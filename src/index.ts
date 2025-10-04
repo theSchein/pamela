@@ -3,14 +3,20 @@ import {
   type IAgentRuntime,
   type Project,
   type ProjectAgent,
+  type Character,
 } from "@elizaos/core";
 import bootstrapPlugin from "@elizaos/plugin-bootstrap";
 import starterPlugin from "./plugin.ts";
 import polymarketPlugin from "@theschein/plugin-polymarket";
-import { character } from "./character.ts";
+import { loadCharacter, validateCharacter } from "./utils/character-loader.ts";
 import { getNewsService } from "./services/news";
 import { RedemptionService } from "./services/redemption-service";
 import { IndexTradingService } from "./services/IndexTradingService";
+import { InvestmentFundService } from "./services/InvestmentFundService";
+
+// Load character dynamically based on AGENT_CHARACTER env var
+const character = await loadCharacter();
+validateCharacter(character);
 
 // Conditionally import Discord plugin if configured
 let discordPlugin: any = null;
@@ -63,6 +69,18 @@ const initCharacter = async ({ runtime }: { runtime: IAgentRuntime }) => {
       logger.warn("Failed to start index trading service:", error);
     }
   }
+
+  // Start investment fund service if configured
+  if (process.env.INVESTMENT_FUND_ENABLED === 'true') {
+    try {
+      const fundService = InvestmentFundService.fromEnvironment();
+      await fundService.initialize(runtime);
+      await fundService.start();
+      logger.info("Investment fund service started successfully");
+    } catch (error) {
+      logger.warn("Failed to start investment fund service:", error);
+    }
+  }
 };
 
 export const projectAgent: ProjectAgent = {
@@ -92,7 +110,7 @@ const project: Project = {
   agents: [projectAgent],
 };
 
-// Export character
-export { character } from "./character.ts";
+// Export the loaded character
+export { character };
 
 export default project;
