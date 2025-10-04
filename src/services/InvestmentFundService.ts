@@ -23,7 +23,7 @@
  * - Handles fund returns when trading completes
  */
 
-import { elizaLogger, IAgentRuntime, Service } from "@elizaos/core";
+import { elizaLogger, IAgentRuntime, Service, type Metadata } from "@elizaos/core";
 import { ethers } from "ethers";
 
 export interface InvestmentFundConfig {
@@ -50,8 +50,8 @@ export interface FundState {
 }
 
 export class InvestmentFundService extends Service {
-  private runtime: IAgentRuntime | null = null;
-  private config: InvestmentFundConfig;
+  runtime: IAgentRuntime = null as any;
+  config: InvestmentFundConfig & Metadata;
   private provider: ethers.JsonRpcProvider | null = null;
   private fundContract: ethers.Contract | null = null;
   private usdcContract: ethers.Contract | null = null;
@@ -94,7 +94,7 @@ export class InvestmentFundService extends Service {
 
   constructor(config: InvestmentFundConfig) {
     super();
-    this.config = config;
+    this.config = config as InvestmentFundConfig & Metadata;
   }
 
   async initialize(runtime: IAgentRuntime): Promise<void> {
@@ -364,7 +364,7 @@ export class InvestmentFundService extends Service {
     } catch (error) {
       // Only log if it's not an expected error during testing
       if (error instanceof Error && !error.message.includes("Failed to get")) {
-        elizaLogger.error("Failed to calculate portfolio value:", error);
+        elizaLogger.error("Failed to calculate portfolio value:", error as any);
       }
       return 0;
     }

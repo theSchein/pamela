@@ -49,7 +49,7 @@ RUN mkdir -p /app/.eliza
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV AGENT_CHARACTER={{AGENT_NAME}}
+ENV AGENT_CHARACTER=lib-out
 
 # Other env vars will be set via docker-compose or runtime
 # PGLITE_DATA_DIR will be set via docker-compose or runtime

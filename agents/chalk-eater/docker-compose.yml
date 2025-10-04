@@ -1,0 +1,72 @@
+# Docker Compose Template for Multi-Agent Deployment
+# This file is a template - use scripts/generate-docker-configs.sh to create agent-specific compose files
+
+version: '3.8'
+
+services:
+  chalk-eater:
+    build:
+      context: ../..
+      dockerfile: agents/chalk-eater/Dockerfile
+    image: ${DOCKER_USERNAME:-trading-agents}/chalk-eater:${DOCKER_IMAGE_TAG:-latest}
+    container_name: chalk-eater-agent
+
+    # Load agent-specific environment variables
+    env_file:
+      - .env
+
+    # Override specific env vars for clarity
+    environment:
+      - AGENT_CHARACTER=chalk-eater
+      - PGLITE_DATA_DIR=/app/.eliza/.elizadb-chalk-eater
+      - NODE_ENV=production
+
+    # Port mapping (customize per agent to avoid conflicts)
+    ports:
+      - "3005:3000"
+
+    # Persistent storage for agent database
+    volumes:
+      - agent_chalk-eater_data:/app/.eliza
+      - agent_chalk-eater_logs:/app/logs
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Health check')"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Named volumes for persistence
+volumes:
+  agent_chalk-eater_data:
+    driver: local
+  agent_chalk-eater_logs:
+    driver: local
+
+# Optional: Network configuration for agent communication
+networks:
+  default:
+    name: trading-agents-network
+    driver: bridge

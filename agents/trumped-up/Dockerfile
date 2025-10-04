@@ -41,17 +41,18 @@ COPY --from=builder /app/web ./web
 COPY pamela.json ./
 COPY tsconfig.json ./
 
-# Copy agents directory for agent-specific configs
-COPY --from=builder /app/agents ./agents
+# Agent-specific: Copy character files
+COPY --from=builder /app/src/characters ./src/characters
+COPY --from=builder /app/src/models ./src/models
 
 # Create directory for database (agent-specific path will be set via env var)
 RUN mkdir -p /app/.eliza
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV AGENT_CHARACTER={{AGENT_NAME}}
 
-# Other env vars will be set via docker-compose or runtime
+# AGENT_NAME will be set via docker-compose or runtime
+# AGENT_CHARACTER will be set via docker-compose or runtime
 # PGLITE_DATA_DIR will be set via docker-compose or runtime
 
 # Health check

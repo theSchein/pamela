@@ -11,33 +11,24 @@ import { logger } from "@elizaos/core";
  *   AGENT_CHARACTER=agent1 npm run dev
  *   AGENT_CHARACTER=agent2 npm run dev
  *
- * Character files should be placed in src/characters/<name>.ts
- * If AGENT_CHARACTER is not set, falls back to src/character.ts (legacy)
+ * Agent configs should be placed in agents/<name>/agent-config.json
+ * If AGENT_CHARACTER is not set, falls back to default configuration
  */
 
 /**
- * Dynamically loads a character file from src/characters/ directory
- * @param characterName - Name of the character file (without .ts extension)
- * @returns Character configuration
+ * This function is deprecated - character loading now happens in src/character.ts
+ * which loads agent configs from agents/<name>/agent-config.json
+ * @param characterName - Name of the character (for backwards compatibility)
+ * @returns Character configuration from src/character.ts
  */
 async function loadCharacterFile(characterName: string): Promise<Character> {
-  try {
-    // Try loading from src/characters/ directory
-    const characterModule = await import(`../characters/${characterName}.ts`);
-
-    if (!characterModule.character) {
-      throw new Error(`Character file ${characterName}.ts must export a 'character' object`);
-    }
-
-    logger.info(`Loaded character from src/characters/${characterName}.ts`);
-    return characterModule.character;
-  } catch (error) {
-    logger.error(`Failed to load character from src/characters/${characterName}.ts:`, error);
-    throw new Error(
-      `Could not load character '${characterName}'. ` +
-      `Make sure src/characters/${characterName}.ts exists and exports a character object.`
-    );
+  logger.info(`Loading character configuration for: ${characterName}`);
+  // All character loading now happens through the unified character.ts file
+  const characterModule = await import("../character.ts");
+  if (!characterModule.character) {
+    throw new Error("character.ts must export a 'character' object");
   }
+  return characterModule.character;
 }
 
 /**
@@ -85,7 +76,7 @@ export function validateCharacter(character: Character): void {
 
   // Validate UUID format for id
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(character.id)) {
+  if (character.id && !uuidRegex.test(character.id)) {
     throw new Error(`Character id must be a valid UUID. Got: ${character.id}`);
   }
 
