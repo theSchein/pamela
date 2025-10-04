@@ -53,15 +53,27 @@ function resetDatabase() {
 function detectDatabaseError(data) {
     const errorPatterns = [
         'Aborted(). Build with -sASSERTIONS',
-        'Database connection failed',
-        'Database migration failed',
         'CUSTOM MIGRATOR] Database connection failed',
         'PGLite connection error',
         'RuntimeError: Aborted()',
-        'Failed to run database migrations'
+        // Only match actual failures, not info messages about migrations
+        'Error: Failed to run database migrations',
+        'Fatal: Database connection failed',
+        'Critical: Database migration failed',
+        // Add entity creation errors
+        'Failed to create agent entity',
+        'Failed to create entity for agent'
     ];
     
     const dataStr = data.toString();
+    
+    // Don't treat normal migration messages as errors
+    if (dataStr.includes('Running database migrations') || 
+        dataStr.includes('Checking database migrations') ||
+        dataStr.includes('Database migrations completed')) {
+        return false;
+    }
+    
     return errorPatterns.some(pattern => dataStr.includes(pattern));
 }
 
@@ -124,8 +136,8 @@ function startServer(isDevMode = false) {
             process.stdout.write(data);
             outputBuffer += data.toString();
             
-            // Check for database errors in output
-            if (!errorDetected) {
+            // Check for database errors in output (skip during grace period)
+            if (!errorDetected && !graceperiodActive) {
                 checkForDatabaseError();
             }
         });
@@ -135,13 +147,21 @@ function startServer(isDevMode = false) {
             process.stderr.write(data);
             outputBuffer += data.toString();
             
-            // Check for database errors in output
-            if (!errorDetected) {
+            // Check for database errors in output (skip during grace period)
+            if (!errorDetected && !graceperiodActive) {
                 checkForDatabaseError();
             }
         });
 
-        // Set a timeout to check for errors in the first 30 seconds
+        // Set a longer initial grace period for database initialization
+        // Don't check for errors in the first 5 seconds to allow normal startup
+        let graceperiodActive = true;
+        setTimeout(() => {
+            graceperiodActive = false;
+            log('👀 Now monitoring for database errors...', 'cyan');
+        }, 5000);
+        
+        // Set a timeout to check for errors after initial startup
         errorCheckTimeout = setTimeout(() => {
             if (!errorDetected) {
                 log('\n✅ Server started successfully', 'green');

@@ -53,12 +53,12 @@ import { TradingConfig } from "../../config/trading-config.js";
 import { getMarketsToMonitor } from "../../config/hardcoded-markets.js";
 import { initializeClobClient } from "@theschein/plugin-polymarket";
 
-import { MarketScanner } from "./market-scanner.js";
 import { OpportunityEvaluator } from "./opportunity-evaluator.js";
 import { TradeExecutor } from "./trade-executor.js";
 import { PositionManager } from "./position-manager.js";
 import { BalanceManager } from "./balance-manager.js";
-import { TradingDecision } from "./types.js";
+import { TradingDecision, MarketOpportunity } from "./types.js";
+import { StrategyFactory, IStrategy } from "./strategies/index.js";
 
 export class AutonomousTradingService extends Service {
   private tradingConfig: TradingConfig;
@@ -69,11 +69,12 @@ export class AutonomousTradingService extends Service {
   private clobClient: any = null;
 
   // Modular components
-  private marketScanner: MarketScanner | null = null;
   private opportunityEvaluator: OpportunityEvaluator | null = null;
   private tradeExecutor: TradeExecutor | null = null;
   private positionManager: PositionManager | null = null;
   private balanceManager: BalanceManager | null = null;
+  private strategyFactory: StrategyFactory | null = null;
+  private strategies: IStrategy[] = [];
 
   private static instance: AutonomousTradingService | null = null;
 
@@ -147,7 +148,7 @@ export class AutonomousTradingService extends Service {
     }
 
     // Initialize modular components
-    this.initializeComponents(runtime);
+    await this.initializeComponents(runtime);
 
     // Check initial balance
     await this.balanceManager?.logInitialBalance();
@@ -172,14 +173,33 @@ export class AutonomousTradingService extends Service {
     this.startAutonomousTrading();
   }
 
-  private initializeComponents(runtime: IAgentRuntime): void {
+  private async initializeComponents(runtime: IAgentRuntime): Promise<void> {
     // Initialize position manager first as it's needed by scanner
     this.positionManager = new PositionManager(runtime);
     
+    // Initialize strategy factory and create strategies
+    this.strategyFactory = new StrategyFactory();
+    this.strategies = await this.strategyFactory.createStrategies();
+    
+    if (this.strategies.length > 0) {
+      elizaLogger.info(`Initialized ${this.strategies.length} trading strategies:`);
+      this.strategies.forEach(s => elizaLogger.info(`  - ${s.name}: ${s.description}`));
+    } else {
+      // Default to SimpleThresholdStrategy if no strategies configured
+      elizaLogger.info("No strategies configured, using default SimpleThresholdStrategy");
+      const { SimpleThresholdStrategy } = await import("./strategies/SimpleThresholdStrategy.js");
+      this.strategies = [new SimpleThresholdStrategy({
+        enabled: true,
+        buyThreshold: 0.3,
+        sellThreshold: 0.7,
+        minEdge: 0.15,
+        useHardcodedMarkets: true,
+        useNewsSignals: true
+      })];
+      elizaLogger.info("Initialized default SimpleThresholdStrategy");
+    }
+    
     // Initialize other components
-    this.marketScanner = new MarketScanner(
-      this.positionManager.getOpenPositions()
-    );
     this.opportunityEvaluator = new OpportunityEvaluator(this.tradingConfig);
     this.tradeExecutor = new TradeExecutor(
       runtime,
@@ -219,11 +239,27 @@ export class AutonomousTradingService extends Service {
         return;
       }
 
-      const opportunities = await this.marketScanner!.findOpportunities();
+      let opportunities: MarketOpportunity[] = [];
+
+      // Use strategies to find opportunities
+      for (const strategy of this.strategies) {
+        if (strategy.isActive()) {
+          const strategyOpportunities = await strategy.findOpportunities(
+            this.positionManager!.getOpenPositions()
+          );
+          opportunities.push(...strategyOpportunities);
+          
+          if (strategyOpportunities.length > 0) {
+            elizaLogger.info(
+              `${strategy.name} found ${strategyOpportunities.length} opportunities`
+            );
+          }
+        }
+      }
 
       if (opportunities.length > 0) {
         elizaLogger.info(
-          `✨ Found ${opportunities.length} trading opportunities!`
+          `✨ Found ${opportunities.length} total trading opportunities!`
         );
         for (const opp of opportunities) {
           elizaLogger.info(
@@ -373,12 +409,20 @@ export class AutonomousTradingService extends Service {
     const positionSummary = this.positionManager?.getPositionSummary() || "No positions";
     const balanceStatus = this.balanceManager?.getBalanceStatus() || "Balance unknown";
     
+    let strategyStatus = "";
+    if (this.strategies.length > 0) {
+      strategyStatus = "\n\n📊 Active Strategies:\n";
+      this.strategies.forEach(s => {
+        strategyStatus += `- ${s.name}: ${s.isActive() ? "✅ Active" : "❌ Inactive"}\n`;
+      });
+    }
+    
     return `
 🤖 Autonomous Trading Service Status:
 - Service: ${this.isRunning ? "✅ Running" : "❌ Stopped"}
 - Mode: ${this.tradingConfig.unsupervisedMode ? "🚨 Unsupervised (Live Trading)" : "👁️ Monitoring Only"}
 - Daily Trades: ${this.dailyTradeCount}/${this.tradingConfig.maxDailyTrades}
-
+${strategyStatus}
 ${positionSummary}
 
 ${balanceStatus}

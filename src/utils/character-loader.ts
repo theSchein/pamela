@@ -16,14 +16,25 @@ import { logger } from "@elizaos/core";
  */
 
 /**
- * This function is deprecated - character loading now happens in src/character.ts
- * which loads agent configs from agents/<name>/agent-config.json
- * @param characterName - Name of the character (for backwards compatibility)
- * @returns Character configuration from src/character.ts
+ * Loads character configuration based on character name
+ * @param characterName - Name of the character
+ * @returns Character configuration
  */
 async function loadCharacterFile(characterName: string): Promise<Character> {
   logger.info(`Loading character configuration for: ${characterName}`);
-  // All character loading now happens through the unified character.ts file
+  
+  // Try to load specific character file first
+  try {
+    const characterModule = await import(`../character-${characterName}.ts`);
+    if (characterModule.character) {
+      logger.info(`Loaded specific character file for: ${characterName}`);
+      return characterModule.character;
+    }
+  } catch (error) {
+    logger.info(`No specific character file found for ${characterName}, using default`);
+  }
+  
+  // Fall back to default character.ts
   const characterModule = await import("../character.ts");
   if (!characterModule.character) {
     throw new Error("character.ts must export a 'character' object");
