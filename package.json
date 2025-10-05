@@ -79,7 +79,7 @@
     "@elizaos/plugin-web-search": "^0.25.6-alpha.1",
     "@polymarket/clob-client": "^4.16.0",
     "@polymarket/sdk": "^6.0.0",
-    "@theschein/plugin-polymarket": "^0.2.0",
+    "@theschein/plugin-polymarket": "^0.3.0",
     "drizzle-orm": "^0.44.5",
     "ethers": "^6.13.1",
     "node-fetch": "^3.0.0",
