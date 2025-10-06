@@ -12,7 +12,7 @@ function loadAgentConfig() {
   try {
     const configData = fs.readFileSync(configPath, "utf-8");
     const config = JSON.parse(configData);
-    console.log(`Loaded agent configuration for: ${config.name}`);
+    console.log(`Loaded agent configuration for: ${config.name} from ${configPath}`);
     return config;
   } catch (error) {
     console.warn(`Failed to load agent config from ${configPath}, using defaults`);

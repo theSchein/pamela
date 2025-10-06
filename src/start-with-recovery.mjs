@@ -4,11 +4,26 @@ import { spawn } from 'child_process';
 import { existsSync, rmSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const DB_DIR = join(__dirname, '../.eliza/.elizadb');
+// Load agent-specific environment if AGENT_CHARACTER is set
+const AGENT_CHARACTER = process.env.AGENT_CHARACTER;
+if (AGENT_CHARACTER) {
+    const agentEnvPath = join(__dirname, `../agents/${AGENT_CHARACTER}/.env`);
+    if (existsSync(agentEnvPath)) {
+        console.log(`Loading agent-specific environment from agents/${AGENT_CHARACTER}/.env`);
+        dotenv.config({ path: agentEnvPath, override: true });
+    } else {
+        console.warn(`Warning: AGENT_CHARACTER=${AGENT_CHARACTER} specified but no .env found at ${agentEnvPath}`);
+    }
+}
+
+// Support per-agent database directories
+const DB_SUFFIX = AGENT_CHARACTER ? `-${AGENT_CHARACTER}` : '';
+const DB_DIR = join(__dirname, `../.eliza/.elizadb${DB_SUFFIX}`);
 const ELIZA_DIR = join(__dirname, '../.eliza');
 const MAX_RETRIES = 3;
 let retryCount = 0;
@@ -233,8 +248,11 @@ function startServer(isDevMode = false) {
 async function main() {
     const isDevMode = process.argv.includes('--dev') || process.argv.includes('dev');
     
+    const agentName = process.env.AGENT_NAME || 'Pamela';
+    const agentDisplay = AGENT_CHARACTER ? `${agentName} (${AGENT_CHARACTER})` : agentName;
+    
     log('═══════════════════════════════════════════════════════', 'magenta');
-    log('  🤖 Pamela Trading Agent - Startup with Recovery', 'magenta');
+    log(`  🤖 ${agentDisplay} Trading Agent - Startup with Recovery`, 'magenta');
     log('═══════════════════════════════════════════════════════', 'magenta');
     log(`Database: ${DB_DIR}`, 'cyan');
     log('Recovery: Automatic on database errors', 'cyan');
