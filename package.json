@@ -83,6 +83,7 @@
     "@theschein/plugin-polymarket": "^0.3.0",
     "drizzle-orm": "^0.44.5",
     "ethers": "^6.13.1",
+    "express": "^5.1.0",
     "node-fetch": "^3.0.0",
     "ws": "^8.17.0",
     "zod": "^3.25.76"
