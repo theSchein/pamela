@@ -1,0 +1,72 @@
+# Docker Compose Template for Multi-Agent Deployment
+# This file is a template - use scripts/generate-docker-configs.sh to create agent-specific compose files
+
+version: '3.8'
+
+services:
+  trumped-up:
+    build:
+      context: ../..
+      dockerfile: agents/trumped-up/Dockerfile
+    image: ${DOCKER_USERNAME:-trading-agents}/trumped-up:${DOCKER_IMAGE_TAG:-latest}
+    container_name: trumped-up-agent
+
+    # Load agent-specific environment variables
+    env_file:
+      - .env
+
+    # Override specific env vars for clarity
+    environment:
+      - AGENT_CHARACTER=trumped-up
+      - PGLITE_DATA_DIR=/app/.eliza/.elizadb-trumped-up
+      - NODE_ENV=production
+
+    # Port mapping (customize per agent to avoid conflicts)
+    ports:
+      - "3002:3000"
+
+    # Persistent storage for agent database
+    volumes:
+      - agent_trumped-up_data:/app/.eliza
+      - agent_trumped-up_logs:/app/logs
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Health check')"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Named volumes for persistence
+volumes:
+  agent_trumped-up_data:
+    driver: local
+  agent_trumped-up_logs:
+    driver: local
+
+# Optional: Network configuration for agent communication
+networks:
+  default:
+    name: trading-agents-network
+    driver: bridge

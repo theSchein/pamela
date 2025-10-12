@@ -55,7 +55,13 @@
     "generate-wallet": "node scripts/generate-wallet.js",
     "wallet:new": "node scripts/generate-wallet.js",
     "wallet:manage": "node scripts/manage-wallets.js",
-    "wallets": "node scripts/manage-wallets.js"
+    "wallets": "node scripts/manage-wallets.js",
+    "agent:setup": "./scripts/setup-agent-monorepo.sh",
+    "agent:run": "./scripts/run-agent.sh",
+    "agent:docker": "./scripts/generate-docker-configs.sh",
+    "agent:logs": "./scripts/logs-agent.sh",
+    "deploy:all": "./scripts/deploy-all.sh",
+    "deploy:stop": "./scripts/stop-all.sh"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.8",
@@ -77,6 +83,7 @@
     "@theschein/plugin-polymarket": "^0.3.0",
     "drizzle-orm": "^0.44.5",
     "ethers": "^6.13.1",
+    "express": "^5.1.0",
     "node-fetch": "^3.0.0",
     "ws": "^8.17.0",
     "zod": "^3.25.76"

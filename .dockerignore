@@ -52,3 +52,10 @@ docker-compose*.yml
 # Temporary files
 tmp/
 temp/
+
+# Legacy agent configs (being phased out for git tag deployment)
+agents/
+
+# Web dashboard (separate deployment)
+web/
+shared/

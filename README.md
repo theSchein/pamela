@@ -98,6 +98,11 @@ cp .env.example .env
 ### Running Pamela
 
 ```bash
+# For first-time setup with a fresh database (ElizaOS 1.6.1 requirement)
+# This creates the agent record in the database before starting
+export AGENT_CHARACTER=pamela  # or your agent name
+node scripts/setup-agent-db.mjs
+
 # Development mode
 npm run dev
 
@@ -106,6 +111,11 @@ npm start
 
 # With web dashboard
 npm run dev:all  # Runs both agent and web dashboard
+
+# For multi-agent monorepo setup
+export AGENT_CHARACTER=lib-out  # Set which agent to run
+node scripts/setup-agent-db.mjs  # One-time setup for this agent
+npm run dev
 ```
 
 ### Docker & TEE Deployment

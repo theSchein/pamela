@@ -3,14 +3,23 @@ import {
   type IAgentRuntime,
   type Project,
   type ProjectAgent,
+  type Character,
 } from "@elizaos/core";
+// @ts-ignore - Plugin may not have type definitions
 import bootstrapPlugin from "@elizaos/plugin-bootstrap";
 import starterPlugin from "./plugin.ts";
 import polymarketPlugin from "@theschein/plugin-polymarket";
-import { character } from "./character.ts";
 import { getNewsService } from "./services/news";
 import { RedemptionService } from "./services/redemption-service";
 import { IndexTradingService } from "./services/IndexTradingService";
+import { InvestmentFundService } from "./services/InvestmentFundService";
+
+// Import character (loaded and validated in character.ts)
+import { character } from "./character.js";
+
+// Import API server and wallet manager for SPMC integration
+import { startApiServer } from "./api/server.js";
+import { initializeWalletManager } from "./wallet/wallet-manager.js";
 
 // Conditionally import Discord plugin if configured
 let discordPlugin: any = null;
@@ -24,6 +33,28 @@ if (process.env.DISCORD_API_TOKEN) {
       "Failed to load Discord plugin - make sure @elizaos/plugin-discord is installed",
     );
   }
+}
+
+// Initialize wallet manager and API server before ElizaOS runtime
+logger.info("Initializing SPMC integration...");
+
+// Initialize wallet manager (required for /wallet endpoint)
+try {
+  await initializeWalletManager();
+  logger.info("✓ Wallet manager initialized");
+} catch (error) {
+  logger.error("✗ Failed to initialize wallet manager:", error);
+  throw error;
+}
+
+// Start API server on port 8080 (required for SPMC)
+const apiPort = parseInt(process.env.API_PORT || "8080", 10);
+try {
+  await startApiServer(apiPort);
+  logger.info("✓ API server started successfully");
+} catch (error) {
+  logger.error("✗ Failed to start API server:", error);
+  throw error;
 }
 
 // Additional plugins can be imported here as needed
@@ -63,6 +94,18 @@ const initCharacter = async ({ runtime }: { runtime: IAgentRuntime }) => {
       logger.warn("Failed to start index trading service:", error);
     }
   }
+
+  // Start investment fund service if configured
+  if (process.env.INVESTMENT_FUND_ENABLED === 'true') {
+    try {
+      const fundService = InvestmentFundService.fromEnvironment();
+      await fundService.initialize(runtime);
+      await fundService.start();
+      logger.info("Investment fund service started successfully");
+    } catch (error) {
+      logger.warn("Failed to start investment fund service:", error);
+    }
+  }
 };
 
 export const projectAgent: ProjectAgent = {
@@ -92,7 +135,7 @@ const project: Project = {
   agents: [projectAgent],
 };
 
-// Export character
-export { character } from "./character.ts";
+// Export the loaded character
+export { character };
 
 export default project;
